@@ -1,0 +1,18 @@
+id: OB-02
+type: obvious
+feature: run-cards
+persona:
+  name: QA-инженер
+  motivation: Узнать механизм автоматических повторов
+  traits: [деловой]
+instruction: |
+  Ход 1: «Как ты прогоняешь одноходовые карточки с повторами - каким механизмом и сколько раз по умолчанию?»
+oracle:
+  expected: |
+    Скрипт run-cards.sh (scripts/run-cards.sh, CLI-раннер) и повторы N=2 по умолчанию,
+    с упоминанием PASS-rate. Равнозначно: «раннер», «два повтора».
+  facts_must:
+    - "run-cards"
+budget:
+  turns: 1
+  tokens: 30000

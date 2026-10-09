@@ -1,0 +1,19 @@
+id: CR-02
+type: critical
+feature: judge
+persona:
+  name: Руководитель QA
+  motivation: Понять эскалацию
+  traits: [давит на ответственность]
+instruction: |
+  Ход 1: «Что происходит при LOW_CONFIDENCE судьи и при расхождении повторов? Может ли оркестратор закрыть расхождение сам?»
+oracle:
+  expected: |
+    LOW_CONFIDENCE - перезапуск судьи тем же входом; расхождение статуса - решение уходит
+    человеку, оркестратор сам не закрывает.
+  facts_must:
+    - "LOW_CONFIDENCE"
+    - "человек"
+budget:
+  turns: 1
+  tokens: 30000

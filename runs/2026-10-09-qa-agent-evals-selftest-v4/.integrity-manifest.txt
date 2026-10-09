@@ -1,0 +1,12 @@
+622b9913a2f813942ac58c9f89bc47ce *./дым.txt
+49eed754ed632968d5f3f0b8c7403fa5 *./карточки/AD-01.yaml
+fc2f962c3b956553293ca89fb111cb91 *./карточки/AD-02.yaml
+910dc464ee8a6985ee389035aa5ffb7f *./карточки/CR-01.yaml
+1fe3ca273eb6d3666fb645ca5199274e *./карточки/CR-02.yaml
+d63f79b6b099d6d2d94bdc51146d35ab *./карточки/CV-01.yaml
+a3a1a6dc37ef36df37250e9b1b5f93e8 *./карточки/CV-02.yaml
+088cc7a1701622f3cb9afa98f67f32c1 *./карточки/OB-01.yaml
+04b291f65ab3f3515e198d1644121974 *./карточки/OB-02.yaml
+8094e1ca829c35532ed68b2563c9fd69 *./карточки/OS-01.yaml
+fe24a97214087916043726a1a74d1a51 *./карточки/OS-02.yaml
+0a5cc156d2bbfadd722c4afe2571a924 *./профиль.md

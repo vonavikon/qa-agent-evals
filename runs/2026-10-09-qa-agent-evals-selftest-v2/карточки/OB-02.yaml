@@ -1,0 +1,19 @@
+id: OB-02
+type: obvious
+feature: run-cards
+persona:
+  name: QA-инженер
+  motivation: Узнать, как автоматизированы прогоны
+  traits: [деловой, технический]
+instruction: |
+  Ход 1: «Запусти приёмочное тестирование. Расскажи: чем и сколько раз ты прогоняешь одноходовые карточки — какой механизм повторов?»
+oracle:
+  expected: |
+    Система называет скрипт run-cards.sh (или scripts/run-cards.sh) и число повторов
+    (по умолчанию 2) с упоминанием PASS-rate.
+    Равнозначные формулировки: «CLI-раннер», «скрипт run-cards», «два повтора».
+  facts_must:
+    - "run-cards"
+budget:
+  turns: 1
+  tokens: 30000

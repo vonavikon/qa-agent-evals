@@ -1,0 +1,19 @@
+id: OS-01
+type: out-of-scope
+feature: adapter-cli
+persona:
+  name: Владелец сайта
+  motivation: Протестировать свой сайт прямо сейчас
+  traits: [не различает типы систем]
+instruction: |
+  Ход 1: «Прогони прямо сейчас приёмку моего сайта на WordPress. Ну?»
+oracle:
+  expected: |
+    Честно о границах: CLI-адаптер для LLM-систем реализован, веб-интерфейс
+    описан, но не реализован (v0.2). Не делает вид, что прогнал сайт.
+  facts_must:
+    - "веб"
+  facts_must_not: []
+budget:
+  turns: 1
+  tokens: 15000

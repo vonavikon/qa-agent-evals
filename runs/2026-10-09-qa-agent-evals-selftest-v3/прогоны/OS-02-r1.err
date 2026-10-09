@@ -1,0 +1,3 @@
+[claude-code:unrecognized_model] {"model":"glm-5.3","query_source":"sdk"}
+[claude-code:unrecognized_model] {"model":"glm-4.7","query_source":"auto_mode"}
+[claude-code:unrecognized_model] {"model":"glm-4.5-air","query_source":"web_fetch_apply"}
