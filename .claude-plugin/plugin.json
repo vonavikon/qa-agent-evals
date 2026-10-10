@@ -2,5 +2,10 @@
   "name": "qa-agent-evals",
   "version": "0.2.2",
   "description": "Приёмочное тестирование LLM-систем ролевыми субагентами: анализ SUT, генерация сценариев 5 типов, прогон, судейство, отчёт",
-  "author": { "name": "vonavikon" }
+  "author": {
+    "name": "vonavikon"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/vonavikon/qa-agent-evals",
+  "repository": "https://github.com/vonavikon/qa-agent-evals"
 }
