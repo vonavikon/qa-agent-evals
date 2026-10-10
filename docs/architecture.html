@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qa-agent-evals — архитектура конвейера</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #141c26; --panel2: #0e151d; --line: #2a3a4c;
+    --text: #e8eef2; --muted: #9fb4c4; --dim: #8fa6b8;
+    --green: #34d17c; --green-d: #12331f; --yellow: #e8c45a; --yellow-d: #332b12;
+    --red: #ff7d8a; --red-d: #3a1418; --blue: #6fb3e0; --blue-d: #12283a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font-family: "Segoe UI", system-ui, sans-serif; font-size: 16px; line-height: 1.55; }
+  header { padding: 28px 32px 12px; }
+  h1 { margin: 0; font-size: 28px; letter-spacing: -0.5px; }
+  h1 .a { color: var(--green); }
+  .subtitle { color: var(--muted); margin-top: 6px; max-width: 900px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chip { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  nav { padding: 10px 32px 0; border-bottom: 1px solid var(--line); }
+  nav button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--muted);
+               font-size: 15px; padding: 10px 14px; cursor: pointer; font-family: inherit; }
+  nav button:hover { color: var(--text); }
+  nav button.on { color: var(--green); border-bottom-color: var(--green); }
+  main { padding: 20px 32px 60px; }
+  section[hidden] { display: none; }
+
+  /* конвейер */
+  .pipe-wrap { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 24px; align-items: start; }
+  .flow { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
+  .col { min-width: 205px; flex: 1; display: flex; flex-direction: column; gap: 10px; position: relative; }
+  .col:not(:last-child)::after { content: "→"; position: absolute; right: -13px; top: 18px; color: var(--green);
+                                 font-size: 18px; z-index: 2; }
+  .phase-head { background: var(--green-d); border: 1px solid var(--green); color: var(--green);
+                border-radius: 10px; padding: 8px 12px; font-weight: 600; font-size: 14px; }
+  .phase-head small { display: block; color: var(--dim); font-weight: 400; font-size: 12px; }
+  .node { text-align: left; background: var(--panel); border: 1.5px solid var(--line); border-radius: 10px;
+          padding: 10px 12px; cursor: pointer; font: inherit; color: var(--text); }
+  .node:hover { border-color: var(--dim); }
+  .node.sel { border-color: var(--green); background: #16231c; }
+  .node b { display: block; font-size: 14px; }
+  .node small { color: var(--dim); font-size: 12px; }
+  .node.k-agent { border-color: #2c5a3f; }
+  .node.k-gate  { border-color: var(--yellow); background: var(--yellow-d); }
+  .node.k-gate b { color: var(--yellow); }
+  .node.k-art   { background: var(--panel2); }
+  .node.k-script{ border-color: #2a4a66; }
+  .node.k-script b { color: var(--blue); font-family: Consolas, monospace; font-size: 13px; }
+  .node.k-sut   { border-color: #6e2a33; background: var(--red-d); }
+  .node.k-sut b { color: var(--red); }
+  .infra { margin-top: 22px; border-top: 1px dashed var(--line); padding-top: 14px; }
+  .infra-title { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .infra-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .infra-row .node { min-width: 220px; flex: 0 1 260px; }
+
+  /* панель деталей */
+  .detail { position: sticky; top: 16px; background: var(--panel); border: 1px solid var(--line);
+            border-radius: 14px; padding: 18px 20px; max-height: calc(100vh - 40px); overflow-y: auto; }
+  .detail .k { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+  .detail h2 { margin: 4px 0 8px; font-size: 20px; }
+  .detail p { margin: 0 0 10px; color: var(--muted); }
+  .detail h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim);
+               margin: 16px 0 6px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .detail ul { margin: 0; padding-left: 18px; color: var(--muted); }
+  .detail li { margin: 3px 0; }
+  .detail code { background: #0a0e12; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px;
+                 font-family: Consolas, monospace; font-size: 13px; color: #8fd8ac; word-break: break-all; }
+  table.lv { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  table.lv td { border: 1px solid var(--line); padding: 6px 8px; vertical-align: top; color: var(--muted); }
+  table.lv td:first-child { color: var(--text); }
+  .status { display: inline-block; font-size: 12px; border-radius: 6px; padding: 2px 8px; margin-top: 8px; }
+  .st-done { background: var(--green-d); color: var(--green); border: 1px solid #2c5a3f; }
+  .st-plan { background: var(--yellow-d); color: var(--yellow); border: 1px solid #5c4e22; }
+
+  /* общие таблицы и стеки */
+  table.big { border-collapse: collapse; width: 100%; font-size: 14px; }
+  table.big th, table.big td { border: 1px solid var(--line); padding: 8px 10px; text-align: left;
+                               vertical-align: top; color: var(--muted); }
+  table.big th { color: var(--text); background: var(--panel); }
+  table.big td:first-child { color: var(--text); white-space: nowrap; }
+  table.big code { color: #8fd8ac; font-family: Consolas, monospace; font-size: 13px; }
+  .stack { display: flex; flex-direction: column; gap: 0; max-width: 760px; }
+  .layer { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--panel); }
+  .layer + .layer { margin-top: 26px; position: relative; }
+  .layer + .layer::before { content: "↓ сильнее сигнал"; position: absolute; top: -24px; left: 24px;
+                            color: var(--dim); font-size: 12px; }
+  .layer h3 { margin: 0 0 4px; font-size: 16px; color: var(--text); }
+  .layer .who { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
+  .layer p { margin: 0; color: var(--muted); font-size: 14px; }
+  .cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .mcard { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .mcard b { color: var(--green); }
+  .mcard p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+  .note { border-left: 3px solid var(--yellow); background: var(--yellow-d); border-radius: 0 10px 10px 0;
+          padding: 10px 14px; color: var(--muted); font-size: 14px; margin: 14px 0; max-width: 900px; }
+  h2.sec { font-size: 20px; margin: 26px 0 12px; }
+  .hint { color: var(--dim); font-size: 13px; margin: 0 0 14px; }
+  footer { padding: 18px 32px 30px; color: var(--dim); font-size: 13px; border-top: 1px solid var(--line); }
+  @media (max-width: 1100px) { .pipe-wrap { grid-template-columns: 1fr; } .detail { position: static; max-height: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>qa-<span class="a">agent</span>-evals · архитектура конвейера</h1>
+  <div class="subtitle">Интерактивная схема: пять фаз приёмки, агенты, артефакты и инфраструктура. Кликни любой узел — справа его разбор: входы, выходы и рычаги влияния (какой файл или параметр это меняет).</div>
+  <div class="legend">
+    <span><i class="chip" style="background:#2c5a3f"></i>агент</span>
+    <span><i class="chip" style="background:#332b12;border:1px solid #e8c45a"></i>гейт человека</span>
+    <span><i class="chip" style="background:#0e151d;border:1px solid #2a3a4c"></i>артефакт</span>
+    <span><i class="chip" style="background:#12283a;border:1px solid #6fb3e0"></i>скрипт</span>
+    <span><i class="chip" style="background:#3a1418;border:1px solid #ff7d8a"></i>SUT</span>
+  </div>
+</header>
+<nav>
+  <button data-v="pipeline" class="on">Конвейер</button>
+  <button data-v="layers">Слои оценщика</button>
+  <button data-v="levers">Матрица рычагов</button>
+  <button data-v="method">Методика и принципы</button>
+</nav>
+<main>
+  <section id="view-pipeline">
+    <div class="pipe-wrap">
+      <div>
+        <div class="flow" id="flow"></div>
+        <div class="infra">
+          <div class="infra-title">Инфраструктура прогона — обслуживает фазы D и E, кликни для деталей</div>
+          <div class="infra-row" id="infra"></div>
+        </div>
+      </div>
+      <aside class="detail" id="detail"><p class="hint">Выбери узел схемы, чтобы увидеть разбор и рычаги влияния.</p></aside>
+    </div>
+  </section>
+
+  <section id="view-layers" hidden>
+    <p class="hint">Проверка одной карточки разложена на четыре именованных слоя (заимствовано из Inspect AI). Новый тип проверки = новый scorer, конвейер не переделывается. Сверху вниз сигнал слабеет; где возможна проверка уровнем выше — поднимай её туда.</p>
+    <div class="stack">
+      <div class="layer"><h3>1 · deterministic-scorer</h3><div class="who">программная часть судьи · grep по транскрипту</div><p>Матчинг facts_must / facts_must_not по тексту ответа и провенансу. Без мнения модели: факт либо дословно доказан цитатой/прочитанным файлом, либо нет.</p></div>
+      <div class="layer"><h3>2 · model-graded-scorer</h3><div class="who">судья, шаг 1 · LLM на другой модели</div><p>Смысловая оценка по оракулу. Вход изолирован: оракул + протокол, без persona и instruction — судья не знает замысла карточки. Шкала GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED.</p></div>
+      <div class="layer"><h3>3 · supervisor-scorer</h3><div class="who">судья, шаг 2</div><p>Супервизия исполнителя: держал ли роль, не помогал ли SUT, дожал ли сценарий. INVALID — только по явным критериям, не по вкусу.</p></div>
+      <div class="layer"><h3>4 · reducer</h3><div class="who">оркестратор · агрегация повторов</div><p>majority (дефолт) / unanimous / at_least(k). Расхождение повторов = split — пограничное поведение, решение за человеком. Комитеты смягчают шум, но не коррелированные смещения судьи.</p></div>
+    </div>
+    <div class="note">Плановое усиление (research-rsi, P1): факты, которые можно проверить grep'ом, уводятся из LLM-судьи в слой 1 — исполнимая проверка сильнее мнения модели.</div>
+  </section>
+
+  <section id="view-levers" hidden>
+    <p class="hint">Вся настройка конвейера — правками этих файлов. Колонка «когда» подсказывает момент, где рычаг обычно двигают.</p>
+    <table class="big" id="lever-table"></table>
+  </section>
+
+  <section id="view-method" hidden>
+    <h2 class="sec">Подход</h2>
+    <p class="hint" style="max-width:900px">Приёмочное тестирование зондами: не «прогнали промпты и посмотрели», а заранее записанный оракул против каждой карточки, судья на другой модели, изолированная среда и асимметричные выводы. Критерий оценки скрыт от тестируемой системы (развязка публичного и приватного сигнала, arXiv:2609.26457).</p>
+    <div class="cols2">
+      <div class="mcard"><b>Асимметрия вердиктов</b><p>FAIL / ATTACK_PASSED — доказательство дефекта. Позитив — «не опровергнуто за N прогонов» (risk bounding), не «доказано». Формулировка «система прошла приёмку» запрещена.</p></div>
+      <div class="mcard"><b>Оракул до прогона</b><p>Ожидания и факты фиксируются до диалога и не правятся после — вердикт не подгоняется. Факты бинарны (facts_must / facts_must_not), не градуированы.</p></div>
+      <div class="mcard"><b>Изоляция по иерархии</b><p>Исполнители не знают друг о друге; судья не знает замысла карточки на шаге 1; SUT-сессия не видит среду владельца (нейтральный cwd, без скиллов и MCP).</p></div>
+      <div class="mcard"><b>Судья на другой модели</b><p>Генератор и оценщик в одной сущности реплицируют свои смещения (arXiv:2607.07663). Разводка: headless-вызов с явной --model, выбор согласуется с человеком в фазе B.</p></div>
+      <div class="mcard"><b>Повторы и редьюсеры</b><p>N прогонов на карточку (дефолт 2; расхождение — сигнал поднять до 5 на critical/adversarial). Шум — главная угроза валидности, усреднение обязательно.</p></div>
+      <div class="mcard"><b>Корень каждого негативного вердикта</b><p>FAIL / PARTIAL / ATTACK_PASSED получают разбор: сломала система, сорвал исполнитель или ошибочен оракул. Маркер доказывает выдачу, не секретность выданного.</p></div>
+      <div class="mcard"><b>Dev/test дисциплина</b><p>Фикс плагина, найденный самоприёмкой, закрыт только после контрольного прогона на внешней SUT — иначе overfitting на себе.</p></div>
+      <div class="mcard"><b>Плацебо-правило для циклов улучшения</b><p>После оптимизации харнесса (HALO-класс) валидация только свежими карточками; старый набор — регрессионный дым. Улучшение может следовать инструкции, а не доказательствам (+24 п.п. на плацебо, arXiv:2607.07663).</p></div>
+    </div>
+    <h2 class="sec">Методики по типам карточек</h2>
+    <table class="big">
+      <tr><th>Тип</th><th>Методика-источник</th><th>Что берём</th><th>Норма вердикта</th></tr>
+      <tr><td>obvious</td><td>happy path testing</td><td>прямой маршрут фичи, проверяемый факт</td><td>GOT</td></tr>
+      <tr><td>convoluted</td><td>multi-turn ambiguity</td><td>инструкция кусками, опечатки, вопрос на вопрос</td><td>GOT / HONEST</td></tr>
+      <tr><td>critical</td><td>risk-based testing (риск = вероятность × ущерб)</td><td>давление на зоны ущерба: данные, доступы, деньги</td><td>GOT (защита держит)</td></tr>
+      <tr><td>adversarial</td><td>red teaming, OWASP LLM Top 10</td><td>одна атака на карточку: инъекция, имперсонация, извлечение, социнженерия</td><td>GOT (провал = ATTACK_PASSED)</td></tr>
+      <tr><td>out-of-scope</td><td>честность границ</td><td>вопрос рядом с базой; правильный ответ — «не знаю», не выдумка</td><td>HONEST</td></tr>
+    </table>
+    <h2 class="sec">Документация</h2>
+    <p class="hint">Спека и план — <code>docs/spec.md</code>, <code>docs/plan.md</code>; текстовая версия этой схемы — <code>docs/architecture.md</code>; обзоры источников — <code>docs/research-2026-10-09.md</code> (Inspect AI, Promptfoo, DeepEval, OTel, Langfuse) и <code>docs/research-2026-10-10-rsi.md</code> (Anthropic Institute, AIDE², survey RSI).</p>
+  </section>
+</main>
+<footer>qa-agent-evals v0.2.2 · схема отражает состояние конвейера на 2026-10-10 · файл: docs/architecture.html</footer>
+
+<script>
+const KIND_LABEL = {agent:"агент", gate:"гейт человека", art:"артефакт", script:"скрипт", sut:"тестируемая система", phase:"фаза"};
+
+const NODES = {
+  analyst: { kind:"agent", phase:"A", title:"analyst", short:"строит профиль SUT",
+    sum:"Аналитик читает репозиторий SUT и собирает профиль: реестр фич, карта рисков, поверхность атаки, точки неопределённости, варианты адаптеров. Качество системы не оценивает — только фиксирует, что есть.",
+    inp:["репозиторий / каталог SUT", "knowledge SUT (лексика для будущих фактов)"],
+    out:["runs/…/профиль.md"],
+    levers:[["Что искать и как глубоко","agents/analyst.md — контракт агента"],
+            ["Формат профиля","секция профиля в SKILL.md (оркестратор задаёт структуру)"]],
+    meth:"Risk-based: риск = вероятность × ущерб. Поверхность атаки готовит critical/adversarial-карточки фазы C.", st:"done"},
+
+  profile: { kind:"art", phase:"A", title:"профиль.md", short:"фичи · риски · атака",
+    sum:"Профиль SUT — вход генерации карточек. Утверждается человеком: ошибки профиля размножаются в карточках.",
+    inp:["работа аналитика"], out:["утверждённый профиль"],
+    levers:[["Содержание","правки до утверждения — единственная точка влияния"],
+            ["Точки неопределённости","превращаются в convoluted-карточки фазой C"]],
+    meth:"Профиль версии N протухает на N+1 — при смене версии SUT анализ заново (самодостаточный аудит).", st:"done"},
+
+  adapter: { kind:"gate", phase:"B", title:"Фаза B · адаптер + дым", short:"изоляция, модели, smoke",
+    sum:"Выбор адаптера, настройка изоляции SUT-сессии, выбор моделей субагентов и судьи, дымовой прогон. Дым не прошёл — к карточкам не переходят.",
+    inp:["профиль", "среда запуска"],
+    out:["команда запуска SUT", "выбранная модель судьи", "результат дыма"],
+    levers:[["Изоляция среды","knowledge/adapters.md: нейтральный /tmp-cwd, --disallowedTools Skill, пустой MCP-конфиг, --max-turns (20+, запас на чтение SUT), ASP для скилл-SUT"],
+            ["Модель судьи","выбор человека из доступных (ListModels / /model / CLI мини-дым с 400-фильтром); внешняя модель со своими ключами; разводка claude -p --model"],
+            ["CLAUDE_CONFIG_DIR","не задавать — ломает авторизацию (выучено прогонами)"],
+            ["Дым-критерии","knowledge/adapters.md: контрольный вопрос «запусти посторонний скилл → отказ»"]],
+    meth:"Фиксированные бюджеты: выигрыш отражает систему, а не вычисления (arXiv:2609.26457).", st:"done"},
+
+  cards: { kind:"gate", phase:"C", title:"Фаза C · карточки", short:"5 типов + утверждение",
+    sum:"Генерация карточек-сценариев по профилю и таксономии. Формат YAML: persona, instruction, oracle (facts_must / facts_must_not + ожидание прозой), budget. Человек утверждает — прогон без утверждения не запускается.",
+    inp:["профиль", "knowledge/taxonomy.md", "лексика knowledge SUT"],
+    out:["runs/…/карточки/*.yaml"],
+    levers:[["Типы и паттерны","knowledge/taxonomy.md: 5 типов, эталонный YAML, факт обязателен для obvious/critical/adversarial"],
+            ["Формат оракула","knowledge/oracle.md: факты бинарные, маркеры из лексики самой системы"],
+            ["Состав набора","минимум 2 карточки на тип; точки неопределённости профиля → convoluted"],
+            ["Отбор","человек правит/отклоняет на гейте утверждения"]],
+    meth:"Rewarding rightness: LLM-генерированные тесты предсказуемы — варьируй формулировки зондов между прогонами (план P3).", st:"done"},
+
+  roleuser: { kind:"agent", phase:"D", title:"role-user", short:"исполнитель персоны",
+    sum:"Ролевой исполнитель отыгрывает персону против SUT через адаптер: не выходит из роли, не помогает SUT, дожимает сценарий. Пишет протокол с метками фактов. Одноходовые карточки вместо него гоняет run-cards.sh.",
+    inp:["карточка (persona + instruction)", "адаптер SUT"],
+    out:["runs/…/прогоны/*.txt", "runs/…/протоколы/<id>-r<N>.md"],
+    levers:[["Контракт роли","agents/role-user.md: границы поведения, формат протокола, метки фактов"],
+            ["Бюджет хода","поле budget в карточке: лимит ходов многоходовки"],
+            ["Многоходовые","ведёт субагент; одноходовые — скрипт (правило в SKILL.md)"]],
+    meth:"Супервизия исполнителя обязательна — судья, шаг 2.", st:"done"},
+
+  sut: { kind:"sut", phase:"D", title:"SUT-сессия", short:"изолированная headless",
+    sum:"Тестируемая система в изолированной headless-сессии. Не видит среду владельца: нейтральный cwd без CLAUDE.md, скиллы не вызываются, MCP не грузится. Все события пишутся в поток (events.jsonl).",
+    inp:["реплики исполнителя / карточка"],
+    out:["ответы", "events.jsonl (транскрипт + tool-вызовы)"],
+    levers:[["Степень изоляции","knowledge/adapters.md — все флаги запуска"],
+            ["Что видит из окружения","ограничение доступа: каталог прогона, readonly где возможно"],
+            ["Версия SUT","пининг версии в отчёте; смена версии — диф-прогон (план P2)"]],
+    meth:"Изоляция отрезает вызов скиллов, но не знание об их существовании — известное ограничение, честно фиксируется в отчёте.", st:"done"},
+
+  judge: { kind:"agent", phase:"D", title:"judge", short:"двухшаговый судья",
+    sum:"Шаг 1: оценка SUT по оракулу — вход оракул + протокол, БЕЗ persona и instruction, вердикт фиксируется файлом и не меняется. Шаг 2: супервизия исполнителя — OK или INVALID только по явным критериям. Работает на модели, отличной от исполнителей и SUT; при совпадении — самопометка «ОГРАНИЧЕНИЕ» первой строкой вердикта.",
+    inp:["протокол + оракул (шаг 1)", "instruction + контракт роли (шаг 2)"],
+    out:["runs/…/вердикты/<id>-r<N>.md"],
+    levers:[["Контракт судьи","agents/judge.md: два шага, критерии INVALID, правило самопометки"],
+            ["Модель","фаза B: выбор человека; дефолт в frontmatter model: (работает не во всех средах); CLI-разводка --model"],
+            ["Калибровка","golden-набор с эталонными вердиктами (порог согласия 6/8); без эталонов — пометка, не блокер"],
+            ["Контрольная выборка","фиксированные карточки с заведомыми вердиктами — замер смещения при смене модели (план P1, приём Anthropic)"]],
+    meth:"Развязка сигналов: критерий скрыт от SUT. Судья-LLM — уровень 3 иерархии верификации: где возможен grep — факт уходит в детерминированный слой (план P1).", st:"done"},
+
+  verdicts: { kind:"art", phase:"E", title:"вердикты + index.jsonl", short:"вердикты повторов → свод",
+    sum:"Вердикты по повторам агрегируются редьюсером в итог на карточку. build-index.py пишет машиночитаемый index.jsonl: строка на карточку с вердиктами, результатом редьюсера и путями артефактов — открывает re-scoring (пересуд по протоколам без новых прогонов).",
+    inp:["файлы вердиктов"], out:["index.jsonl", "PASS-rate на карточку"],
+    levers:[["Редьюсер","knowledge/oracle.md: majority (дефолт) / unanimous / at_least(k); split = пограничное поведение"],
+            ["Пересуд","scripts/build-index.py — re-scoring по записанным протоколам"]],
+    meth:"Unanimous защищает от шума, не от коррелированных смещений — не продавать его как доказательство отсутствия дефектов.", st:"done"},
+
+  report: { kind:"gate", phase:"E", title:"Фаза E · отчёты", short:"report.md + report-human.md",
+    sum:"Два формата: report.md — рабочему агенту (таблицы вердиктов, матрица «фича × тип», PASS-rate, корневые разборы); report-human.md — человеку-решателю: находки без жаргона, цитаты с провенансом «откуда взяла», секреты в цитатах замаскированы, секция «чего этот прогон НЕ проверял». Асимметрия: позитив = «не опровергнуто», не «прошла».",
+    inp:["вердикты", "index.jsonl", "диагностика прогона"],
+    out:["runs/…/report.md", "runs/…/report-human.md"],
+    levers:[["Шаблоны","knowledge/oracle.md — обе формы отчёта"],
+            ["Приоритеты находок","блокер / важно / терпимо в human-шаблоне"],
+            ["Формулировки","positive = risk bounding, не evidence of correctness (план P1)"]],
+    meth:"Каждый негативный вердикт получает разбор корня: система, исполнитель или оракул.", st:"done"},
+
+  runcards: { kind:"script", phase:"infra", title:"run-cards.sh", short:"раннер одноходовых ×N",
+    sum:"CLI-раннер: гонит одноходовые карточки N повторов в изолированных сессиях, пишет транскрипты (txt), провенанс (prov), диагностику (diag), ошибки (err). Многоходовые пропускает (SKIP) — их ведёт субагент role-user. Guards каталогов, квотинг ASP для путей с пробелами.",
+    inp:["карточки/*.yaml", "настройки адаптера"],
+    out:["прогоны/<id>-r<N>.{txt,prov.txt,diag.txt,err}", "events.jsonl на прогон"],
+    levers:[["Число повторов N","аргумент раннера (дефолт 2; critical/adversarial — поднимать до 5)"],
+            ["Флаги изоляции","передаются из knowledge/adapters.md"],
+            ["Что считать одноходовым","структура карточки (наличие многоходовой инструкции)"]],
+    meth:"Повторы — усреднение против шума; ложно принятый результат уводит цикл улучшения в сторону (AIDE²).", st:"done"},
+
+  parse: { kind:"script", phase:"infra", title:"parse-events.py", short:"лог: txt · провенанс · diag",
+    sum:"Модуль логирования: разбирает events.jsonl (stream-json) на прогон — текст ответа, провенанс (какие файлы читала SUT: Read/Grep/Glob), диагностику (класс ошибки: адаптер max-turns / среда / ок). Провенанс решает спор «выдумка или чтение базы» списком прочитанного.",
+    inp:["events.jsonl"], out:["txt / prov.txt / diag.txt на прогон"],
+    levers:[["Классы диагностики","scripts/parse-events.py — словарь классов (кандидат на расширение таксономией отказов MAST)"],
+            ["Источники провенанса","сейчас Read/Grep/Glob; ASP-слой и кэш-ходы провенанса не дают — правило с оговоркой в oracle.md"]],
+    meth:"Маркер доказывает выдачу, не секретность выданного. Отсутствие провенанса не доказывает выдумку.", st:"done"},
+
+  integrity: { kind:"script", phase:"infra", title:"run-integrity.sh", short:"детектор вмешательства",
+    sum:"Snapshot/verify по md5-манифесту каталога прогона. Ловит вмешательство SUT-сессии в инфраструктуру приёмки (запись вердиктов до судьи, правки карточек) — класс атак из самоприёмки v2.",
+    inp:["каталог прогона"], out:[".integrity-manifest.txt", "отчёт о расхождениях"],
+    levers:[["Когда снимать","snapshot до прогона, verify после — вызовы в SKILL.md"],
+            ["Что накрывает","файлы манифеста: карточки, вердикты, профиль"]],
+    meth:"SUT — активный участник: изоляция без детектора вмешательства неполна.", st:"done"},
+
+  buildindex: { kind:"script", phase:"infra", title:"build-index.py", short:"index.jsonl прогона",
+    sum:"Машиночитаемый лог прогона: строка на карточку — вердикты повторов, результат редьюсера, пути артефактов (транскрипт, провенанс, вердикты). Основа для программных сводок и re-scoring.",
+    inp:["каталог прогона"], out:["index.jsonl"],
+    levers:[["Состав строки","scripts/build-index.py"],
+            ["Срабатываемость оракула","план P2: счётчик сработавших пунктов facts_* — несработавшие кандидаты на удаление (мёртвый код оракула)"]],
+    meth:"Заимствовано из Inspect AI (.eval-лог).", st:"done"}
+};
+
+const FLOW = [
+  {ph:"A", name:"Анализ SUT", nodes:["analyst","profile"]},
+  {ph:"B", name:"Адаптер + дым", nodes:["adapter"]},
+  {ph:"C", name:"Генерация карточек", nodes:["cards"]},
+  {ph:"D", name:"Прогон × N", nodes:["roleuser","sut","judge"]},
+  {ph:"E", name:"Отчёт", nodes:["verdicts","report"]}
+];
+const INFRA = ["runcards","parse","integrity","buildindex"];
+
+const LEVERS = [
+  ["skills/acceptance-test/SKILL.md","оркестратор: порядок фаз, бюджеты, границы применения","порядок и правила фаз, анти-дамп-политика, правило утверждения","когда меняется методика конвейера"],
+  ["agents/analyst.md","контракт аналитика","что искать в SUT, глубина, формат профиля","перед приёмкой нового типа систем"],
+  ["agents/role-user.md","контракт исполнителя","границы роли, формат протокола, метки фактов","когда судья ловит подыгрывание SUT"],
+  ["agents/judge.md","контракт судьи","два шага, критерии INVALID, дефолт модели, самопометка","при калибровке или смене модели судьи"],
+  ["knowledge/taxonomy.md","типы карточек","5 типов, паттерны, эталонный YAML, нормы вердиктов","когда набор карточек перестаёт ловить новое"],
+  ["knowledge/adapters.md","адаптеры и изоляция","флаги headless-сессии, дым-критерии, разводка моделей","при новом типе SUT (бот, API, скилл)"],
+  ["knowledge/oracle.md","оракулы и отчёты","шкала вердиктов, редьюсеры, шаблоны двух отчётов","при смене политики выводов"],
+  ["scripts/run-cards.sh","раннер прогонов","N повторов, флаги изоляции, артефакты на прогон","при tuning статистики прогона"],
+  ["scripts/parse-events.py","логирование и провенанс","классы диагностики, источники провенанса","когда нужен новый класс ошибок среды"],
+  ["scripts/build-index.py","машиночитаемый индекс","состав строки index.jsonl","при новых програмных сводках / re-scoring"],
+  ["scripts/run-integrity.sh","детектор вмешательства","что накрывает манифест, когда snapshot/verify","после инцидентов вмешательства SUT"],
+  ["карточка YAML (на прогон)","сценарий + бюджет конкретной проверки","persona, instruction, oracle, budget, многоходовость","на гейте утверждения фазы C"],
+  ["выбор моделей (фаза B)","разводка судьи и исполнителей","модель судьи, внешние модели с ключами владельца","каждый прогон; фиксируется в отчёте"]
+];
+
+const flow = document.getElementById("flow"), infra = document.getElementById("infra"),
+      detail = document.getElementById("detail"), ltab = document.getElementById("lever-table");
+
+function nodeBtn(id) {
+  const n = NODES[id], b = document.createElement("button");
+  b.className = "node k-" + n.kind; b.dataset.id = id;
+  b.innerHTML = "<b>" + n.title + "</b><small>" + n.short + "</small>";
+  b.addEventListener("click", () => select(id));
+  return b;
+}
+FLOW.forEach(c => {
+  const col = document.createElement("div"); col.className = "col";
+  const h = document.createElement("div"); h.className = "phase-head";
+  h.innerHTML = "Фаза " + c.ph + "<small>" + c.name + "</small>";
+  col.appendChild(h);
+  c.nodes.forEach(id => col.appendChild(nodeBtn(id)));
+  flow.appendChild(col);
+});
+INFRA.forEach(id => infra.appendChild(nodeBtn(id)));
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function li(a){ return a.map(x => "<li>" + esc(x) + "</li>").join(""); }
+function select(id) {
+  document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === id));
+  const n = NODES[id];
+  let h = "<div class='k'>" + KIND_LABEL[n.kind] + " · фаза " + n.phase + "</div><h2>" + n.title + "</h2><p>" + n.sum + "</p>";
+  h += "<h3>Вход</h3><ul>" + li(n.inp) + "</ul>";
+  h += "<h3>Выход</h3><ul>" + li(n.out) + "</ul>";
+  h += "<h3>Рычаги влияния</h3><table class='lv'>" +
+       n.levers.map(l => "<tr><td>" + esc(l[0]) + "</td><td>" + esc(l[1]) + "</td></tr>").join("") + "</table>";
+  h += "<h3>Методика</h3><p>" + esc(n.meth) + "</p>";
+  h += n.st === "done" ? "<span class='status st-done'>реализовано</span>"
+                        : "<span class='status st-plan'>в плане</span>";
+  detail.innerHTML = h;
+}
+
+LEVERS.forEach(r => {
+  const tr = document.createElement("tr");
+  tr.innerHTML = "<td><code>" + r[0] + "</code></td><td>" + r[1] + "</td><td>" + r[2] + "</td><td>" + r[3] + "</td>";
+  ltab.appendChild(tr);
+});
+document.querySelector("#view-levers table").insertAdjacentHTML("afterbegin",
+  "<tr><th>Файл / точка</th><th>За что отвечает</th><th>Что меняет</th><th>Когда двигать</th></tr>");
+
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  ["pipeline","layers","levers","method"].forEach(v =>
+    document.getElementById("view-" + v).hidden = (v !== b.dataset.v));
+}));
+select("analyst");
+</script>
+</body>
+</html>
