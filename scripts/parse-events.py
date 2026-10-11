@@ -41,7 +41,9 @@ def parse(events_path: str, base: str) -> list:
             ev = json.loads(line)
         except ValueError:
             continue
-        msg = ev.get("message") or {}
+        msg = ev.get("message")
+        if not isinstance(msg, dict):
+            msg = {}
         content = msg.get("content")
         if isinstance(content, list):
             for blk in content:
