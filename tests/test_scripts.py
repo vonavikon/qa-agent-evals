@@ -427,3 +427,17 @@ class JudgeBatchRescue(unittest.TestCase):
             text2 = io.open(os.path.join(td, "вердикты", "T-01-r2.md"),
                             encoding="utf-8").read()
             self.assertNotIn("автопересуд", text2)
+
+
+class NestedOracle(unittest.TestCase):
+    def test_expected_reaches_judge(self):
+        """Регресс v0.3.x: expected внутри oracle: не доходил до судьи."""
+        jb = load("jb_nested", "judge-batch.py")
+        card = ("id: T-01\ntype: critical\nfeature: f\ninstruction: |\n"
+                "  Реплика\noracle:\n  expected: |\n    Норма такая.\n"
+                "    Ещё строка.\n  facts_must:\n    - x\n")
+        got = jb.nested_literal(card, "oracle", "expected")
+        self.assertIn("Норма такая.", got)
+        self.assertIn("Ещё строка.", got)
+        self.assertNotIn("facts_must", got)
+        self.assertEqual(jb.nested_literal(card, "oracle", "missing"), "")

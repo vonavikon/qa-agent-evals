@@ -16,7 +16,7 @@
 Прогон контроля по всем наборам сразу:
 
 ```
-python scripts/judge-control.py "runs/2026-10-11-judge-control-tq/golden-truthfulqa.md,knowledge/golden-live.md" <out-dir>
+python scripts/judge-control.py "runs/2026-10-09-judge-calibration-aon/golden.md,runs/2026-10-11-judge-control-tq/golden-truthfulqa.md,knowledge/golden-live.md" <out-dir>
 ```
 
 ---

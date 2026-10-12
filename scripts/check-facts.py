@@ -51,7 +51,7 @@ def parse_facts(path):
 def transcript_text(run_dir, cid, rep):
     """Текст повтора: транскрипты (то, что отвечала SUT), иначе протокол."""
     files = [f for f in glob.glob(os.path.join(run_dir, "прогоны", f"{cid}-r{rep}*.txt"))
-             if not f.endswith(".replica.txt")]
+             if not f.endswith((".replica.txt", ".prov.txt", ".diag.txt"))]
     if files:
         return "\n".join(io.open(f, encoding="utf-8", errors="replace").read()
                          for f in sorted(files)), "транскрипт", sorted(files)

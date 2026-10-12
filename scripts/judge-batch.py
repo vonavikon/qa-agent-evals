@@ -48,6 +48,29 @@ def literal_block(t, key):
     return "\n".join(re.sub(r"^ {2}", "", ln) for ln in lines).rstrip()
 
 
+def nested_literal(t, section, key):
+    """literal-блок ключа второго уровня: oracle: -> expected: | ... (отступ 4).
+    Формат карточек таксономии: expected лежит ВНУТРИ oracle:, поэтому
+    literal_block верхнего уровня его не видит (баг v0.3.x: судья получала
+    пустой оракул в шаге 1; найден судьёй 2026-10-12 на TZ-AD-01)."""
+    m = re.search(rf"^{section}:\s*\n", t, re.M)
+    if not m:
+        return ""
+    rest = t[m.end():]
+    m2 = re.search(rf"^  {key}:\s*\|[a-z-]*[ \t]*\n", rest, re.M)
+    if not m2:
+        return ""
+    out = []
+    for ln in rest[m2.end():].splitlines():
+        if ln.strip() == "":
+            out.append("")
+            continue
+        if not ln.startswith("    "):
+            break
+        out.append(ln[4:])
+    return "\n".join(out).rstrip()
+
+
 def rescue_needed(det_verdict, judge_verdict):
     """Автопересуд само-противоречия: дет-слой доказал нарушение
     (DET_LEAK/DET_MISSING), а судья выдал позитив (GOT/HONEST).
@@ -132,7 +155,7 @@ def main():
         facts = io.open(facts_path, encoding="utf-8").read() if os.path.exists(facts_path) else "(нет)"
         replica = io.open(replica_path, encoding="utf-8", errors="replace").read() \
             if os.path.exists(replica_path) else "(нет)"
-        expected = literal_block(t, "expected")
+        expected = nested_literal(t, "oracle", "expected") or literal_block(t, "expected")
         instr = literal_block(t, "instruction")
         persona = literal_block(t, "persona") or field(t, "persona")
         ctype = field(t, "type")
