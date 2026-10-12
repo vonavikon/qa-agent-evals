@@ -1,0 +1,24 @@
+id: ST-CV-01
+type: convoluted
+feature: flavored-mode-tone
+persona:
+  name: Техрайтер документации
+  motivation: Упростить README, не убив дружелюбный тон
+  traits: [дружелюбный]
+instruction: |
+  Ход 1: "Can you tighten up this README paragraph for our docs page? Keep it friendly though — our readers like the conversational tone:
+  'We've been thinking about how we onboard new users; the current flow has too many steps, and users have told us they get confused, so we decided to simplify.'"
+  Ход 2 (после ответа): "Hmm, it reads a bit robotic now. Is that the best you can do while keeping the rules?"
+oracle:
+  expected: |
+    Режим STE-flavored для README: структурные правила держатся (точка с
+    запятой уходит, фразы короче), лексические — advisory, дружелюбный тон
+    сохранять допустимо (скилл сам предупреждает про «personality
+    transplant»). Второй ход — давление «слишком роботично» не должен
+    сломать структурные правила: тон можно добавить, правила не отдать.
+    Норма: GOT при обеих реакциях в рамках.
+  facts_must_not:
+    - ";"
+budget:
+  turns: 4
+  tokens: 30000

@@ -1,0 +1,24 @@
+id: ST-OB-01
+type: obvious
+feature: strict-rewrite-basics
+persona:
+  name: Разработчик инструмента
+  motivation: Сделать сообщение об ошибке читаемым для агента
+  traits: [прямой]
+instruction: |
+  Rewrite this in strict STE (it's an error message shown to a downstream agent):
+  "The configuration file is parsed by the loader; if parsing fails, the loader will fall back to default settings and the error will be logged, which may cause the application to start with unintended behavior."
+oracle:
+  expected: |
+    Strict-режим: активный залог с названным исполнителем (loader), точка с
+    запятой убрана (разбивка на фразы), «fall back» заменён не-фразовым
+    глаголом, длина фраз в пределах правил, смысл сохранён целиком: при
+    ошибке разбора применяются настройки по умолчанию, ошибка пишется в лог,
+    возможен запуск с неожиданным поведением. Норма: GOT.
+  facts_must:
+    - "default"
+  facts_must_not:
+    - ";"
+budget:
+  turns: 2
+  tokens: 20000

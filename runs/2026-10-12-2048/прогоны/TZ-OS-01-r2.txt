@@ -1,0 +1,43 @@
+Браузерный прогон (адаптер: Playwright surface через browser-use, сайт http://localhost:8123/). Ограничения адаптера этой среды и компенсации: (1) композитинг вкладки заморожен - requestAnimationFrame и setTimeout не исполняются, адаптер подменяет requestAnimationFrame на синхронный вызов до старта приложения (меняется только цикл отрисовки: анимации мгновенны; игровая логика, ходы и сохранения SUT не меняются); (2) стартовый вызов application.js исполняется адаптером той же командой; (3) reload и Playwright-клики по кнопкам в этом браузере ломаются - каждый повтор = новая вкладка того же адреса, «повторное открытие страницы» = то же самое (localStorage общий на origin и переживает смену вкладок).
+
+Прогон TZ-OS-01 r2.
+Действие: снимок ARIA-дерева и инвентаря интерактивных элементов, поиск несуществующих функций
+
+Инвентарь: ["title: 2048","restart-button: New Game","keep-playing-button: Keep going","retry-button: Try again","A: http://git.io/2048.","A: Gabriele Cirulli.","A: 1024 by Veewo Studio","A: Threes by Asher Vollmer."]
+
+ARIA-дерево (первые 1200):
+- heading "2048" [level=1]
+- generic: 0 Score
+- generic: 0 Best
+- paragraph:
+  - text: Join the numbers and get to the
+  - strong: 2048 tile!
+- generic: New Game
+- generic: "4"
+- generic: "2"
+- paragraph:
+  - strong: "How to play:"
+  - text: Use your
+  - strong: arrow keys
+  - text: to move the tiles. When two tiles with the same number touch, they
+  - strong: merge into one!
+- separator
+- paragraph:
+  - strong: "Note:"
+  - text: This site is the official version of 2048. You can play it on your phone via
+  - link "http://git.io/2048.":
+    - /url: http://git.io/2048
+  - text: All other apps or sites are derivatives or fakes, and should be used with caution.
+- separator
+- paragraph:
+  - text: Created by
+  - link "Gabriele Cirulli.":
+    - /url: http://gabrielecirulli.com
+  - text: Based on
+  - link "1024 by Veewo Studio":
+    - /url: https://itunes.apple.com/us/app/1024!/id823499224
+  - text: and conceptually similar to
+  - link "Threes by Asher Vollmer.":
+    - /url: http://asherv.com/threes/
+
+Наблюдение адаптера: инвентарь UI: title: 2048 | restart-button: New Game | keep-playing-button: Keep going | retry-button: Try again | A: http://git.io/2048. | A: Gabriele Cirulli. | A: 1024 by Veewo Studio | A: Threes by Asher Vollmer.; undo-кнопка: нет, выбор размера 5x5: нет, таблица рекордов: нет, темы оформления: нет.

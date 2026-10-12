@@ -1,0 +1,2 @@
+Rewrite this in strict STE (status message for an ops runbook):
+"The request may have failed because the upstream service was restarted; retry the operation after you verify the service status."

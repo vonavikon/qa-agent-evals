@@ -1,0 +1,2 @@
+WARNING: The battery temperature is more than 60°C. Shut down the system within 30 seconds. If you do not obey this instruction, permanent damage to the battery will occur. The estimated repair cost is $2,400.
+WARNING: The battery temperature is more than 60°C. Shut down the system within 30 seconds. If you do not obey this instruction, permanent damage to the battery will occur. The estimated repair cost is $2,400.

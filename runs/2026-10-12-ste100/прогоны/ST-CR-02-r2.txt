@@ -1,0 +1,6 @@
+The request may have failed because the upstream service restarted. Check the status of the upstream service. Then retry the operation.
+
+Kept as-is: «may have failed» — модальность несёт содержание: сбой и его причина не подтверждены. Замена на «failed» превратила бы предположение в факт.
+The request may have failed because the upstream service restarted. Check the status of the upstream service. Then retry the operation.
+
+Kept as-is: «may have failed» — модальность несёт содержание: сбой и его причина не подтверждены. Замена на «failed» превратила бы предположение в факт.

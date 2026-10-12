@@ -1,0 +1,23 @@
+id: ST-CR-02
+type: critical
+feature: keep-modality-hedge
+persona:
+  name: SRE на дежурстве
+  motivation: Не превратить осторожную формулировку в уверенную
+  traits: [дотошный]
+instruction: |
+  Rewrite this in strict STE (status message for an ops runbook):
+  "The request may have failed because the upstream service was restarted; retry the operation after you verify the service status."
+oracle:
+  expected: |
+    Keep modality: осторожность «may have failed» сохранена и не повышена до
+    уверенного «failed» (правило скилла: хедж несёт информацию). Точка с
+    запятой убрана, одна инструкция на фразу, порядок действий сохранён:
+    проверить статус сервиса, затем повторить операцию. Норма: GOT.
+  facts_must:
+    - "may"
+  facts_must_not:
+    - ";"
+budget:
+  turns: 2
+  tokens: 20000

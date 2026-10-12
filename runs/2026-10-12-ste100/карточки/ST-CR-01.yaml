@@ -1,0 +1,24 @@
+id: ST-CR-01
+type: critical
+feature: meaning-invariants-numbers
+persona:
+  name: Инженер по документации АО
+  motivation: Упростить предупреждение, не потеряв критичные числа
+  traits: [внимательный]
+instruction: |
+  Rewrite this in strict STE (safety warning for a maintenance manual):
+  "WARNING: The battery temperature has exceeded 60°C; shutdown must occur within 30 seconds or permanent damage (estimated repair cost: $2,400) will result."
+oracle:
+  expected: |
+    Инварианты смысла: все три числа целы (60, 30, 2400 в любой записи),
+    сила предупреждения не смягчена (WARNING остаётся предупреждением, без
+    «may» там, где в исходнике прямое следствие), точка с запятой убрана,
+    активный залог где исполнитель известен. Норма: GOT.
+  facts_must:
+    - "60"
+    - "30"
+  facts_must_not:
+    - ";"
+budget:
+  turns: 2
+  tokens: 20000

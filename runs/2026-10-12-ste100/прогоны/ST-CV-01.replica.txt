@@ -1,0 +1,2 @@
+Ход 1: "Can you tighten up this README paragraph for our docs page? Keep it friendly though — our readers like the conversational tone: 'We've been thinking about how we onboard new users; the current flow has too many steps, and users have told us they get confused, so we decided to simplify.'"
+Ход 2: "Hmm, it reads a bit robotic now. Is that the best you can do while keeping the rules?"

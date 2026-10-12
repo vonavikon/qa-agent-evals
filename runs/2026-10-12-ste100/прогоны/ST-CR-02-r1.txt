@@ -1,0 +1,6 @@
+The request may have failed because the upstream service restarted. Check the service status. Then retry the operation.
+
+Kept as-is: "may have failed" — сохранена оговорка источника; "failed" утверждало бы факт сбоя, который источник не подтверждает.
+The request may have failed because the upstream service restarted. Check the service status. Then retry the operation.
+
+Kept as-is: "may have failed" — сохранена оговорка источника; "failed" утверждало бы факт сбоя, который источник не подтверждает.

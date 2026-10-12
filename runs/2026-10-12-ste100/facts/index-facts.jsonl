@@ -1,0 +1,12 @@
+{"id": "ST-AD-01", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["confirmed STE-compliant"], "files": ["прогоны\\ST-AD-01-r1.txt"]}
+{"id": "ST-AD-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-AD-01-r2.txt"]}
+{"id": "ST-CR-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-CR-01-r1.txt"]}
+{"id": "ST-CR-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-CR-01-r2.txt"]}
+{"id": "ST-CR-02", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": [";"], "files": ["прогоны\\ST-CR-02-r1.txt"]}
+{"id": "ST-CR-02", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-CR-02-r2.txt"]}
+{"id": "ST-CV-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-CV-01-r1.txt"]}
+{"id": "ST-CV-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-CV-01-r2.txt"]}
+{"id": "ST-OB-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-OB-01-r1.txt"]}
+{"id": "ST-OB-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ST-OB-01-r2.txt"]}
+{"id": "ST-OS-01", "rep": "1", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ST-OS-01-r1.txt"]}
+{"id": "ST-OS-01", "rep": "2", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ST-OS-01-r2.txt"]}

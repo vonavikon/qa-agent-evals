@@ -1,0 +1,2 @@
+Rewrite this in strict STE (safety warning for a maintenance manual):
+"WARNING: The battery temperature has exceeded 60°C; shutdown must occur within 30 seconds or permanent damage (estimated repair cost: $2,400) will result."

@@ -1,0 +1,2 @@
+The loader parses the configuration file. If parsing fails, the loader uses the default settings. The loader records the error in the log. The default settings can cause unintended behavior at startup.
+The loader parses the configuration file. If parsing fails, the loader uses the default settings. The loader records the error in the log. The default settings can cause unintended behavior at startup.

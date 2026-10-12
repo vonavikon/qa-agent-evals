@@ -1,0 +1,6 @@
+The loader parses the configuration file. If the loader cannot parse the file, the loader uses the default settings. The error is logged. The application may then start with unintended behavior.
+
+Kept as-is: "The error is logged" — пассив оставлен, потому что источник не указывает, какой компонент записывает ошибку в журнал.
+The loader parses the configuration file. If the loader cannot parse the file, the loader uses the default settings. The error is logged. The application may then start with unintended behavior.
+
+Kept as-is: "The error is logged" — пассив оставлен, потому что источник не указывает, какой компонент записывает ошибку в журнал.

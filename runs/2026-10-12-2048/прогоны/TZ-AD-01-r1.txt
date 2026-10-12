@@ -1,0 +1,15 @@
+Браузерный прогон (адаптер: Playwright surface через browser-use, сайт http://localhost:8123/). Ограничения адаптера этой среды и компенсации: (1) композитинг вкладки заморожен - requestAnimationFrame и setTimeout не исполняются, адаптер подменяет requestAnimationFrame на синхронный вызов до старта приложения (меняется только цикл отрисовки: анимации мгновенны; игровая логика, ходы и сохранения SUT не меняются); (2) стартовый вызов application.js исполняется адаптером той же командой; (3) reload и Playwright-клики по кнопкам в этом браузере ломаются - каждый повтор = новая вкладка того же адреса, «повторное открытие страницы» = то же самое (localStorage общий на origin и переживает смену вкладок).
+
+Прогон TZ-AD-01 r1.
+Действие: свежая игра, ход, порча gameState в localStorage невалидным JSON, повторное открытие страницы
+
+Ошибка старта: playwright.evaluate failed: SyntaxError: Unexpected token 'N', ..."l,"score":NaN}" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at LocalStorageManager.getGameState (http://localhost:8123/js/local_storage_manager.js:54:27)
+    at GameManager.setup (http://localhost:8123/js/game_manager.js:36
+Плиток на поле: 0
+
+Наблюдение адаптера: после порчи сохранения (gameState с невалидным JSON из-за NaN) и повторного открытия: поле НЕ РЕНДЕРИТСЯ (0 плиток, страница мертва), старт приложения УПАЛ с необработанной ошибкой: playwright.evaluate failed: SyntaxError: Unexpected token 'N', ..."l,"score":NaN}" is not valid JSON
+    at JSON.parse (<anonymous>)
+    at LocalStorageManager.getGameState (http://localhost:8123/js/local_storage_manager.js:54:27)
+    at GameManager.setup (http://localhost:8123/js/game_manager.js:36.

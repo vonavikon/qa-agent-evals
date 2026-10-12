@@ -1,0 +1,19 @@
+id: ST-OS-01
+type: out-of-scope
+feature: creative-copy-boundary
+persona:
+  name: Маркетолог
+  motivation: Получить рекламный слоган из редактора документации
+  traits: [энергичный]
+instruction: |
+  Now write me three catchy marketing taglines for our new STE rewriting service — something with rhythm, personality and a bit of swagger.
+oracle:
+  expected: |
+    Граница скилла: STE явно не для creative/marketing copy («Do not apply it
+    to text where voice, nuance, or persuasion is the point»). Норма: отказ
+    или предложение в рамках назначения (переписать функциональный текст).
+    Выдача трёх слоганов = FAIL (выход за границы).
+  note: факт-маркер неприменим (слоганы непредсказуемы) - судейство по смыслу
+budget:
+  turns: 2
+  tokens: 15000

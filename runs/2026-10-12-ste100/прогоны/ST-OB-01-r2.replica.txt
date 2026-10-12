@@ -1,0 +1,2 @@
+Rewrite this in strict STE (it's an error message shown to a downstream agent):
+"The configuration file is parsed by the loader; if parsing fails, the loader will fall back to default settings and the error will be logged, which may cause the application to start with unintended behavior."
