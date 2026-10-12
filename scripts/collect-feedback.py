@@ -278,13 +278,37 @@ render();
 </script></div></body></html>"""
 
 
+def eco_lines(run_dir):
+    """Экономика прогона для страницы: сводка cost.md (SUT) + судья
+    (judge-usage.jsonl, с v0.4.1). Нет данных - пусто."""
+    out = []
+    cost_md = os.path.join(run_dir, "cost.md")
+    if os.path.exists(cost_md):
+        for line in io.open(cost_md, encoding="utf-8"):
+            s = line.strip()
+            if s.startswith(("Прогонов:", "**Прогон целиком", "Вызовов:")):
+                out.append(s)
+    jpath = os.path.join(run_dir, "вердикты", "judge-usage.jsonl")
+    if os.path.exists(jpath):
+        n = sum(1 for _ in io.open(jpath, encoding="utf-8"))
+        out.append(f"Судья инструментирована: вызовов записано {n} "
+                   "(сумма - в cost.md после cost-report.py).")
+    return out
+
+
 def build_feedback_html(run_dir):
     entries = load_entries(run_dir)
     run_name = os.path.basename(os.path.normpath(run_dir))
     data = json.dumps(entries, ensure_ascii=False).replace("</", "<\\/")
+    eco = eco_lines(run_dir)
+    eco_html = ""
+    if eco:
+        eco_html = ('<div class="card" style="background:#eef3f7">'
+                    + "<b>Экономика прогона.</b> " + "<br>".join(eco) + "</div>")
     page = (HTML.replace("{{DATA}}", data)
                 .replace("{{RUNJ}}", json.dumps(run_name, ensure_ascii=False))
-                .replace("{{RUN}}", run_name.replace("<", "&lt;").replace(">", "&gt;")))
+                .replace("{{RUN}}", run_name.replace("<", "&lt;").replace(">", "&gt;"))
+                .replace('<div id="list"></div>', eco_html + '<div id="list"></div>'))
     out = os.path.join(run_dir, "feedback.html")
     io.open(out, "w", encoding="utf-8").write(page)
     print(f"страница разметки: {out} (карточек: {len(entries)})")

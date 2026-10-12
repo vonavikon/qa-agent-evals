@@ -37,6 +37,27 @@ def run_stats(path):
     return None
 
 
+def judge_stats(rd):
+    """Сумма вызовов судьи из вердикты/judge-usage.jsonl (judge-batch, v0.4.1).
+    Нет файла (прогон до инструментации) - судейская экономика не измерена."""
+    path = os.path.join(rd, "вердикты", "judge-usage.jsonl")
+    if not os.path.exists(path):
+        return None
+    tot = {"in": 0, "out": 0, "cache_read": 0, "usd": 0.0, "dur_s": 0.0, "n": 0}
+    for line in io.open(path, encoding="utf-8"):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        tot["in"] += r.get("in", 0)
+        tot["out"] += r.get("out", 0)
+        tot["cache_read"] += r.get("cache_read", 0)
+        tot["usd"] += r.get("cost_usd", 0) or 0
+        tot["dur_s"] += r.get("dur_s", 0) or 0
+        tot["n"] += 1
+    return tot
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir")
@@ -80,10 +101,23 @@ def main():
         c = per_card[cid]
         lines.append(f"| {cid} | {c['n']} | {c['in']:,} | {c['out']:,} | "
                      f"{c['ms']/1000:.1f} | {c['usd']:.3f} |")
+    j = judge_stats(rd)
+    if j:
+        lines += ["", "## Судья (вызовы CLI judge-batch)", "",
+                  f"Вызовов: {j['n']} (включая автопересуды). Токены: input {j['in']:,} "
+                  f"(cache read {j['cache_read']:,}), output {j['out']:,}. "
+                  f"Суммарная длительность: {j['dur_s']:.0f} с. "
+                  f"Стоимость: ${j['usd']:.4f}.",
+                  "", f"**Прогон целиком: ${tot['usd'] + j['usd']:.3f}** "
+                  f"(SUT ${tot['usd']:.3f} + судья ${j['usd']:.4f})."]
+    else:
+        lines += ["", "Судья: вызовы не инструментированы (прогон до v0.4.1); "
+                      "экономика судьи - по оценке артефактов."]
     out = os.path.join(rd, "cost.md")
     io.open(out, "w", encoding="utf-8").write("\n".join(lines) + "\n")
     print(f"cost.md: {tot['n']} прогонов, ${tot['usd']:.3f}, "
-          f"{tot['ms']/1000:.1f} с, in {tot['in']:,} / out {tot['out']:,} токенов")
+          f"{tot['ms']/1000:.1f} с, in {tot['in']:,} / out {tot['out']:,} токенов"
+          + (f"; судья: {j['n']} вызовов, ${j['usd']:.4f}" if j else ""))
 
 
 if __name__ == "__main__":

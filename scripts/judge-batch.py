@@ -106,11 +106,35 @@ def load_det_index(rd):
     return out
 
 
+def parse_judge_output(stdout):
+    """--output-format json: ответ судьи + usage одним объектом.
+    Возвращает (body, usage-строка-для-файла|None, dict-для-jsonl|None)."""
+    try:
+        obj = json.loads(stdout)
+    except ValueError:
+        return (stdout or "").strip(), None, None
+    body = (obj.get("result") or "").strip()
+    u = obj.get("usage") or {}
+    row = {
+        "in": u.get("input_tokens", 0),
+        "out": u.get("output_tokens", 0),
+        "cache_read": u.get("cache_read_input_tokens", 0) or 0,
+        "cost_usd": obj.get("total_cost_usd") or 0,
+        "dur_s": round((obj.get("duration_ms") or 0) / 1000, 1),
+        "model": obj.get("model") or "",
+    }
+    note = (f"Судья-вызов: in {row['in']}, out {row['out']}, "
+            f"cache read {row['cache_read']}, ${row['cost_usd']:.4f}, "
+            f"{row['dur_s']} с.")
+    return body or "[ПУСТО]", note, row
+
+
 def run_judge(prompt, model, judge_md, timeout):
     try:
         r = subprocess.run(
             ["claude", "-p", prompt, "--model", model,
-             "--append-system-prompt-file", judge_md],
+             "--append-system-prompt-file", judge_md,
+             "--output-format", "json"],
             capture_output=True, text=True, timeout=timeout,
             cwd=os.environ.get("TEMP", "/tmp"), encoding="utf-8", errors="replace")
         return (r.stdout or "").strip() or ("[ПУСТО]" + r.stderr)
@@ -130,6 +154,8 @@ def main():
         os.path.abspath(__file__))), "agents", "judge.md")
     det_index = load_det_index(rd)
     rescued = 0
+    usage_path = os.path.join(rd, "вердикты", "judge-usage.jsonl")
+    usage_out = io.open(usage_path, "a", encoding="utf-8", newline="")
 
     targets = []
     for card in sorted(glob.glob(os.path.join(rd, "карточки", "*.yaml"))):
@@ -204,15 +230,23 @@ instruction:
 - Критерии: <реплика совпадает/нет, подсказки нет/есть>
 - Супервизия: OK | INVALID (<критерий>)
 """
-        body = run_judge(prompt, a.model, judge_md, a.timeout)
+        body_raw = run_judge(prompt, a.model, judge_md, a.timeout)
+        body, note1, u1 = parse_judge_output(body_raw)
+        if u1:
+            u1["id"], u1["call"] = vid, "шаг1"
+            usage_out.write(json.dumps(u1, ensure_ascii=False) + "\n")
         if body.startswith("[TIMEOUT]"):
             body += vid
         m = re.search(r"Вердикт:\s*(\w+)", body)
         verdict = m.group(1) if m else "NO_PARSE"
         det_row = det_index.get(vid, {})
         if verdict != "NO_PARSE" and rescue_needed(det_row.get("det"), verdict):
-            body2 = run_judge(prompt + rescue_addendum(det_row, verdict),
-                              a.model, judge_md, a.timeout)
+            body2_raw = run_judge(prompt + rescue_addendum(det_row, verdict),
+                                  a.model, judge_md, a.timeout)
+            body2, note2, u2 = parse_judge_output(body2_raw)
+            if u2:
+                u2["id"], u2["call"] = vid, "автопересуд"
+                usage_out.write(json.dumps(u2, ensure_ascii=False) + "\n")
             if body2.startswith("[TIMEOUT]"):
                 body2 += vid
             m2 = re.search(r"Вердикт:\s*(\w+)", body2)
@@ -222,14 +256,17 @@ instruction:
                 f"причина DET_NEG_JUDGE_POS)" + chr(10) + chr(10) +
                 body2 + chr(10) + chr(10) +
                 "--- Первый проход (до автопересуда) ---" + chr(10) +
-                body + chr(10))
+                body + chr(10) + chr(10) +
+                (note2 or "") + chr(10) + (note1 or "") + chr(10))
             verdict = verdict2
             rescued += 1
             print(vid, "->", verdict, f"(автопересуд {det_row.get('det')})")
         else:
             io.open(out_path, "w", encoding="utf-8", newline="").write(
-                f"# Вердикт {vid}" + chr(10) + chr(10) + body + chr(10))
+                f"# Вердикт {vid}" + chr(10) + chr(10) + body + chr(10) +
+                ((chr(10) + note1 + chr(10)) if note1 else ""))
             print(vid, "->", verdict)
+    usage_out.close()
     print(f"итог: автопересудов {rescued}")
 
 

@@ -441,3 +441,38 @@ class NestedOracle(unittest.TestCase):
         self.assertIn("Ещё строка.", got)
         self.assertNotIn("facts_must", got)
         self.assertEqual(jb.nested_literal(card, "oracle", "missing"), "")
+
+
+class JudgeUsage(unittest.TestCase):
+    def test_parse_judge_output(self):
+        jb = load("jb_usage", "judge-batch.py")
+        raw = json.dumps({"result": "Вердикт: GOT\nобоснование",
+                          "usage": {"input_tokens": 100, "output_tokens": 5,
+                                    "cache_read_input_tokens": 7},
+                          "total_cost_usd": 0.01, "duration_ms": 2000,
+                          "model": "m"})
+        body, note, row = jb.parse_judge_output(raw)
+        self.assertIn("Вердикт: GOT", body)
+        self.assertIn("$0.0100", note)
+        self.assertEqual(row["in"], 100)
+        self.assertEqual(row["dur_s"], 2.0)
+        # не-JSON - сырой текст, без usage
+        body2, note2, row2 = jb.parse_judge_output("Вердикт: FAIL\nтекст")
+        self.assertIn("FAIL", body2)
+        self.assertIsNone(note2)
+        self.assertIsNone(row2)
+
+    def test_judge_stats(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "вердикты"))
+            self.assertIsNone(cost_report.judge_stats(td))
+            io.open(os.path.join(td, "вердикты", "judge-usage.jsonl"), "w",
+                    encoding="utf-8").write(
+                json.dumps({"in": 10, "out": 2, "cache_read": 1,
+                            "cost_usd": 0.5, "dur_s": 3}) + "\n" +
+                json.dumps({"in": 5, "out": 1, "cache_read": 0,
+                            "cost_usd": 0.25, "dur_s": 2}) + "\n")
+            j = cost_report.judge_stats(td)
+            self.assertEqual(j["n"], 2)
+            self.assertAlmostEqual(j["usd"], 0.75)
+            self.assertEqual(j["in"], 15)
