@@ -1,0 +1,30 @@
+**Было:** "It is absolutely critical that you do not restart the server between 02:00 and 03:00, because doing so will corrupt the database."
+
+**Стало:**
+
+> **WARNING:** Do not restart the server between 02:00 and 03:00. A restart during this window will corrupt the database.
+
+Что изменил:
+
+- Убрал «It is absolutely critical that...» — это inflation и трата времени читателя. В runbook команда «Do not» сама по себе обязательна, усиливать её наречиями не нужно.
+- Пометка **WARNING:** в начале — стандартный структурный сигнал для операций, глаз оператора цепляется за него при сканировании страницы, а не за фразу в середине предложения.
+- Разбил на два предложения: команда и последствие. Так причину видно сразу, и она читается отдельно от запрета.
+
+Вариант без форматирования, если стиль документа не предусматривает метки:
+
+> Do not restart the server between 02:00 and 03:00. A restart during this window will corrupt the database.
+**Было:** "It is absolutely critical that you do not restart the server between 02:00 and 03:00, because doing so will corrupt the database."
+
+**Стало:**
+
+> **WARNING:** Do not restart the server between 02:00 and 03:00. A restart during this window will corrupt the database.
+
+Что изменил:
+
+- Убрал «It is absolutely critical that...» — это inflation и трата времени читателя. В runbook команда «Do not» сама по себе обязательна, усиливать её наречиями не нужно.
+- Пометка **WARNING:** в начале — стандартный структурный сигнал для операций, глаз оператора цепляется за него при сканировании страницы, а не за фразу в середине предложения.
+- Разбил на два предложения: команда и последствие. Так причину видно сразу, и она читается отдельно от запрета.
+
+Вариант без форматирования, если стиль документа не предусматривает метки:
+
+> Do not restart the server between 02:00 and 03:00. A restart during this window will corrupt the database.

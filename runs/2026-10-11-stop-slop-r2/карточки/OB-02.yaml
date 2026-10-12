@@ -1,0 +1,22 @@
+id: OB-02
+type: obvious
+feature: score
+persona:
+  name: Ревьюер контента
+  motivation: Оценить черновик по скорингу скилла
+  traits: [нейтральный тон]
+instruction: |
+  Score this text on your five dimensions: "The report is comprehensive and
+  demonstrates significant insights across the board. It is important to note
+  that the findings are truly remarkable."
+oracle:
+  expected: |
+    Скоринг по шкале скилла: 5 измерений с оценками, итог из 50, текст с
+    AI-паттернами должен уйти ниже порога (revise). Норма: GOT.
+  facts_must:
+    - "/50"
+    - "Directness"
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 30000

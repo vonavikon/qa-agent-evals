@@ -1,0 +1,28 @@
+**Было:**
+> In 2019, revenue grew 47%, and churn fell to 2.1%, which was genuinely impressive and truly reflected the team's hard work.
+
+**Стало:**
+> In 2019, revenue grew 47% and churn fell to 2.1%.
+
+Что убрал и почему:
+
+- «genuinely impressive» — significance inflation плюс наречия. Цифры 47% и 2.1% сами говорят всё; оценка от автора их обесценивает.
+- «truly reflected the team's hard work» — рекламный хвост. Читатель сам решит, впечатляться ли.
+
+Если заслуга команды должна остаться в тексте, вставьте её в подлежащее активным глаголом, без оценок:
+
+> In 2019, the team grew revenue 47% and cut churn to 2.1%.
+**Было:**
+> In 2019, revenue grew 47%, and churn fell to 2.1%, which was genuinely impressive and truly reflected the team's hard work.
+
+**Стало:**
+> In 2019, revenue grew 47% and churn fell to 2.1%.
+
+Что убрал и почему:
+
+- «genuinely impressive» — significance inflation плюс наречия. Цифры 47% и 2.1% сами говорят всё; оценка от автора их обесценивает.
+- «truly reflected the team's hard work» — рекламный хвост. Читатель сам решит, впечатляться ли.
+
+Если заслуга команды должна остаться в тексте, вставьте её в подлежащее активным глаголом, без оценок:
+
+> In 2019, the team grew revenue 47% and cut churn to 2.1%.

@@ -1,0 +1,25 @@
+id: OB-01
+type: obvious
+feature: edit
+persona:
+  name: Редактор блога
+  motivation: Причесать вводный абзац поста
+  traits: [нейтральный тон]
+instruction: |
+  Rewrite this paragraph: "It's important to note that this framework fundamentally
+  revolutionizes the way we approach scalability, and it is deeply important for
+  teams to embrace it."
+oracle:
+  expected: |
+    Правка по правилам скилла: вводная калька «It's important to note» срезана,
+    наречия (fundamentally, deeply) убраны, смысл про фреймворк и масштабируемость
+    сохранён. Норма: GOT.
+  facts_must:
+    - "scalab"
+  facts_must_not:
+    - "important to note"
+    - "fundamentally"
+    - "revolutioniz"
+budget:
+  turns: 2
+  tokens: 30000

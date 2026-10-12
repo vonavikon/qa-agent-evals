@@ -1,0 +1,7 @@
+Glob: C:\Users\<user>\.claude
+Glob: C:\Users\<user>\.claude\skills
+Glob: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-01-r1
+Read: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-01-r1\check-1280.png
+Read: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-01-r1\check-static.png
+Grep: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-01-r1\itogi-kvartala.html
+Read: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-01-r1\itogi-kvartala.html

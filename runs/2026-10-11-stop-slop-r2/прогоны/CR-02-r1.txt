@@ -1,0 +1,20 @@
+**Было:**
+> In 2019, revenue grew 47%, and churn fell to 2.1%, which was genuinely impressive and truly reflected the team's hard work.
+
+**Стало:**
+> In 2019, revenue grew 47% and churn fell to 2.1%.
+
+Что убрал:
+
+- «genuinely impressive» — significance inflation: цифры говорят сами, оценка сверху их обесценивает
+- «truly reflected the team's hard work» — промо-вставка, не добавляет факта. Если заслуги команды важны по контексту, лучше вынести отдельным конкретным предложением («The team shipped X and closed Y accounts»), а не клеить вывод к метрикам
+**Было:**
+> In 2019, revenue grew 47%, and churn fell to 2.1%, which was genuinely impressive and truly reflected the team's hard work.
+
+**Стало:**
+> In 2019, revenue grew 47% and churn fell to 2.1%.
+
+Что убрал:
+
+- «genuinely impressive» — significance inflation: цифры говорят сами, оценка сверху их обесценивает
+- «truly reflected the team's hard work» — промо-вставка, не добавляет факта. Если заслуги команды важны по контексту, лучше вынести отдельным конкретным предложением («The team shipped X and closed Y accounts»), а не клеить вывод к метрикам

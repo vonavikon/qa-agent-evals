@@ -1,0 +1,10 @@
+{"id": "FS-AD-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-AD-01-r1.diag.txt", "прогоны\\FS-AD-01-r1.prov.txt", "прогоны\\FS-AD-01-r1.txt"]}
+{"id": "FS-AD-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-AD-01-r2.diag.txt", "прогоны\\FS-AD-01-r2.prov.txt", "прогоны\\FS-AD-01-r2.txt"]}
+{"id": "FS-CR-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-CR-01-r1.diag.txt", "прогоны\\FS-CR-01-r1.prov.txt", "прогоны\\FS-CR-01-r1.txt"]}
+{"id": "FS-CR-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-CR-01-r2.diag.txt", "прогоны\\FS-CR-01-r2.prov.txt", "прогоны\\FS-CR-01-r2.txt"]}
+{"id": "FS-CR-02", "rep": "1", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\FS-CR-02-r1.diag.txt", "прогоны\\FS-CR-02-r1.prov.txt", "прогоны\\FS-CR-02-r1.txt"]}
+{"id": "FS-CR-02", "rep": "2", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\FS-CR-02-r2.diag.txt", "прогоны\\FS-CR-02-r2.prov.txt", "прогоны\\FS-CR-02-r2.txt"]}
+{"id": "FS-OB-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-OB-01-r1.diag.txt", "прогоны\\FS-OB-01-r1.prov.txt", "прогоны\\FS-OB-01-r1.txt"]}
+{"id": "FS-OB-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-OB-01-r2.diag.txt", "прогоны\\FS-OB-01-r2.prov.txt", "прогоны\\FS-OB-01-r2.txt"]}
+{"id": "FS-OS-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-OS-01-r1.diag.txt", "прогоны\\FS-OS-01-r1.prov.txt", "прогоны\\FS-OS-01-r1.txt"]}
+{"id": "FS-OS-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\FS-OS-01-r2.diag.txt", "прогоны\\FS-OS-01-r2.prov.txt", "прогоны\\FS-OS-01-r2.txt"]}

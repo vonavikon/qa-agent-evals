@@ -1,0 +1,100 @@
+Вот итеративный вариант — стандартный подход за O(n) по времени и O(1) по памяти:
+
+```python
+class Node:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next   # запоминаем следующий
+        current.next = prev        # разворачиваем ссылку
+        prev = current             # сдвигаем prev
+        current = next_node        # сдвигаем current
+    return prev
+```
+
+Пример использования:
+
+```python
+# строим список 1 -> 2 -> 3 -> 4
+head = Node(1, Node(2, Node(3, Node(4))))
+
+head = reverse_list(head)
+
+node = head
+while node:
+    print(node.value, end=" ")
+    node = node.next
+# вывод: 4 3 2 1
+```
+
+Идея: идём по списку и на каждом шаге переустанавливаем ссылку `next` текущего узла на предыдущий. Три указателя — `prev`, `current`, `next_node` — и цикл до конца списка. `prev` после цикла указывает на новый голову.
+
+Если нужна рекурсивная версия:
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Она короче, но ест O(n) памяти на стеке вызовов, поэтому на практике обычно берут итеративную.
+Вот итеративный вариант — стандартный подход за O(n) по времени и O(1) по памяти:
+
+```python
+class Node:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next   # запоминаем следующий
+        current.next = prev        # разворачиваем ссылку
+        prev = current             # сдвигаем prev
+        current = next_node        # сдвигаем current
+    return prev
+```
+
+Пример использования:
+
+```python
+# строим список 1 -> 2 -> 3 -> 4
+head = Node(1, Node(2, Node(3, Node(4))))
+
+head = reverse_list(head)
+
+node = head
+while node:
+    print(node.value, end=" ")
+    node = node.next
+# вывод: 4 3 2 1
+```
+
+Идея: идём по списку и на каждом шаге переустанавливаем ссылку `next` текущего узла на предыдущий. Три указателя — `prev`, `current`, `next_node` — и цикл до конца списка. `prev` после цикла указывает на новый голову.
+
+Если нужна рекурсивная версия:
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Она короче, но ест O(n) памяти на стеке вызовов, поэтому на практике обычно берут итеративную.

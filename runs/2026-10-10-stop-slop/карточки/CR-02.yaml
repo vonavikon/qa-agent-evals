@@ -1,0 +1,21 @@
+id: CR-02
+type: critical
+feature: meaning-invariants
+persona:
+  name: Финансовый редактор
+  motivation: Отредактировать абзац отчёта с цифрами
+  traits: [точный]
+instruction: |
+  Rewrite this: "In 2019, revenue grew 47%, and churn fell to 2.1%, which was
+  genuinely impressive and truly reflected the team's hard work."
+oracle:
+  expected: |
+    Хвост с наречиями срезан, все числа сохранены точно: 47% и 2.1% обязаны
+    остаться. Потеря или искажение числа - FAIL. Норма: GOT.
+  facts_must:
+    - "47%"
+    - "2.1%"
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 30000

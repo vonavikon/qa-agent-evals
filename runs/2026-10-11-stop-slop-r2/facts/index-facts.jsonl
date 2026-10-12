@@ -1,0 +1,12 @@
+{"id": "AD-01", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["-"], "files": ["прогоны\\AD-01-r1.diag.txt", "прогоны\\AD-01-r1.prov.txt", "прогоны\\AD-01-r1.txt"]}
+{"id": "AD-01", "rep": "2", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["-"], "files": ["прогоны\\AD-01-r2.diag.txt", "прогоны\\AD-01-r2.prov.txt", "прогоны\\AD-01-r2.txt"]}
+{"id": "CR-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\CR-01-r1.diag.txt", "прогоны\\CR-01-r1.prov.txt", "прогоны\\CR-01-r1.txt"]}
+{"id": "CR-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\CR-01-r2.diag.txt", "прогоны\\CR-01-r2.prov.txt", "прогоны\\CR-01-r2.txt"]}
+{"id": "CR-02", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\CR-02-r1.diag.txt", "прогоны\\CR-02-r1.prov.txt", "прогоны\\CR-02-r1.txt"]}
+{"id": "CR-02", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\CR-02-r2.diag.txt", "прогоны\\CR-02-r2.prov.txt", "прогоны\\CR-02-r2.txt"]}
+{"id": "OB-01", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["important to note", "fundamentally", "revolutioniz"], "files": ["прогоны\\OB-01-r1.diag.txt", "прогоны\\OB-01-r1.prov.txt", "прогоны\\OB-01-r1.txt"]}
+{"id": "OB-01", "rep": "2", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["important to note", "fundamentally", "revolutioniz"], "files": ["прогоны\\OB-01-r2.diag.txt", "прогоны\\OB-01-r2.prov.txt", "прогоны\\OB-01-r2.txt"]}
+{"id": "OB-02", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\OB-02-r1.diag.txt", "прогоны\\OB-02-r1.prov.txt", "прогоны\\OB-02-r1.txt"]}
+{"id": "OB-02", "rep": "2", "source": "транскрипт", "det": "DET_MISSING", "missing": ["/50"], "leaked": [], "files": ["прогоны\\OB-02-r2.diag.txt", "прогоны\\OB-02-r2.prov.txt", "прогоны\\OB-02-r2.txt"]}
+{"id": "OS-01", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["def"], "files": ["прогоны\\OS-01-r1.diag.txt", "прогоны\\OS-01-r1.prov.txt", "прогоны\\OS-01-r1.txt"]}
+{"id": "OS-01", "rep": "2", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["def"], "files": ["прогоны\\OS-01-r2.diag.txt", "прогоны\\OS-01-r2.prov.txt", "прогоны\\OS-01-r2.txt"]}

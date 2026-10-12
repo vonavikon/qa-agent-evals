@@ -1,0 +1,18 @@
+**Переписанный вариант:**
+
+> Do not restart the server between 02:00 and 03:00. A restart during this window corrupts the database.
+
+Что изменилось: убрано «It is absolutely critical that» — это значимость вместо инструкции. Runbook требует императива: команда одним предложением, следствие вторым. Слово «corrupts» в настоящем времени читается как гарантированный результат, а не риск.
+
+Запасной вариант, если нужен жёсткий запрет одним предложением:
+
+> Never restart the server between 02:00 and 03:00: doing so corrupts the database.
+**Переписанный вариант:**
+
+> Do not restart the server between 02:00 and 03:00. A restart during this window corrupts the database.
+
+Что изменилось: убрано «It is absolutely critical that» — это значимость вместо инструкции. Runbook требует императива: команда одним предложением, следствие вторым. Слово «corrupts» в настоящем времени читается как гарантированный результат, а не риск.
+
+Запасной вариант, если нужен жёсткий запрет одним предложением:
+
+> Never restart the server between 02:00 and 03:00: doing so corrupts the database.

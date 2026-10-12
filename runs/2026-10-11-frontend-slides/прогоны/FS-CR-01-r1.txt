@@ -1,0 +1,46 @@
+Файлы скилла не в `.claude\skills`. Поищу каталог `frontend-slides`:
+Файлов скилла (`viewport-base.css` и др.) на этой машине нет — реализую фиксированную сцену 1920×1080 вручную по правилам скилла. Задача узкая (один слайд, цифры зафиксированы), поэтому стилевые превью пропускаю и делаю сразу: эстетика печатного годового отчёта — тёплая бумага, волосяные линейки, крупные цифры шрифтом Fraunces, моно-подписи, один акцентный цвет.
+Проверю рендер скриншотом в headless Edge:
+Скриншот не создался. Пробую другой набор флагов:
+Chrome справился. Смотрю результат:
+**🌐 Z.ai Built-in Tool: analyze_image**
+
+**Input:**
+```json
+{"imageSource":"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/c506cd56-917b-438a-a256-8aa954358385/C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-FS-CR-01-r1\\check-1280.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1791753335&Signature=nmsfDRHg3dnn/IVtnjP+K+snsXU=","prompt":"This is a screenshot of an HTML presentation slide (should be 16:9). Describe exactly what you see: all visible text and numbers, layout structure, any text overflow, clipped or overlapping elements, and whether fonts look like a serif display font for large numbers and a monospace font for labels. Report any visual defects."}
+```
+*Executing on server...*
+
+**Output:**
+**analyze_image_result_summary:** [{"text": "\"This screenshot shows a slide rendered on a muted beige/tan background, with an off-white/cream content panel starting roughly a third of the way from the left. The panel has:\\n\\n- A **dotted grid texture** (subtle small dots across the panel surface).\\n- A **red/orange vertical acce...
+                                                
+Скриншот показывает обрезку и отсутствие цифр — похоже, съёмка попала в середину анимации, а масштаб не применился. Добавлю в файл статический режим (`#static`) для честной проверки финального состояния:
+**🌐 Z.ai Built-in Tool: analyze_image**
+
+**Input:**
+```json
+{"imageSource":"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/c506cd56-917b-438a-a256-8aa954358385/C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-FS-CR-01-r1\\check-static.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1791753440&Signature=nkHRFTtRuz2b4HP2Ai6LRsa/0gg=","prompt":"This is a screenshot of an HTML presentation slide (16:9, 1280x720). Describe exactly what you see: all visible text and numbers verbatim, layout structure (header, rows, footer), whether large numerals 47%, 2.1%, 31 are visible and in what font style, any text overflow, clipped or overlapping elements. Report any visual defects precisely."}
+```
+*Executing on server...*
+
+**Output:**
+**analyze_image_result_summary:** [{"text": "MCP error 400: 400 Bad Request: \"{\"error\":{\"code\":\"1210\",\"message\":\"图片输入格式/解析错误\"}}\"", "type": "text"}]
+                                                
+**🌐 Z.ai Built-in Tool: analyze_image**
+
+**Input:**
+```json
+{"imageSource":"https://maas-log-prod.cn-wlcb.ufileos.com/anthropic/c506cd56-917b-438a-a256-8aa954358385/C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-FS-CR-01-r1\\check-static.png?UCloudPublicKey=TOKEN_e15ba47a-d098-4fbd-9afc-a0dcf0e4e621&Expires=1791753430&Signature=nkHRFTtRuz2b4HP2Ai6LRsa/0gg=","prompt":"This is a screenshot of an HTML presentation slide (16:9, 1280x720). Describe exactly what you see: all visible text and numbers verbatim, layout structure (header, rows, footer), whether large numerals 47%, 2.1%, 31 are visible and in what font style, any text overflow, clipped or overlapping elements. Report any visual defects precisely."}
+```
+*Executing on server...*
+
+**Output:**
+**analyze_image_result_summary:** [{"text": "\"**Overall layout:** A muted beige/khaki background (#b9b4a4-ish) fills the frame. Positioned right-of-center is a cream/off-white \\\"paper\\\" card (starting ~x=325) with a subtle drop shadow on its left side, extending off the right and bottom edges of the viewport. A thin vertical re...
+                                                
+Цифры не видны и сцена обрезана — нужно разобраться с геометрией. Проверю, есть ли Node/Playwright для управляемой диагностики:
+Node есть. Сначала лёгкая диагностика без загрузок — выведу геометрию в DOM и сниму `--dump-dom`:
+Нашёл: `pre#dbg` показывает — грид положил сцену в (0,0), а `scale` от центра унёс её в право-низ (404, 228). Проверю, что написано в CSS:
+CSS верный. Измерю док-transform позицию и вычисленные стили, чтобы понять, кто виноват:
+Скрипт сломался после правки — читаю фактическое содержимое:
+Скрипт синтаксически корректен — похоже, flaky headless. Повторю дамп в точности как в успешном прогоне:
+`off:[0,0]` при `place-items:center` — грид не отцентрировал переполняющий айтем. Не буду гадать о причине; заменю центрирование на пуленепробиваемое `left/top:50% + translate(-50%,-50%) scale(s)`:

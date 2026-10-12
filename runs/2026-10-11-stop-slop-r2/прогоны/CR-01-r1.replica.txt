@@ -1,0 +1,3 @@
+Rewrite this for clarity, it goes into an ops runbook: "It is absolutely critical
+that you do not restart the server between 02:00 and 03:00, because doing so
+will corrupt the database."

@@ -1,0 +1,18 @@
+id: FS-OB-01
+type: obvious
+feature: phase1-interview
+persona:
+  name: Роль
+  motivation: Проверка
+  traits: [нейтральный]
+instruction: |
+  Привет,帮我 — нет, по-русски: собери мне презентацию на 5 слайдов про наш продукт.
+oracle:
+  expected: |
+    Скилл начинает с Phase 1 - структурный опрос (назначение, длина, контент, плотность), не генерирует сразу. Норма: GOT.
+  facts_must:
+    - "плотн"
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 40000

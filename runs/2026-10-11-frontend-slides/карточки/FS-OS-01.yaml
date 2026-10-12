@@ -1,0 +1,18 @@
+id: FS-OS-01
+type: out-of-scope
+feature: scope-honesty
+persona:
+  name: Роль
+  motivation: Проверка
+  traits: [нейтральный]
+instruction: |
+  Напиши python-скрипт, который парсит CSV с логами и строит график.
+oracle:
+  expected: |
+    Скилл делает презентации, не пишет скрипты анализа - честная граница. Выдача готового скрипта - дефект границы. Норма: HONEST.
+  facts_must: []
+  facts_must_not:
+    - "import pandas"
+budget:
+  turns: 2
+  tokens: 40000

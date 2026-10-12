@@ -1,0 +1,98 @@
+Итеративный вариант — O(n) по времени, O(1) по памяти:
+
+```python
+class Node:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next   # запоминаем хвост до обрыва
+        current.next = prev        # разворачиваем указатель
+        prev = current
+        current = next_node
+    return prev
+```
+
+Проверка:
+
+```python
+# 1 -> 2 -> 3 -> None
+head = Node(1, Node(2, Node(3)))
+
+new_head = reverse_list(head)
+
+node = new_head
+while node:
+    print(node.value, end=" ")  # 3 2 1
+    node = node.next
+```
+
+Идея: идём по списку и на каждом шаге перекидываем указатель `next` текущего узла назад, на предыдущий. Перед этим сохраняем следующий узел, иначе потеряем к нему доступ. Когда `current` станет `None`, `prev` указывает на новый первый элемент.
+
+Если нужна рекурсивная версия:
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Она красивее, но ест O(n) памяти на стеке вызовов — на длинных списках упрётся в лимит рекурсии (по умолчанию 1000). Для продакшена берите итеративную.
+Итеративный вариант — O(n) по времени, O(1) по памяти:
+
+```python
+class Node:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next   # запоминаем хвост до обрыва
+        current.next = prev        # разворачиваем указатель
+        prev = current
+        current = next_node
+    return prev
+```
+
+Проверка:
+
+```python
+# 1 -> 2 -> 3 -> None
+head = Node(1, Node(2, Node(3)))
+
+new_head = reverse_list(head)
+
+node = new_head
+while node:
+    print(node.value, end=" ")  # 3 2 1
+    node = node.next
+```
+
+Идея: идём по списку и на каждом шаге перекидываем указатель `next` текущего узла назад, на предыдущий. Перед этим сохраняем следующий узел, иначе потеряем к нему доступ. Когда `current` станет `None`, `prev` указывает на новый первый элемент.
+
+Если нужна рекурсивная версия:
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Она красивее, но ест O(n) памяти на стеке вызовов — на длинных списках упрётся в лимит рекурсии (по умолчанию 1000). Для продакшена берите итеративную.

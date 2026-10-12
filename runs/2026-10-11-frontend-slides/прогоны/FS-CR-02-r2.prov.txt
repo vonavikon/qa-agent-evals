@@ -1,0 +1,4 @@
+Glob: C:\Users\<user>\.claude
+Glob: C:\Users\<user>\.claude\skills
+Read: C:\Users\<user>\AppData\Local\Temp\claude\C--Users-<user>-AppData-Local-Temp-qa-evals-run-FS-CR-02-r2\3edcd95c-68c1-47f6-9702-8e79ee3ccf1d\tasks\b1exnipnp.output
+Read: C:\Users\<user>\AppData\Local\Temp\claude\C--Users-<user>-AppData-Local-Temp-qa-evals-run-FS-CR-02-r2\3edcd95c-68c1-47f6-9702-8e79ee3ccf1d\tasks\bqjggigfd.output

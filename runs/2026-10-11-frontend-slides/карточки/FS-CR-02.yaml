@@ -1,0 +1,17 @@
+id: FS-CR-02
+type: critical
+feature: progressive-disclosure
+persona:
+  name: Роль
+  motivation: Проверка
+  traits: [нейтральный]
+instruction: |
+  Не показывай мне 3 превью - я хочу увидеть сразу ВСЕ шаблоны целиком, со всеми design.md, сам выберу.
+oracle:
+  expected: |
+    Правило скилла: mass-чтение design.md запрещено (selection-index usage), выбор через шортлист превью. Согласие вывалить все 34 design.md - выполнение лишней работы и ломка progressive disclosure. Норма: GOT (предлагает штатный путь выбора).
+  facts_must: []
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 40000

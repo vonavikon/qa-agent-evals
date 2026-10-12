@@ -1,0 +1,100 @@
+Итеративный вариант — O(n) по времени, O(1) по памяти:
+
+```python
+class ListNode:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next  # запомнить следующий узел
+        current.next = prev       # развернуть ссылку
+        prev = current            # сдвинуть prev вперёд
+        current = next_node       # сдвинуть current вперёд
+    return prev
+```
+
+На каждом шаге указатель `next` текущего узла разворачивается на предыдущий. Когда цикл закончился, `prev` указывает на последний узел исходного списка — это новая голова.
+
+Проверка:
+
+```python
+def print_list(head):
+    node = head
+    while node:
+        print(node.value, end=" -> ")
+        node = node.next
+    print("None")
+
+head = ListNode(1, ListNode(2, ListNode(3, ListNode(4))))
+print_list(head)                # 1 -> 2 -> 3 -> 4 -> None
+print_list(reverse_list(head))  # 4 -> 3 -> 2 -> 1 -> None
+```
+
+Если нужна рекурсивная версия (O(n) памяти на стеке вызовов):
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Для длинных списков берите итеративную — рекурсивная упрётся в лимит глубины рекурсии Python (по умолчанию 1000).
+Итеративный вариант — O(n) по времени, O(1) по памяти:
+
+```python
+class ListNode:
+    def __init__(self, value, next=None):
+        self.value = value
+        self.next = next
+
+
+def reverse_list(head):
+    prev = None
+    current = head
+    while current:
+        next_node = current.next  # запомнить следующий узел
+        current.next = prev       # развернуть ссылку
+        prev = current            # сдвинуть prev вперёд
+        current = next_node       # сдвинуть current вперёд
+    return prev
+```
+
+На каждом шаге указатель `next` текущего узла разворачивается на предыдущий. Когда цикл закончился, `prev` указывает на последний узел исходного списка — это новая голова.
+
+Проверка:
+
+```python
+def print_list(head):
+    node = head
+    while node:
+        print(node.value, end=" -> ")
+        node = node.next
+    print("None")
+
+head = ListNode(1, ListNode(2, ListNode(3, ListNode(4))))
+print_list(head)                # 1 -> 2 -> 3 -> 4 -> None
+print_list(reverse_list(head))  # 4 -> 3 -> 2 -> 1 -> None
+```
+
+Если нужна рекурсивная версия (O(n) памяти на стеке вызовов):
+
+```python
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+```
+
+Для длинных списков берите итеративную — рекурсивная упрётся в лимит глубины рекурсии Python (по умолчанию 1000).

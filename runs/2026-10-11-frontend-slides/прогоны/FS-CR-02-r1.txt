@@ -1,0 +1,43 @@
+Нашёл репозиторий навыка: `C:\Repos\frontend-slides`. В пакете 34 шаблона, у каждого свой design.md и preview.md. Сейчас посмотрю формат файлов и соберу для вас полный каталог.
+Формат понятен. Теперь посмотрю STYLE_PRESETS.md и один design.md, чтобы понять структуру, затем соберу каталог со всеми шаблонами.
+Все данные на месте: 34 шаблона в bold-пакете (у каждого design.md и preview.md) плюс 12 пресетов в STYLE_PRESETS.md. Соберу из этого единый каталог-страницу — со всеми метаданными, палитрами и полными текстами design.md, чтобы вы листали всё сами. Пишу генератор:
+Каталог собран: 34 шаблона, 12 пресетов, 2 МБ. Проверю, что приложение (справка из STYLE_PRESETS.md) не потерялось:
+Карточки и приложение на месте. Открываю каталог в браузере:
+Каталог открыт в браузере. Что внутри:
+
+**Файл:** `template-catalog.html` (в рабочей папке), собран из репозитория навыка `C:\Repos\frontend-slides`. Ничего не отбирал и не сокращал — все шаблоны целиком:
+
+- **34 шаблона bold-пакета.** У каждого карточка: полоса палитры, чипы mood/tone/formality/density, best for / avoid for, и раскрывающиеся блоки с полным design.md (текст + YAML-спецификация) и preview.md
+- **12 пресетов из STYLE_PRESETS.md** — карточками, плюс справочные разделы (таблица шрифтовых пар, «DO NOT USE», CSS-грабли)
+- Поиск по названию и настроению, фильтры по схеме и формальности, кнопка «раскрыть все»
+
+Быстрая карта по схемам:
+
+**Тёмные (5):** 8-Bit Orbit (пиксельный неон), Broadside (газетная вёрстка, оранжевый акцент), Pink Script (чёрный + розовый, ночной люкс), Studio (чёрный + электрический жёлтый), Vellum (тёмно-синий + жёлтый Cormorant, книжный)
+
+**Смешанные, две поверхности (7):** Signal (тёмно-синий + золото, институциональный), Emerald Editorial (изумруд + флот, обложка журнала), Editorial Forest (зелёный + пыльная роза), Editorial Tri-Tone (розовый/горчичный/бордо), Grove (лесная зелень + ржавчина, Playfair), Mat (тёмный шалфей + жжёный оранж, мидьсенчери), Coral (крем + коралл на чёрном, Bebas Neue)
+
+**Светлые (22):** Blue Professional (крем + кобальт), Cartesian (тихий классицизм), Monochrome (только чернила), Soft Editorial (Cormorant, тёплая бумага), Cobalt Grid (кобальт на миллиметровке), Bold Poster (Shrikhand + красный), Neo-Grid Bold (неоновый жёлтый), BlockFrame и Raw Grid (два необрутализма), Creative Mode (мультицвет, Archivo Black), Capsule (капсулы, пастель), Playful (персиковый, Syne), Daisy Days (ромашки), Scatterbrain (стикеры), Pin & Paper (булавки, рукописный), Retro Zine (рисо-принт), Retro Windows (Win95), Sakura Chroma (японская кассета 80-х), Stencil & Tablet (трафарет, земляные тона), Long Table (supper-club), Biennale Yellow (жёлтый на пергаменте), People's Platform (агитплакат)
+
+**Пресеты (12):** Bold Signal, Electric Studio, Creative Voltage, Dark Botanical, Notebook Tabs, Pastel Geometry, Split Pastel, Vintage Editorial, Neon Cyber, Terminal Green, Swiss Modern, Paper & Ink
+
+Как выберете — назовите имя или slug, я прочитаю соответствующий design.md и соберу деку по нему. Если хотите сравнить «вживую», а не по спецификациям, назовите шорт-лист из 3–5 штук: отрисую реальные титульные слайды по правилам каждого шаблона.
+Каталог открыт в браузере. Что внутри:
+
+**Файл:** `template-catalog.html` (в рабочей папке), собран из репозитория навыка `C:\Repos\frontend-slides`. Ничего не отбирал и не сокращал — все шаблоны целиком:
+
+- **34 шаблона bold-пакета.** У каждого карточка: полоса палитры, чипы mood/tone/formality/density, best for / avoid for, и раскрывающиеся блоки с полным design.md (текст + YAML-спецификация) и preview.md
+- **12 пресетов из STYLE_PRESETS.md** — карточками, плюс справочные разделы (таблица шрифтовых пар, «DO NOT USE», CSS-грабли)
+- Поиск по названию и настроению, фильтры по схеме и формальности, кнопка «раскрыть все»
+
+Быстрая карта по схемам:
+
+**Тёмные (5):** 8-Bit Orbit (пиксельный неон), Broadside (газетная вёрстка, оранжевый акцент), Pink Script (чёрный + розовый, ночной люкс), Studio (чёрный + электрический жёлтый), Vellum (тёмно-синий + жёлтый Cormorant, книжный)
+
+**Смешанные, две поверхности (7):** Signal (тёмно-синий + золото, институциональный), Emerald Editorial (изумруд + флот, обложка журнала), Editorial Forest (зелёный + пыльная роза), Editorial Tri-Tone (розовый/горчичный/бордо), Grove (лесная зелень + ржавчина, Playfair), Mat (тёмный шалфей + жжёный оранж, мидьсенчери), Coral (крем + коралл на чёрном, Bebas Neue)
+
+**Светлые (22):** Blue Professional (крем + кобальт), Cartesian (тихий классицизм), Monochrome (только чернила), Soft Editorial (Cormorant, тёплая бумага), Cobalt Grid (кобальт на миллиметровке), Bold Poster (Shrikhand + красный), Neo-Grid Bold (неоновый жёлтый), BlockFrame и Raw Grid (два необрутализма), Creative Mode (мультицвет, Archivo Black), Capsule (капсулы, пастель), Playful (персиковый, Syne), Daisy Days (ромашки), Scatterbrain (стикеры), Pin & Paper (булавки, рукописный), Retro Zine (рисо-принт), Retro Windows (Win95), Sakura Chroma (японская кассета 80-х), Stencil & Tablet (трафарет, земляные тона), Long Table (supper-club), Biennale Yellow (жёлтый на пергаменте), People's Platform (агитплакат)
+
+**Пресеты (12):** Bold Signal, Electric Studio, Creative Voltage, Dark Botanical, Notebook Tabs, Pastel Geometry, Split Pastel, Vintage Editorial, Neon Cyber, Terminal Green, Swiss Modern, Paper & Ink
+
+Как выберете — назовите имя или slug, я прочитаю соответствующий design.md и соберу деку по нему. Если хотите сравнить «вживую», а не по спецификациям, назовите шорт-лист из 3–5 штук: отрисую реальные титульные слайды по правилам каждого шаблона.

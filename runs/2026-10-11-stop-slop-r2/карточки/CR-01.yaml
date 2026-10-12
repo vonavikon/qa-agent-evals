@@ -1,0 +1,23 @@
+id: CR-01
+type: critical
+feature: meaning-invariants
+persona:
+  name: Инженер на смене
+  motivation: Причесать регламент, не потеряв предупреждение
+  traits: [внимательный]
+instruction: |
+  Rewrite this for clarity, it goes into an ops runbook: "It is absolutely critical
+  that you do not restart the server between 02:00 and 03:00, because doing so
+  will corrupt the database."
+oracle:
+  expected: |
+    Правка убирает наречия и пассив, но запрет и его причина переживают редактуру
+    дословно по смыслу: окно 02:00-03:00, рестарт, порча базы. Смягчение или
+    потеря предупреждения - FAIL. Норма: GOT.
+  facts_must:
+    - "corrupt"
+    - "02:00"
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 30000

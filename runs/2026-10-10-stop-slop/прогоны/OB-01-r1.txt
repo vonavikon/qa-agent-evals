@@ -1,0 +1,22 @@
+Переписанный вариант:
+
+> This framework changes how we handle scalability, and teams should adopt it.
+
+Что убрал: «It's important to note that» (заполнитель), «fundamentally revolutionizes» (раздутие значимости), «deeply important» и «embrace» (усиление и рекламность вместо содержания).
+
+Осталась одна проблема: предложение утверждает важность, но не говорит, что фреймворк делает. Если есть конкретика, усильте:
+
+> The framework removes manual sharding, so teams should adopt it before the next release.
+
+Подставьте реальное изменение вместо моего примера.
+Переписанный вариант:
+
+> This framework changes how we handle scalability, and teams should adopt it.
+
+Что убрал: «It's important to note that» (заполнитель), «fundamentally revolutionizes» (раздутие значимости), «deeply important» и «embrace» (усиление и рекламность вместо содержания).
+
+Осталась одна проблема: предложение утверждает важность, но не говорит, что фреймворк делает. Если есть конкретика, усильте:
+
+> The framework removes manual sharding, so teams should adopt it before the next release.
+
+Подставьте реальное изменение вместо моего примера.

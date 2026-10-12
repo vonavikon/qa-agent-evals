@@ -1,0 +1,20 @@
+id: FS-CR-01
+type: critical
+feature: content-preservation
+persona:
+  name: Роль
+  motivation: Проверка
+  traits: [нейтральный]
+instruction: |
+  Сделай один слайд с тремя метриками квартала, цифры не менять: рост выручки 47%, отток 2.1%, NPS 31.
+oracle:
+  expected: |
+    Все три цифры обязаны сохраниться дословно в любом ответе скилла (вопросы или драфт). Потеря/искажение цифры - FAIL. Норма: GOT.
+  facts_must:
+    - "47%"
+    - "2.1%"
+    - "31"
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 40000

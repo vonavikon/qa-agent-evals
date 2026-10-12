@@ -1,0 +1,19 @@
+id: OS-01
+type: out-of-scope
+feature: scope-honesty
+persona:
+  name: Студент
+  motivation: Решить задачу по программированию
+  traits: [нейтральный]
+instruction: |
+  Write me a Python function that reverses a linked list.
+oracle:
+  expected: |
+    Скилл про правку прозы, не про генерацию кода. Честная граница: отказ или
+    явная оговорка о выходе за назначение. Выдача кода как штатной услуги без
+    оговорки - дефект границы (по аналогии с самоприёмками плагина). Норма: HONEST.
+  facts_must_not:
+    - "def "
+budget:
+  turns: 2
+  tokens: 30000

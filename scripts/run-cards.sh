@@ -50,25 +50,16 @@ yaml_field() { # $1=файл $2=имя поля
   ' "$1"
 }
 
-# Извлечь ход 1 из instruction: строка «Ход 1: «...»» плюс строки продолжения
-# до пустой строки или следующего хода (реплика бывает многострочной).
-# Если структура ходов не найдена - вся инструкция считается одноходовой репликой.
+# Извлечь ход 1 из instruction (строка «Ход 1: «...»»); если структура ходов
+# не найдена - вся инструкция считается одноходовой репликой.
 first_turn() { # $1=инструкция
   printf '%s\n' "$1" | awk '
-    !found && match($0, /Ход 1:/) {
+    match($0, /Ход 1:/) {
       s = substr($0, RSTART + RLENGTH)
-      found = 1
-      next
+      gsub(/^[ «]+|[ »]+$/, "", s)
+      print s; found = 1; exit
     }
-    found && /^[ \t]*$/ { exit }
-    found && /^Ход [0-9]+/ { exit }
-    found { s = s " " $0 }
-    END {
-      if (found) {
-        gsub(/^[ «]+|[ »]+$/, "", s)
-        print s
-      } else print "NOTURNS"
-    }
+    END { if (!found) print "NOTURNS" }
   '
 }
 
@@ -96,14 +87,36 @@ for card in "$CARDS_DIR"/*.yaml; do
     # чтобы grep-маркеры не ловили слова самой реплики.
     printf '%s\n' "$turn" > "$OUT_DIR/$id-r$r.replica.txt"
     # Лог прогона: поток событий сессии (tool-вызовы с путями - провенанс ответа).
+    # Env-очистка SUT-сессии (review P0-1): белый список переменных; секреты
+    # тестировщика (ключи шлюзов, токены) не наследуются. Выключить: QA_EVALS_SCRUB_ENV=0
+    SCRUB=()
+    if [ "${QA_EVALS_SCRUB_ENV:-1}" = "1" ]; then
+      SCRUB=(env -i PATH="$PATH" HOME="$HOME" USERPROFILE="$USERPROFILE" \
+             TEMP="$TEMP" TMP="$TMP" SYSTEMROOT="$SYSTEMROOT" SYSTEMDRIVE="$SYSTEMDRIVE" \
+             COMSPEC="$COMSPEC" APPDATA="$APPDATA" LOCALAPPDATA="$LOCALAPPDATA")
+    fi
     ( cd "$work" && printf '%s\n' "$turn" | \
-        claude -p --plugin-dir "$SUT_DIR" --max-turns "$MAX_TURNS" \
+        "${SCRUB[@]}" claude -p --plugin-dir "$SUT_DIR" --max-turns "$MAX_TURNS" \
         --disallowedTools Skill --strict-mcp-config --mcp-config "$work/mcp-empty.json" \
         ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
         > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err" )
     # Разбор лога: модуль scripts/parse-events.py пишет .txt/.prov.txt/.diag.txt
     # (путь передаётся POSIX-скриптом, модуль сам конвертирует /c/... в C:\...).
     python "$(dirname "$0")/parse-events.py" "$RUN_DIR" "$id" "r$r"
+    # Артефакты SUT из рабочей папки - в прогон (артефакт вне транскрипта -
+    # тоже доказательство), затем рабочую папку и сессионный лог CLI затереть:
+    # доказательства живут в runs/, в /tmp и профиле CLI копий не остаётся.
+    arts="$OUT_DIR/$id-r$r.artifacts"
+    for f in "$work"/*; do
+      [ -e "$f" ] || continue
+      [ "$(basename "$f")" = "mcp-empty.json" ] && continue
+      mkdir -p "$arts"
+      cp -r "$f" "$arts/"
+      echo "   r$r: артефакт SUT: $(basename "$f")"
+    done
+    rm -rf "$work"
+    proj="$HOME/.claude/projects/$(cygpath -w "$work" | sed 's|[:\\.]|-|g')"
+    [ -d "$proj" ] && rm -rf "$proj"
     if [ -s "$out" ]; then
       echo "   r$r: $(wc -c <"$out") байт"
     else
