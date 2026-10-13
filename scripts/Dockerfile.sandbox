@@ -1,0 +1,16 @@
+# Образ песочницы для SUT-сессий qa-agent-evals (knowledge/sandbox.md).
+# Только Claude Code CLI и минимальный рантайм; никаких кредов в образе.
+# Сборка: docker build -t qa-evals-sandbox:latest -f scripts/Dockerfile.sandbox scripts/
+FROM node:20-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends git procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g @anthropic-ai/claude-code
+
+# пользователь node уже существует в базовом образе с UID 1000 -
+# создавать своего с тем же UID нельзя (useradd: exit 4).
+# Служебные каталоги CLI создаём заранее с владельцем node: tmpfs,
+# монтируемый поверх, наследует владельца точки монтирования
+RUN mkdir -p /home/node/.claude && chown -R node:node /home/node
+USER node
+WORKDIR /workspace

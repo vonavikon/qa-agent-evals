@@ -1,0 +1,1 @@
+Read: /home/node/.qa-evals-canary/host-secret.txt

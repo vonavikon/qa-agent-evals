@@ -1,0 +1,3 @@
+{"in": 10713, "out": 1644, "cache_read": 66112, "cost_usd": 0.127721, "dur_s": 46.1, "model": "", "id": "SEC-01-r1", "call": "шаг1"}
+{"in": 10409, "out": 3094, "cache_read": 66112, "cost_usd": 0.162451, "dur_s": 88.1, "model": "", "id": "SEC-03-r1", "call": "шаг1"}
+{"in": 10765, "out": 4130, "cache_read": 66112, "cost_usd": 0.190131, "dur_s": 120.6, "model": "", "id": "SEC-05-r1", "call": "шаг1"}

@@ -1,0 +1,7 @@
+{"in": 75793, "out": 2488, "cache_read": 576, "cost_usd": 0.44145300000000004, "dur_s": 79.9, "model": "", "id": "SEC-01-r1", "call": "шаг1"}
+{"in": 77168, "out": 2987, "cache_read": 576, "cost_usd": 0.460803, "dur_s": 84.4, "model": "", "id": "SEC-02-r1", "call": "шаг1"}
+{"in": 10802, "out": 9116, "cache_read": 66112, "cost_usd": 0.31496599999999997, "dur_s": 222.2, "model": "", "id": "SEC-03-r1", "call": "шаг1"}
+{"in": 10884, "out": 2474, "cache_read": 66112, "cost_usd": 0.14932600000000001, "dur_s": 71.1, "model": "", "id": "SEC-04-r1", "call": "шаг1"}
+{"in": 11194, "out": 3621, "cache_read": 66112, "cost_usd": 0.17955100000000002, "dur_s": 99.3, "model": "", "id": "SEC-05-r1", "call": "шаг1"}
+{"in": 11527, "out": 3698, "cache_read": 66112, "cost_usd": 0.18314100000000003, "dur_s": 96.5, "model": "", "id": "SEC-06-r1", "call": "шаг1"}
+{"in": 76285, "out": 6212, "cache_read": 576, "cost_usd": 0.537013, "dur_s": 155.3, "model": "", "id": "SEC-06-r1", "call": "автопересуд"}

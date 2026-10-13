@@ -11,6 +11,10 @@
 
 set -u
 
+# Git Bash конвертирует POSIX-аргументы в Windows-пути (/workspace -> X:/Git/workspace)
+# и ломает аргументы контейнера; для этого скрипта конверсию отключаем
+export MSYS_NO_PATHCONV=1
+
 CARDS_DIR="${1:?Usage: run-cards.sh <cards-dir> <sut-plugin-dir> <run-dir> [repeats] [max-turns] [skill-md]}"
 SUT_DIR="${2:?нет пути к плагину SUT}"
 RUN_DIR="${3:?нет каталога прогона}"
@@ -34,6 +38,22 @@ ASP=()
 
 OUT_DIR="$RUN_DIR/прогоны"
 mkdir -p "$OUT_DIR"
+
+# Уровень изоляции (knowledge/sandbox.md): host - как раньше; docker -
+# контейнер, единый work на прогон (уникальный mktemp), копия SUT и конфиг
+# CLI внутри, сеть off. Fail-closed: docker недоступен - стоп.
+SANDBOX="${QA_EVALS_SANDBOX:-host}"
+SB="$(dirname "$0")/sandbox.py"
+SBWORK=""
+if [ "$SANDBOX" = "docker" ]; then
+  python "$SB" verify docker || exit 1
+  SBWORK=$(python "$SB" prepare docker "$SUT_DIR" "$RUN_DIR" | python -c "import json,sys; print(json.load(sys.stdin)['work'])")
+  [ -n "$SBWORK" ] || { echo "sandbox prepare не дал work" >&2; exit 1; }
+  if [ -n "$SKILL_MD" ]; then
+    cp "$SKILL_MD" "$SBWORK/skill.md"; SKILL_MD_INSIDE="/workspace/skill.md"
+  else SKILL_MD_INSIDE=""; fi
+  echo "изоляция: docker, work=$SBWORK (meta-sandbox.json в прогоне)"
+fi
 
 # Извлечь поле из карточки: поле 2-го уровня YAML (скаляр или literal-блок).
 # Формат карточек фиксирован таксономией - простого парсера достаточно.
@@ -80,8 +100,13 @@ for card in "$CARDS_DIR"/*.yaml; do
 
   for r in $(seq 1 "$REPEATS"); do
     out="$OUT_DIR/$id-r$r.txt"
-    work="/tmp/qa-evals-run-$id-r$r"
-    rm -rf "$work"; mkdir -p "$work"
+    if [ "$SANDBOX" = "docker" ]; then
+      work="$SBWORK"
+      rm -rf "$work/out"/* 2>/dev/null; mkdir -p "$work/out"
+    else
+      work="/tmp/qa-evals-run-$id-r$r"
+      rm -rf "$work"; mkdir -p "$work"
+    fi
     printf '{"mcpServers": {}}' > "$work/mcp-empty.json"
     # Реплика - отдельным файлом: транскрипт хранит только ответы SUT,
     # чтобы grep-маркеры не ловили слова самой реплики.
@@ -95,28 +120,52 @@ for card in "$CARDS_DIR"/*.yaml; do
              TEMP="$TEMP" TMP="$TMP" SYSTEMROOT="$SYSTEMROOT" SYSTEMDRIVE="$SYSTEMDRIVE" \
              COMSPEC="$COMSPEC" APPDATA="$APPDATA" LOCALAPPDATA="$LOCALAPPDATA")
     fi
-    ( cd "$work" && printf '%s\n' "$turn" | \
-        "${SCRUB[@]}" claude -p --plugin-dir "$SUT_DIR" --max-turns "$MAX_TURNS" \
-        --disallowedTools Skill --strict-mcp-config --mcp-config "$work/mcp-empty.json" \
-        ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
-        > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err" )
+    if [ "$SANDBOX" = "docker" ]; then
+      ASPD=()
+      [ -n "$SKILL_MD_INSIDE" ] && ASPD=(--append-system-prompt-file "$SKILL_MD_INSIDE")
+      mapfile -t DCMD < <(python "$SB" wrap docker "$work" -- claude -p \
+        --plugin-dir /workspace/sut --max-turns "$MAX_TURNS" \
+        --disallowedTools Skill,WebFetch,WebSearch,webReader,webSearch --strict-mcp-config --mcp-config /workspace/mcp-empty.json \
+        ${ASPD[@]+"${ASPD[@]}"} --output-format stream-json --verbose | \
+        python -c "import json,sys; [print(x) for x in json.load(sys.stdin)]" | tr -d '\r')
+      printf '%s\n' "$turn" | MSYS_NO_PATHCONV=1 "${DCMD[@]}" \
+        > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err"
+    else
+      ( cd "$work" && printf '%s\n' "$turn" | \
+          "${SCRUB[@]}" claude -p --plugin-dir "$SUT_DIR" --max-turns "$MAX_TURNS" \
+          --disallowedTools Skill --strict-mcp-config --mcp-config "$work/mcp-empty.json" \
+          ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
+          > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err" )
+    fi
     # Разбор лога: модуль scripts/parse-events.py пишет .txt/.prov.txt/.diag.txt
     # (путь передаётся POSIX-скриптом, модуль сам конвертирует /c/... в C:\...).
     python "$(dirname "$0")/parse-events.py" "$RUN_DIR" "$id" "r$r"
     # Артефакты SUT из рабочей папки - в прогон (артефакт вне транскрипта -
     # тоже доказательство), затем рабочую папку и сессионный лог CLI затереть:
     # доказательства живут в runs/, в /tmp и профиле CLI копий не остаётся.
+    # docker: work общий на прогон (копия SUT внутри) - между повторами не
+    # трогаем, сессионных хвостов CLI нет (контейнер --rm).
     arts="$OUT_DIR/$id-r$r.artifacts"
-    for f in "$work"/*; do
-      [ -e "$f" ] || continue
-      [ "$(basename "$f")" = "mcp-empty.json" ] && continue
-      mkdir -p "$arts"
-      cp -r "$f" "$arts/"
-      echo "   r$r: артефакт SUT: $(basename "$f")"
-    done
-    rm -rf "$work"
-    proj="$HOME/.claude/projects/$(cygpath -w "$work" | sed 's|[:\\.]|-|g')"
-    [ -d "$proj" ] && rm -rf "$proj"
+    if [ "$SANDBOX" = "docker" ]; then
+      for f in "$work/out"/*; do
+        [ -e "$f" ] || continue
+        mkdir -p "$arts"
+        cp -r "$f" "$arts/"
+        echo "   r$r: артефакт SUT: $(basename "$f")"
+      done
+      rm -rf "$work/out"; mkdir -p "$work/out"
+    else
+      for f in "$work"/*; do
+        [ -e "$f" ] || continue
+        [ "$(basename "$f")" = "mcp-empty.json" ] && continue
+        mkdir -p "$arts"
+        cp -r "$f" "$arts/"
+        echo "   r$r: артефакт SUT: $(basename "$f")"
+      done
+      rm -rf "$work"
+      proj="$HOME/.claude/projects/$(cygpath -w "$work" | sed 's|[:\\.]|-|g')"
+      [ -d "$proj" ] && rm -rf "$proj"
+    fi
     if [ -s "$out" ]; then
       echo "   r$r: $(wc -c <"$out") байт"
     else
@@ -125,5 +174,10 @@ for card in "$CARDS_DIR"/*.yaml; do
     fi
   done
 done
+
+# docker: единый work живёт до конца прогона - затираем после всех карточек
+if [ "$SANDBOX" = "docker" ] && [ -n "$SBWORK" ]; then
+  python "$SB" cleanup "$SBWORK"
+fi
 
 exit $empty

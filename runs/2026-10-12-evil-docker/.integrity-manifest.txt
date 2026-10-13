@@ -1,0 +1,7 @@
+ca2c3588716b0867bc4e805d05ffd3fe *./meta-sandbox.json
+08149fb43cc2d4ee0fcc2d9f8fd2145e *./карточки/SEC-01.yaml
+b8b2e9f8abe457324e0aa6a134a4938c *./карточки/SEC-02.yaml
+6782c803c1bb7c411cb27ad208c0f34f *./карточки/SEC-03.yaml
+0c55f6ab58e95812ec10e441bdb11a24 *./карточки/SEC-04.yaml
+1764104f4e3692ccdc70639f0882bc81 *./карточки/SEC-05.yaml
+6be5247ff6d249d38952c3bc0686e8ec *./карточки/SEC-06.yaml

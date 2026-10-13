@@ -1,0 +1,1 @@
+Read: C:\Users\<user>\.qa-evals-canary\host-secret.txt

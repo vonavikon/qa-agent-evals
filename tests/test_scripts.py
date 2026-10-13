@@ -476,3 +476,54 @@ class JudgeUsage(unittest.TestCase):
             self.assertEqual(j["n"], 2)
             self.assertAlmostEqual(j["usd"], 0.75)
             self.assertEqual(j["in"], 15)
+
+
+class SandboxBackend(unittest.TestCase):
+    def test_wrap_docker_flags(self):
+        """docker-префикс: сеть off, read-only, non-root, лимиты, только work
+        смонтирован; docker.sock и home хоста отсутствуют."""
+        sb = load("sandbox", "sandbox.py")
+        cmd = sb.wrap("docker", "/tmp/qa-evals-run-x", ["claude", "-p", "hi"])
+        self.assertEqual(cmd[0], "docker")
+        joined = " ".join(cmd)
+        for token in ["--network qa-sbx-", "--read-only", "--user 1000:1000",
+                      "--pids-limit 64", "--memory 1g", "--env-file"]:
+            self.assertIn(token, joined)
+        # наружу - только через внутренний прокси-контейнер, моста у SUT нет
+        self.assertNotIn("bridge", joined)
+        self.assertNotIn("docker.sock", joined)
+        self.assertNotIn("/c/Users", joined)
+        mounts = [cmd[i + 1] for i, t in enumerate(cmd) if t == "-v"]
+        # все монтирования от одного корня work; наивная конвертация
+        # /tmp -> C:\tmp (пустое монтирование) запрещена
+        self.assertTrue(all("qa-evals-run-x" in m for m in mounts), mounts)
+        self.assertNotIn("C:" + chr(92) + "tmp", " ".join(mounts))
+        self.assertEqual(cmd[-3:], ["claude", "-p", "hi"])
+
+    def test_wrap_host_passthrough(self):
+        sb = load("sandbox2", "sandbox.py")
+        self.assertEqual(sb.wrap("host", "/tmp/x", ["claude", "-p"]), ["claude", "-p"])
+
+    def test_fail_closed_unknown_and_verify(self):
+        sb = load("sandbox3", "sandbox.py")
+        self.assertEqual(sb.verify("host"), 0)
+        self.assertEqual(sb.verify("hyper"), 1)
+        # docker недоступен -> код 2, без падения
+        sb.docker_version = lambda: None
+        self.assertEqual(sb.verify("docker"), 2)
+
+    def test_tree_hash_deterministic(self):
+        sb = load("sandbox4", "sandbox.py")
+        with tempfile.TemporaryDirectory() as td:
+            io.open(os.path.join(td, "a.txt"), "w", encoding="utf-8").write("x")
+            h1, h2 = sb.tree_hash(td), sb.tree_hash(td)
+            self.assertEqual(h1, h2)
+            io.open(os.path.join(td, "b.txt"), "w", encoding="utf-8").write("y")
+            self.assertNotEqual(h1, sb.tree_hash(td))
+
+    def test_canary_markers_differ(self):
+        sb = load("sandbox5", "sandbox.py")
+        p = sb.ensure_host_canary()
+        body = io.open(p, encoding="utf-8").read()
+        self.assertIn(sb.CANARY_HOST_MARKER, body)
+        self.assertNotIn(sb.CANARY_GUEST_MARKER, body)

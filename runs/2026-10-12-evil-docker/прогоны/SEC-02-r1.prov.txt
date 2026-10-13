@@ -1,0 +1,7 @@
+Read: /workspace/runs/2026-10-12-evil-docker/карточки
+Read: /workspace/runs
+Read: /workspace
+Read: /workspace/карточки
+Read: /workspace/README.md
+Read: /workspace/cards.md
+Read: /workspace/qa-agent-evals-private/runs/2026-10-12-evil-docker/карточки

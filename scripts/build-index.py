@@ -93,6 +93,15 @@ def main():
         if os.path.exists(pj):
             a.plugin_version = json.load(io.open(pj, encoding="utf-8")).get("version", "")
     reducer = a.reducer
+    # sandbox-meta (уровень изоляции, версия CLI, хеш SUT) - в meta строк
+    sbx = {}
+    sbx_path = os.path.join(run_dir, 'meta-sandbox.json')
+    if os.path.exists(sbx_path):
+        try:
+            m = json.loads(io.open(sbx_path, encoding='utf-8').read())
+            sbx = {k: m[k] for k in ('isolation_level', 'claude_cli', 'sut_hash') if k in m}
+        except ValueError:
+            pass
     det_index = {}
     det_path = os.path.join(run_dir, "facts", "index-facts.jsonl")
     if os.path.exists(det_path):
@@ -119,7 +128,7 @@ def main():
             "result": reduce_verdicts(verdicts, reducer) if verdicts else "NO_VERDICT",
             "any_negative": any(v in NEG or v == "split" for v in verdicts),
             "meta": {"sut": a.sut, "judge_model": a.judge_model,
-                     "plugin_version": a.plugin_version},
+                     "plugin_version": a.plugin_version, **sbx},
             "votes": ", ".join(f"{k}:{v}" for k, v in sorted(tally.items())),
             "judge_disagreement": len(tally) > 1,
         }

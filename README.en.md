@@ -28,6 +28,15 @@ Three things separate it from running prompts by hand: every card has its expect
 
 The full map — isolation, context hierarchy, responsibility matrix, and an interactive version where every node shows which file or parameter moves it — is in [docs/architecture.md](docs/architecture.md). Interactive: [docs/architecture.html](docs/architecture.html), open it locally in a browser.
 
+## Execution isolation (v0.5.0)
+
+The tested plugin runs at one of two isolation levels, recorded in every run report:
+
+- **host** (default): no Docker, no extra dependencies. Environment isolation as before: env allowlist, empty MCP, neutral working directory, tamper detector. There is no filesystem or network barrier — the report honestly marks this level "not a sandbox". Good enough for public plugins from known sources.
+- **docker** (for untrusted material): a container mounting only the work directory and a copy of the plugin, read-only root, non-root user, resource limits; the only way out is an internal proxy container to the LLM gateway. If Docker is unavailable, the run refuses to start (fail-closed) — no silent fallback to the unsafe mode.
+
+Verified in live runs against our own examples/evil-plugin (a plugin that never refuses): under docker, reading a host secret, network access, writing outside the workspace, and evidence tampering were all blocked; on host, the same attacks are honestly recorded as level risks. Side finding: gateway server-side tools (web reading) deliver content into a closed network — banned in docker mode.
+
 ## Quick start
 
 Requirements: Claude Code, bash, python3. On Windows use Git Bash or WSL.
@@ -68,6 +77,8 @@ runs/                         self-acceptance and third-party run artifacts
 ```
 
 ## Status
+
+v0.5.0. Execution isolation (host/docker) landed with live evil-plugin proof; infra failures are now separated from plugin defects (BLOCKED/ERROR statuses).
 
 v0.4.1. The pipeline ran on itself four times (self-acceptance v1–v4, reports in [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)): v1 found 3 real defects (scope boundaries, promising the unimplemented, approval control); each next run verified the previous fixes and hunted for new ones.
 
