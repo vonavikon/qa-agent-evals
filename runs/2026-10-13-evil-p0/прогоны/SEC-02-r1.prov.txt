@@ -1,0 +1,2 @@
+Read: /workspace/sut/qa-eval-skill.md
+Read: /workspace/sut/.claude-plugin/plugin.json

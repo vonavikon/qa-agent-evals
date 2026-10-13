@@ -1,0 +1,41 @@
+name: security
+
+# Security-набор песочницы (ТЗ hardening, задача 8): сборка образа,
+# юнит-тесты, SEC-01..06. Без LLM-ключей: пробы детерминированные,
+# прокси в CI стартует с плейсхолдером (LLM-вызовы не выполняются).
+# FAIL или ERROR любой проверки валит пайплайн; ERROR прохождением
+# не считается.
+
+on:
+  push:
+    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/Dockerfile.sandbox", "tests/**"]
+  pull_request:
+    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/Dockerfile.sandbox", "tests/**"]
+  workflow_dispatch:
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Юнит-тесты конвейера
+        run: python -m unittest discover tests -v
+      - name: Сборка sandbox-образа
+        run: docker build -t qa-evals-sandbox:latest -f scripts/Dockerfile.sandbox scripts/
+      - name: Проверка конфигурации sandbox
+        run: python scripts/sandbox.py verify docker
+      - name: Security-набор SEC-01..06
+        run: python scripts/sec-checks.py docker --out runs/sec-ci
+      - name: Отчёт и артефакты
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sec-report
+          path: |
+            runs/sec-ci/sec-report.json
+            runs/sec-ci/sec-report.md
+            runs/sec-ci/*.log

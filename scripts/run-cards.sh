@@ -50,7 +50,8 @@ if [ "$SANDBOX" = "docker" ]; then
   SBWORK=$(python "$SB" prepare docker "$SUT_DIR" "$RUN_DIR" | python -c "import json,sys; print(json.load(sys.stdin)['work'])")
   [ -n "$SBWORK" ] || { echo "sandbox prepare не дал work" >&2; exit 1; }
   if [ -n "$SKILL_MD" ]; then
-    cp "$SKILL_MD" "$SBWORK/skill.md"; SKILL_MD_INSIDE="/workspace/skill.md"
+    # ASP-файл - в ro-копию SUT: /workspace теперь tmpfs, sut смонтирован ro
+    cp "$SKILL_MD" "$SBWORK/sut/qa-eval-skill.md"; SKILL_MD_INSIDE="/workspace/sut/qa-eval-skill.md"
   else SKILL_MD_INSIDE=""; fi
   echo "изоляция: docker, work=$SBWORK (meta-sandbox.json в прогоне)"
 fi
@@ -107,7 +108,12 @@ for card in "$CARDS_DIR"/*.yaml; do
       work="/tmp/qa-evals-run-$id-r$r"
       rm -rf "$work"; mkdir -p "$work"
     fi
-    printf '{"mcpServers": {}}' > "$work/mcp-empty.json"
+    # docker: /workspace - tmpfs, читаемые файлы кладём в монтируемые места
+    if [ "$SANDBOX" = "docker" ]; then
+      printf '{"mcpServers": {}}' > "$work/out/mcp-empty.json"
+    else
+      printf '{"mcpServers": {}}' > "$work/mcp-empty.json"
+    fi
     # Реплика - отдельным файлом: транскрипт хранит только ответы SUT,
     # чтобы grep-маркеры не ловили слова самой реплики.
     printf '%s\n' "$turn" > "$OUT_DIR/$id-r$r.replica.txt"
@@ -125,10 +131,12 @@ for card in "$CARDS_DIR"/*.yaml; do
       [ -n "$SKILL_MD_INSIDE" ] && ASPD=(--append-system-prompt-file "$SKILL_MD_INSIDE")
       mapfile -t DCMD < <(python "$SB" wrap docker "$work" -- claude -p \
         --plugin-dir /workspace/sut --max-turns "$MAX_TURNS" \
-        --disallowedTools Skill,WebFetch,WebSearch,webReader,webSearch --strict-mcp-config --mcp-config /workspace/mcp-empty.json \
+        --disallowedTools Skill,WebFetch,WebSearch,webReader,webSearch --strict-mcp-config --mcp-config /workspace/out/mcp-empty.json \
         ${ASPD[@]+"${ASPD[@]}"} --output-format stream-json --verbose | \
         python -c "import json,sys; [print(x) for x in json.load(sys.stdin)]" | tr -d '\r')
-      printf '%s\n' "$turn" | MSYS_NO_PATHCONV=1 "${DCMD[@]}" \
+      # wall-time лимит сессии (SEC-04): застрявший процесс обрывается
+      printf '%s\n' "$turn" | MSYS_NO_PATHCONV=1 timeout "${QA_EVALS_SUT_TIMEOUT:-900}" \
+        "${DCMD[@]}" \
         > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err"
     else
       ( cd "$work" && printf '%s\n' "$turn" | \
@@ -149,6 +157,7 @@ for card in "$CARDS_DIR"/*.yaml; do
     if [ "$SANDBOX" = "docker" ]; then
       for f in "$work/out"/*; do
         [ -e "$f" ] || continue
+        [ "$(basename "$f")" = "mcp-empty.json" ] && continue
         mkdir -p "$arts"
         cp -r "$f" "$arts/"
         echo "   r$r: артефакт SUT: $(basename "$f")"

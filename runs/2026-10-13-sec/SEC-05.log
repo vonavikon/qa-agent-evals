@@ -1,0 +1,7 @@
+OUT-WRITTEN
+ok.txt
+PROBE-RAN
+
+--stderr--
+sh: 1: cannot create /test-root.txt: Read-only file system
+sh: 1: cannot create /workspace/sut/x.txt: Read-only file system

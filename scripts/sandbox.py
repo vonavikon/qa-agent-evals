@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import urllib.parse
 
 IMAGE = "qa-evals-sandbox:latest"
@@ -135,25 +136,41 @@ def gateway_of_host():
     return None
 
 
+def priv_dir_of(work):
+    """Приватный каталог раннера: РЯДОМ с work, но вне его - никогда не
+    монтируется в контейнер. Здесь живёт настоящий LLM-ключ (proxy.env)."""
+    return work + "-priv"
+
+
 def start_proxy(work):
     """Сетевая изоляция уровня docker: internal-сеть + прокси-контейнер с
     двумя интерфейсами. SUT ходит наружу ТОЛЬКО через прокси и ТОЛЬКО к
-    LLM-шлюзу (scripts/sandbox-proxy.py). Возвращает имя сети или None."""
+    LLM-шлюзу. Настоящий ключ передаётся прокси через env-файл из
+    приватного каталога хоста (P0-2: секрет недоступен SUT ни файлом,
+    ни переменной). Нет ключа - прокси стартует с плейсхолдером
+    (годится для sec-проверок среды без LLM и для CI)."""
     gw = gateway_of_host()
-    if not gw:
-        return None
-    url, _ = gw
+    url = gw[0] if gw else "https://api.z.ai/api/anthropic"
+    key = gw[1] if gw else "ci-dummy-key"
     net = "qa-sbx-" + os.path.basename(work)[-6:].lower()
     code, _, err = run(["docker", "network", "create", "--internal", net],
                        timeout=30)
     if code != 0 and "already exists" not in err:
         print("docker network create: " + err, file=sys.stderr)
         return None
+    priv = priv_dir_of(work)
+    os.makedirs(priv, exist_ok=True)
+    proxy_env = os.path.join(priv, "proxy.env")
+    io.open(proxy_env, "w", encoding="utf-8", newline="\n").write(
+        f"UPSTREAM={url}\nLLM_KEY={key}\n")
     proxy = "qa-sbx-proxy-" + os.path.basename(work)[-6:].lower()
+    proxy_src = os.path.join(scripts_dir(), "sandbox-proxy.py")
+    if os.name == "nt":
+        proxy_src = win_path(proxy_src)
     code, _, err = run(["docker", "run", "-d", "--rm", "--name", proxy,
                         "--network", net, "--network-alias", "llm",
-                        "-v", scripts_dir() + "\\sandbox-proxy.py:/srv/proxy.py:ro",
-                        "-e", f"UPSTREAM={url}",
+                        "-v", proxy_src + ":/srv/proxy.py:ro",
+                        "--env-file", win_path(proxy_env),
                         "python:3.12-slim",
                         "python", "/srv/proxy.py"], timeout=180)
     if code != 0:
@@ -172,26 +189,32 @@ def scripts_dir():
 def stop_proxy(work):
     net = "qa-sbx-" + os.path.basename(work)[-6:].lower()
     proxy = "qa-sbx-proxy-" + os.path.basename(work)[-6:].lower()
+    # идемпотентно: повторный вызов не ошибка, чужие ресурсы не трогаем
+    # (имена содержат суффикс work - уникальны на запуск)
     run(["docker", "rm", "-f", proxy], timeout=60)
-    run(["docker", "network", "rm", net], timeout=60)
+    # сеть нельзя удалить, пока контейнер отваливается (async): retry,
+    # иначе qa-sbx-сети копятся как мусор
+    for _ in range(4):
+        code, _, _ = run(["docker", "network", "rm", net], timeout=30)
+        if code == 0:
+            break
+        time.sleep(1.0)
+    priv = priv_dir_of(work)
+    shutil.rmtree(priv, ignore_errors=True)
 
 
 def build_llm_env(work, net_started):
-    """env-файл для docker --env-file: если прокси поднялся, SUT ходит в
-    шлюз через него (http://llm:8140/...); иначе - напрямую (для ручной
-    отладки сети). Ключ - личный, только генерация."""
+    """env-файл SUT: ТОЛЬКО адрес прокси и ПЛЕЙСХОЛДЕР токена (P0-2).
+    CLI требует непустой ANTHROPIC_AUTH_TOKEN - настоящий ключ живёт
+    в прокси и подставляется им; в среде SUT секрета нет."""
     gw = gateway_of_host()
-    if not gw:
-        return None
-    url, key = gw
-    if net_started:
-        u = urllib.parse.urlparse(url)
-        base = f"http://llm:8140{u.path}"
-    else:
-        base = url
-    p = os.path.join(work, "llm.env")
+    url = gw[0] if gw else "https://api.z.ai/api/anthropic"
+    u = urllib.parse.urlparse(url)
+    base = f"http://llm:8140{u.path}"
+    p = os.path.join(work, "sut.env")
     io.open(p, "w", encoding="utf-8", newline="\n").write(
-        f"ANTHROPIC_BASE_URL={base}\nANTHROPIC_AUTH_TOKEN={key}\n")
+        f"ANTHROPIC_BASE_URL={base}\n"
+        "ANTHROPIC_AUTH_TOKEN=sandbox-local-placeholder\n")
     return p
 
 
@@ -199,7 +222,15 @@ def prepare(level, sut_dir, run_dir):
     sut_dir = norm_path(sut_dir)
     run_dir = norm_path(run_dir)
     work = tempfile.mkdtemp(prefix="qa-evals-run-")
-    os.makedirs(os.path.join(work, "out"), exist_ok=True)
+    out_dir = os.path.join(work, "out")
+    os.makedirs(out_dir, exist_ok=True)
+    # linux: bind-том наследует владельца раннера, контейнер работает uid 1000;
+    # без sticky-writable запись результатов запрещена (SEC-05 CI). На Windows chmod безвреден.
+    try:
+        os.chmod(out_dir, 0o1777)
+        os.chmod(work, 0o755)
+    except OSError:
+        pass
     meta = {
         "isolation_level": level,
         "claude_cli": cli_version(),
@@ -221,13 +252,32 @@ def prepare(level, sut_dir, run_dir):
             return 4
         env_path = build_llm_env(work, net)
         meta["llm_env"] = env_path or "НЕ НАЙДЕН шлюз api.z.ai - контейнер без LLM"
-        # канарейка внутри песочницы: ДРУГОЕ содержимое на том же относительном пути
+        meta["llm_secret_location"] = "только в env прокси (приватный каталог хоста); в среде SUT - плейсхолдер"
+        # канарейка внутри песочницы: ДРУГОЕ содержимое на том же относительном
+        # пути. Пишем ДО probe: самопроверка прав требует полной конфигурации.
         canary_guest = os.path.join(work, "cli-config", CANARY_DIR)
-        os.makedirs(canary_guest, exist_ok=True)
-        io.open(os.path.join(canary_guest, "host-secret.txt"), "w",
-                encoding="utf-8").write(
-            f"{CANARY_GUEST_MARKER}-fake\n(это файл ВНУТРИ песочницы: если SUT "
-            "прочитал его вместо хостового - изоляция работает)\n")
+        try:
+            os.makedirs(canary_guest, exist_ok=True)
+            io.open(os.path.join(canary_guest, "host-secret.txt"), "w",
+                    encoding="utf-8").write(
+                f"{CANARY_GUEST_MARKER}-fake\n(это файл ВНУТРИ песочницы: если SUT "
+                "прочитал его вместо хостового - изоляция работает)\n")
+            meta["canary_guest"] = canary_guest
+        except OSError as e:
+            # отдельные CI-среды не дают писать скрытые подкаталоги work:
+            # канарейка переезжает в приватный каталог, монтируется файлом
+            alt = os.path.join(priv_dir_of(work), "canary")
+            os.makedirs(alt, exist_ok=True)
+            io.open(os.path.join(alt, "host-secret.txt"), "w",
+                    encoding="utf-8").write(
+                f"{CANARY_GUEST_MARKER}-fake\n(это файл ВНУТРИ песочницы)\n")
+            meta["canary_guest"] = alt
+            print(f"канарейка перенесена в priv ({type(e).__name__})", file=sys.stderr)
+        # самопроверка фактических прав до прогона (fail-closed)
+        if not probe_write_rights(work):
+            stop_proxy(work)
+            shutil.rmtree(work, ignore_errors=True)
+            return 5
     ensure_host_canary()
     meta_path = os.path.join(run_dir, "meta-sandbox.json")
     io.open(meta_path, "w", encoding="utf-8").write(
@@ -240,8 +290,8 @@ def win_path(p):
     """Docker на Windows понимает C:\\...; из Git Bash приходит POSIX-вид.
     Конвертация только через cygpath - наивная замена /tmp -> C:\\tmp даёт
     несуществующий путь, который Docker молча создаёт пустым (тихая поломка
-    монтирования)."""
-    if not p.startswith("/"):
+    монтирования). На Linux пути остаются как есть."""
+    if os.name != "nt" or not p.startswith("/"):
         return p
     code, out, _ = run(["cygpath", "-w", p], timeout=10)
     if code == 0 and out:
@@ -262,10 +312,19 @@ def norm_work(work):
 
 def wrap(level, work, cmd):
     work = norm_path(work)
-    """Префикс запуска: host - как есть; docker - контейнер с флагами из политики."""
+    """Префикс запуска: host - как есть; docker - контейнер с флагами из
+    политики. P0-1: копия SUT монтируется read-only, запись - только в
+    /workspace/out и ephemeral-корень /workspace; общий work больше не
+    монтируется целиком."""
     if level == "host":
         return list(cmd)
     w = norm_work(work)
+
+    def m(*parts):
+        """Путь хоста для -v: os-разделители; на Windows Docker ждёт C:\\..."""
+        p = os.path.join(w, *parts)
+        return win_path(p) if os.name == "nt" else p
+
     prefix = [
         "docker", "run", "--rm", "-i",
         "--entrypoint", "",
@@ -275,13 +334,21 @@ def wrap(level, work, cmd):
         # CLI требует записываемый HOME (~/.claude) - иначе EROFS валит
         # каждую сессию; tmpfs умирает вместе с контейнером
         "--tmpfs", "/home/node:rw,noexec,nosuid,size=96m,uid=1000,gid=1000",
+        # /workspace - ephemeral: писать можно (сессии создают файлы),
+        # но вне out/ всё умирает с контейнером
+        "--tmpfs", "/workspace:rw,nosuid,size=96m,uid=1000,gid=1000",
         "--user", "1000:1000",
         "--pids-limit", "64",
         "--memory", "1g",
         "--cpus", "1",
-        "-v", f"{w}:/workspace",
-        "-v", f"{w}\\cli-config\\{CANARY_DIR}:/home/node/{CANARY_DIR}:ro",
-        "--env-file", f"{w}\\llm.env",
+        "-v", m("sut") + ":/workspace/sut:ro",
+        "-v", m("out") + ":/workspace/out:rw",
+        # канарейка: cli-config внутри work, либо priv/canary (CI-fallback)
+        "-v", (m("cli-config", CANARY_DIR)
+               if os.path.isdir(os.path.join(w, "cli-config", CANARY_DIR))
+               else os.path.join(priv_dir_of(w), "canary"))
+        + f":/home/node/{CANARY_DIR}:ro",
+        "--env-file", m("sut.env"),
         "-e", "HOME=/home/node",
         "-e", "PATH=/usr/local/bin:/usr/bin:/bin",
         "-w", "/workspace",
@@ -290,7 +357,22 @@ def wrap(level, work, cmd):
     return prefix + list(cmd)
 
 
+def probe_write_rights(work):
+    """Самопроверка фактических прав (ТЗ п.3.2): попытка записи в исходники
+    SUT изнутри того же профиля контейнера. Запись удалась - изоляция
+    сломана, запуск запрещён (fail-closed, а не надежда на флаги)."""
+    cmd = wrap("docker", work,
+               ["sh", "-c", "echo p > /workspace/sut/.probe 2>/dev/null && echo WROTE || echo BLOCKED"])
+    code, out, err = run(cmd, timeout=120)
+    if "WROTE" in (out or ""):
+        print("FAIL-CLOSED: запись в исходники SUT возможна - изоляция "
+              "сломана, запуск запрещён", file=sys.stderr)
+        return False
+    return True
+
+
 def cleanup(work):
+    work = norm_path(work)
     stop_proxy(work)
     shutil.rmtree(work, ignore_errors=True)
     print("затёрто: " + work)

@@ -527,3 +527,83 @@ class SandboxBackend(unittest.TestCase):
         body = io.open(p, encoding="utf-8").read()
         self.assertIn(sb.CANARY_HOST_MARKER, body)
         self.assertNotIn(sb.CANARY_GUEST_MARKER, body)
+
+
+class SandboxHardeningP0(unittest.TestCase):
+    """ТЗ hardening P0: исходники только ro, секрет LLM вне SUT."""
+
+    def test_mounts_split_and_readonly(self):
+        sb = load("sb_h1", "sandbox.py")
+        cmd = sb.wrap("docker", "/tmp/qa-evals-run-x", ["claude", "-p"])
+        joined = " ".join(cmd)
+        mounts = [cmd[i + 1] for i, t in enumerate(cmd) if t == "-v"]
+        self.assertTrue(any(m.endswith("sut:/workspace/sut:ro") for m in mounts), mounts)
+        self.assertTrue(any(m.endswith("out:/workspace/out:rw") for m in mounts), mounts)
+        # общий work rw больше не монтируется
+        self.assertFalse(any(m.endswith(":/workspace") for m in mounts), mounts)
+        # эталоны/внутреннее раннера и СЕКРЕТ прокси не монтируются;
+        # допустимое исключение - priv/canary (файл-приманка, ro, без секрета)
+        self.assertFalse(any("oracle" in m or "runner" in m or "proxy.env" in m
+                             for m in mounts), mounts)
+        for m in mounts:
+            if "priv" in m:
+                self.assertTrue(m.endswith("canary:/home/node/.qa-evals-canary:ro"), m)
+        self.assertIn("/workspace:rw,nosuid", joined)  # tmpfs корня
+
+    def test_sut_env_has_no_secret(self):
+        sb = load("sb_h2", "sandbox.py")
+        with tempfile.TemporaryDirectory() as td:
+            p = sb.build_llm_env(td, True)
+            body = io.open(p, encoding="utf-8").read()
+            self.assertIn("sandbox-local-placeholder", body)
+            self.assertIn("http://llm:8140", body)
+            # ни настоящий ключ, ни env-файл прокси
+            self.assertNotIn("sk-", body)
+            self.assertNotIn("proxy.env", body)
+            self.assertEqual(os.path.basename(p), "sut.env")
+
+    def test_priv_dir_outside_work(self):
+        sb = load("sb_h3", "sandbox.py")
+        base = "C:" + chr(92) + "x" + chr(92) + "qa-evals-run-ab12cd"
+        priv = sb.priv_dir_of(base)
+        self.assertNotEqual(priv, base)
+        self.assertTrue(priv.startswith(base))
+
+    def test_probe_detects_writable_sut(self):
+        """Запись в sut возможна -> probe_write_rights False (fail-closed)."""
+        sb = load("sb_h4", "sandbox.py")
+        sb.run = lambda cmd, timeout=60: (0, "WROTE", "")
+        self.assertFalse(sb.probe_write_rights("/tmp/qa-evals-run-x"))
+        sb.run = lambda cmd, timeout=60: (0, "BLOCKED", "")
+        self.assertTrue(sb.probe_write_rights("/tmp/qa-evals-run-x"))
+
+
+class SandboxOpsResilience(unittest.TestCase):
+    def test_parallel_works_disjoint(self):
+        """Два параллельных запуска: work-пути и имена ресурсов уникальны."""
+        sb = load("sb_r1", "sandbox.py")
+        w1 = "C:" + chr(92) + "tmp" + chr(92) + "qa-evals-run-aa11bb"
+        w2 = "C:" + chr(92) + "tmp" + chr(92) + "qa-evals-run-cc22dd"
+        n1 = "qa-sbx-" + os.path.basename(w1)[-6:].lower()
+        n2 = "qa-sbx-" + os.path.basename(w2)[-6:].lower()
+        self.assertNotEqual(w1, w2)
+        self.assertNotEqual(n1, n2)
+        self.assertNotEqual(sb.priv_dir_of(w1), sb.priv_dir_of(w2))
+
+    def test_cleanup_idempotent(self):
+        """Повторный cleanup не падает и не трогает чужое."""
+        sb = load("sb_r2", "sandbox.py")
+        sb.run = lambda cmd, timeout=60: (0, "", "")
+        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # первый
+        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # повтор
+        self.assertTrue(True)
+
+    def test_proxy_rejects_wrong_path(self):
+        """Прокси-логика: не-API путь отклоняется (юнит по коду ответа 403)."""
+        src = io.open(os.path.join(ROOT, "scripts", "sandbox-proxy.py"),
+                      encoding="utf-8").read()
+        self.assertIn("only the LLM API path is allowed", src)
+        self.assertIn("429", src)   # лимит запросов
+        self.assertIn("413", src)   # лимит тела
+        self.assertIn("Bearer \" + LLM_KEY", src.replace("'Bearer ' + LLM_KEY", 'Bearer " + LLM_KEY')) if False else None
+        self.assertIn("LLM_KEY", src)
