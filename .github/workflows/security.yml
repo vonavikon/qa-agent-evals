@@ -8,9 +8,9 @@ name: security
 
 on:
   push:
-    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/Dockerfile.sandbox", "tests/**"]
+    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/sec-integration.py", "scripts/Dockerfile.sandbox", "tests/**", ".github/workflows/security.yml"]
   pull_request:
-    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/Dockerfile.sandbox", "tests/**"]
+    paths: ["scripts/sandbox*", "scripts/sec-checks.py", "scripts/sec-integration.py", "scripts/Dockerfile.sandbox", "tests/**", ".github/workflows/security.yml"]
   workflow_dispatch:
 
 jobs:
@@ -22,14 +22,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Юнит-тесты конвейера
-        run: python -m unittest discover tests -v
+      - name: Юнит-тесты конвейера (вкл. fail-closed матрицу пробы прав)
+        run: python -m unittest tests.test_scripts -v
+      - name: "Живые тесты LLM-прокси (dummy-ключ: методы/пути/нормализация/лимиты/секрет)"
+        run: python -m unittest tests.test_proxy_live -v
       - name: Сборка sandbox-образа
         run: docker build -t qa-evals-sandbox:latest -f scripts/Dockerfile.sandbox scripts/
-      - name: Проверка конфигурации sandbox
+      - name: Проверка конфигурации sandbox (fail-closed)
         run: python scripts/sandbox.py verify docker
-      - name: Security-набор SEC-01..06
+      - name: Security-набор SEC-01..06 + SEC-06A/B + CLEANUP
         run: python scripts/sec-checks.py docker --out runs/sec-ci
+      - name: Интеграционный тест (без LLM-ключа ожидаем SKIP; SKIP != PASS)
+        run: |
+          python scripts/sec-integration.py --out runs/secint-ci || [ "$(python -c "import json;print(json.load(open('runs/secint-ci/secint-report.json'))['status'])")" = "SKIP" ]
       - name: Отчёт и артефакты
         if: always()
         uses: actions/upload-artifact@v4
@@ -39,3 +44,4 @@ jobs:
             runs/sec-ci/sec-report.json
             runs/sec-ci/sec-report.md
             runs/sec-ci/*.log
+            runs/secint-ci/*

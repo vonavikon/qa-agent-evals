@@ -163,12 +163,26 @@ def start_proxy(work):
     proxy_env = os.path.join(priv, "proxy.env")
     io.open(proxy_env, "w", encoding="utf-8", newline="\n").write(
         f"UPSTREAM={url}\nLLM_KEY={key}\n")
+    # секрет на хосте читается только владельцем (ТЗ п.5)
+    try:
+        os.chmod(proxy_env, 0o600)
+        os.chmod(priv, 0o700)
+    except OSError:
+        pass
     proxy = "qa-sbx-proxy-" + os.path.basename(work)[-6:].lower()
     proxy_src = os.path.join(scripts_dir(), "sandbox-proxy.py")
     if os.name == "nt":
         proxy_src = win_path(proxy_src)
+    # прокси - доверенный держатель ключа: минимальная поверхность компрометации
+    # (ТЗ п.5): non-root, read-only корень, без capabilities, лимиты ресурсов;
+    # секрет только через env-файл (не в аргументах), каталоги SUT не монтируются
     code, _, err = run(["docker", "run", "-d", "--rm", "--name", proxy,
                         "--network", net, "--network-alias", "llm",
+                        "--user", "65534:65534",
+                        "--read-only",
+                        "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
+                        "--cap-drop", "ALL",
+                        "--memory", "256m", "--cpus", "0.5", "--pids-limit", "32",
                         "-v", proxy_src + ":/srv/proxy.py:ro",
                         "--env-file", win_path(proxy_env),
                         "python:3.12-slim",
@@ -192,6 +206,12 @@ def stop_proxy(work):
     # идемпотентно: повторный вызов не ошибка, чужие ресурсы не трогаем
     # (имена содержат суффикс work - уникальны на запуск)
     run(["docker", "rm", "-f", proxy], timeout=60)
+    # застрявшие контейнеры этого запуска (напр. sleep из таймаут-пробы,
+    # переживший убийство docker-клиента) держат сеть - добиваем по фильтру сети
+    code, ids, _ = run(["docker", "ps", "-aq", "--filter", "network=" + net],
+                       timeout=30)
+    if ids.strip():
+        run(["docker", "rm", "-f"] + ids.split(), timeout=60)
     # сеть нельзя удалить, пока контейнер отваливается (async): retry,
     # иначе qa-sbx-сети копятся как мусор
     for _ in range(4):
@@ -273,8 +293,12 @@ def prepare(level, sut_dir, run_dir):
                 f"{CANARY_GUEST_MARKER}-fake\n(это файл ВНУТРИ песочницы)\n")
             meta["canary_guest"] = alt
             print(f"канарейка перенесена в priv ({type(e).__name__})", file=sys.stderr)
-        # самопроверка фактических прав до прогона (fail-closed)
-        if not probe_write_rights(work):
+        # самопроверка фактических прав до прогона (fail-closed); причина отказа - в meta
+        ok, reason = probe_write_rights(work)
+        if not ok:
+            meta["probe_refused"] = reason
+            io.open(os.path.join(run_dir, "meta-sandbox.json"), "w", encoding="utf-8").write(
+                json.dumps(meta, ensure_ascii=False, indent=1))
             stop_proxy(work)
             shutil.rmtree(work, ignore_errors=True)
             return 5
@@ -358,17 +382,34 @@ def wrap(level, work, cmd):
 
 
 def probe_write_rights(work):
-    """Самопроверка фактических прав (ТЗ п.3.2): попытка записи в исходники
-    SUT изнутри того же профиля контейнера. Запись удалась - изоляция
-    сломана, запуск запрещён (fail-closed, а не надежда на флаги)."""
+    """Самопроверка фактических прав (ТЗ финального усиления, P1): попытка
+    записи в исходники SUT изнутри боевого профиля. Успех ТОЛЬКО при
+    подтверждённой блокировке: rc==0, в выводе ровно маркер BLOCKED и нет
+    WROTE. Любая неоднозначность (docker упал, контейнер не стартовал,
+    таймаут, пустой вывод, оба маркера) = отказ запуска (fail-closed).
+    Возвращает (ok: bool, reason: str)."""
     cmd = wrap("docker", work,
-               ["sh", "-c", "echo p > /workspace/sut/.probe 2>/dev/null && echo WROTE || echo BLOCKED"])
+               ["sh", "-c",
+                "echo p > /workspace/sut/.probe 2>/dev/null && echo WROTE || echo BLOCKED"])
     code, out, err = run(cmd, timeout=120)
-    if "WROTE" in (out or ""):
-        print("FAIL-CLOSED: запись в исходники SUT возможна - изоляция "
-              "сломана, запуск запрещён", file=sys.stderr)
-        return False
-    return True
+    out = out or ""
+    reason = ""
+    ok = False
+    if code == 124 or "TIMEOUT" in out:
+        reason = "проба прав: таймаут"
+    elif code != 0:
+        reason = f"проба прав: docker rc={code}: {(err or out)[:160]}"
+    elif "WROTE" in out and "BLOCKED" in out:
+        reason = "проба прав: неоднозначный вывод (оба маркера)"
+    elif "WROTE" in out:
+        reason = "запись в исходники SUT возможна - изоляция сломана"
+    elif "BLOCKED" not in out:
+        reason = f"проба прав: маркер BLOCKED отсутствует, вывод: {out[:120]!r}"
+    else:
+        ok = True
+    if not ok:
+        print("FAIL-CLOSED: " + reason + " - запуск запрещён", file=sys.stderr)
+    return ok, reason
 
 
 def cleanup(work):

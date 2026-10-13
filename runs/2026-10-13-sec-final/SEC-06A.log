@@ -1,0 +1,7 @@
+cat: '<repo>/runs/2026-10-13-sec-final/oracle-sample.md': No such file or directory
+cat: /workspace/out/../../oracle-sample.md: No such file or directory
+PROBE-RAN
+PROBE-RAN
+
+--stderr--
+sh: 1: cannot create <repo>/runs/2026-10-13-sec-final/oracle-sample.md: Directory nonexistent

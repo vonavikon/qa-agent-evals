@@ -1,0 +1,8 @@
+docker: Docker version 29.1.3, build f52814d
+образ: sha256:55439c52e17025993
+изоляция: docker, work=C:\Users\<user>\AppData\Local\Temp\qa-evals-run-6ev5uoxt (meta-sandbox.json в прогоне)
+== INT-01 (obvious)
+   r1: 568 байт
+затёрто: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-6ev5uoxt
+
+--stderr--

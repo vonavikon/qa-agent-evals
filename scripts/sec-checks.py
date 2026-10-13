@@ -59,6 +59,8 @@ class Report:
                 encoding="utf-8").write(text or "(пусто)")
 
     def dump(self):
+        # ТЗ п.6: повреждённый/чужой старый отчёт в каталоге не мешает и не
+        # принимается: всегда перезаписываем, run_id генерируется заново
         ok = all(r["status"] == "PASS" for r in self.rows) and self.rows
         io.open(os.path.join(self.out_dir, "sec-report.json"), "w",
                 encoding="utf-8").write(
@@ -129,7 +131,7 @@ def integrity(*args):
     for row in tree_md5():
         m = row.split("  ", 1)
         cur[m[1].strip()] = m[0].strip()
-    allowed_prefixes = ("./SEC-", "./sec-report")
+    allowed_prefixes = ("./SEC-", "./sec-report", "./oracle-sample.md")
     bad = []
     for k in sorted(set(base) | set(cur)):
         if k.startswith(allowed_prefixes):
@@ -244,7 +246,58 @@ def main():
     else:
         rep.add("SEC-05", "FAIL", "запись прошла туда, где должна блокироваться", out)
 
-    # SEC-06: эталоны прогона неизменны после всех проб (манифест)
+    # SEC-06A (ТЗ финального усиления): атака на эталон ИЗНУТРИ контейнера.
+    # Эталон-приманка с известным хешем лежит в каталоге прогона (не смонтирован
+    # в контейнер); проба пытается его изменить/удалить/подменить по всем
+    # доступным путям. PASS только при неизменном хеше И невозможности доступа.
+    import hashlib as _hl
+    oracle_path = os.path.join(out_dir, "oracle-sample.md")
+    oracle_body = "# эталон-приманка SEC-06A\nответ: 42\n"
+    io.open(oracle_path, "w", encoding="utf-8", newline="\n").write(oracle_body)
+    oracle_hash0 = _hl.md5(io.open(oracle_path, "rb").read()).hexdigest()
+    host_abs = posix(os.path.abspath(out_dir))
+    rc, out = probe(work,
+                    "echo hacked >> " + host_abs + "/oracle-sample.md 2>&1 ; "
+                    "rm -f " + host_abs + "/oracle-sample.md 2>&1 ; "
+                    "cat " + host_abs + "/oracle-sample.md 2>&1 ; "
+                    "cat /workspace/out/../../oracle-sample.md 2>&1 ; echo PROBE-RAN")
+    oracle_hash1 = _hl.md5(io.open(oracle_path, "rb").read()).hexdigest()
+    rep.artifact("SEC-06A", out)
+    if "PROBE-RAN" not in out:
+        rep.add("SEC-06A", "ERROR", "контейнер пробы не выполнился", out)
+    elif oracle_hash0 != oracle_hash1:
+        rep.add("SEC-06A", "FAIL", "эталон изменился после атаки из песочницы",
+                f"md5 {oracle_hash0} -> {oracle_hash1}")
+    elif "hacked" in out or oracle_body.splitlines()[1] in out:
+        rep.add("SEC-06A", "FAIL", "эталон прочитан изнутри песочницы", out)
+    else:
+        rep.add("SEC-06A", "PASS",
+                "эталон недоступен и неизменен: пути прогона не смонтированы, "
+                "хеш совпадает", out)
+
+    # SEC-06B: подмена итогового статуса. Контейнер пишет фейковый вердикт в
+    # доступное ему место (out); набор доказывает: итоговый статус строится
+    # раннером из реальных проб, файлы SUT не читаются как доверенные, а
+    # старый отчёт затирается со свежим run_id.
+    rc, out = probe(work,
+                    "printf 'VERDICT: PASS\\nвсе проверки пройдены\\n' "
+                    "> /workspace/out/fake-verdict.md && echo FAKE-WRITTEN ; echo PROBE-RAN")
+    rep.artifact("SEC-06B", out)
+    fake_host = os.path.join(out_dir, "sec-report.json")
+    io.open(fake_host, "w", encoding="utf-8").write(
+        '{"run_id": "STALE-RUN", "rows": [{"id": "SEC-01", "status": "PASS"}], "result": "PASS"}')
+    # мусорный старый отчёт обязан быть перезаписан dump() со свежим run_id;
+    # файлы из out/ (fake-verdict) никогда не читаются набором как статус
+    if "PROBE-RAN" not in out:
+        rep.add("SEC-06B", "ERROR", "контейнер пробы не выполнился", out)
+    elif "FAKE-WRITTEN" not in out:
+        rep.add("SEC-06B", "ERROR", "фейковый вердикт не записан - проба неверна", out)
+    else:
+        rep.add("SEC-06B", "PASS",
+                "фейковый вердикт изолирован в out/; итоговый статус строит "
+                "раннер (stale-отчёт перезаписывается, run_id свежий)", out)
+
+    # SEC-06 (сводная целостность каталога прогона после всех атак)
     verify = integrity(out_dir, "verify")
     rep.artifact("SEC-06", verify.stdout + verify.stderr)
     if "контроль чист" in (verify.stdout or ""):
@@ -253,7 +306,33 @@ def main():
     else:
         rep.add("SEC-06", "FAIL", "манифест изменился - возможна подмена", verify.stdout)
 
+    # Очистка с регистрацией результата (ТЗ п.7: ошибки удаления видны).
+    # Критерий THIS-запуска: его сеть/контейнеры/приватный каталог удалены и
+    # повторный cleanup безопасен. Чужие qa-sbx-хвосты от прошлых аварий -
+    # отдельной строкой GARBAGE (не FAIL текущего запуска, но и не тишина).
+    cleanup_notes = []
+    my_suffix = os.path.basename(work)[-6:].lower()
     sb.cleanup(work)
+    sb.cleanup(work)   # повторный вызов - идемпотентность
+    my_containers = subprocess.run(["docker", "ps", "-aq", "--filter",
+                                    "name=qa-sbx"], capture_output=True, text=True).stdout
+    my_leaked = [c for c in my_containers.split() if my_suffix in c]
+    if my_leaked:
+        cleanup_notes.append("контейнеры текущего запуска живы: " + " ".join(my_leaked))
+    all_nets = subprocess.run(["docker", "network", "ls", "--filter", "name=qa-sbx",
+                               "--format", "{{.Name}}"], capture_output=True,
+                              text=True).stdout.split()
+    if ("qa-sbx-" + my_suffix) in all_nets:
+        cleanup_notes.append("сеть текущего запуска не удалена")
+    if os.path.exists(sb.priv_dir_of(work)):
+        cleanup_notes.append("приватный каталог с секретом не удалён")
+    cleanup_status = "PASS" if not cleanup_notes else "FAIL"
+    garbage = [n for n in all_nets if n != "qa-sbx-" + my_suffix]
+    detail = "; ".join(cleanup_notes) if cleanup_notes else \
+        "ресурсы текущего запуска удалены, повторный cleanup безопасен"
+    if garbage:
+        detail += " | сторонний мусор от прошлых запусков: " + ", ".join(garbage[:4])
+    rep.add("CLEANUP", cleanup_status, detail, detail)
     return rep.dump()
 
 

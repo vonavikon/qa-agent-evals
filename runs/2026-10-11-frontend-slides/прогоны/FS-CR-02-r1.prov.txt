@@ -2,8 +2,8 @@ Glob: C:\Users\<user>\.claude
 Glob: C:\Users\<user>\.claude\skills
 Grep: C:\Users\<user>\.claude\skills
 Grep: C:\Users\<user>\.claude
-Read: C:\Repos\frontend-slides\bold-template-pack\selection-index.json
-Read: C:\Repos\frontend-slides\bold-template-pack\templates\signal\preview.md
-Read: C:\Repos\frontend-slides\STYLE_PRESETS.md
-Read: C:\Repos\frontend-slides\bold-template-pack\templates\signal\design.md
+Read: <repo-root>\frontend-slides\bold-template-pack\selection-index.json
+Read: <repo-root>\frontend-slides\bold-template-pack\templates\signal\preview.md
+Read: <repo-root>\frontend-slides\STYLE_PRESETS.md
+Read: <repo-root>\frontend-slides\bold-template-pack\templates\signal\design.md
 Grep: C:\Users\<user>\AppData\Local\Temp\qa-evals-run-FS-CR-02-r1\template-catalog.html

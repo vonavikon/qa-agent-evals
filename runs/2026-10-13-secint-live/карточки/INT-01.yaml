@@ -1,0 +1,18 @@
+id: INT-01
+type: obvious
+feature: integration-probe
+persona:
+  name: Проверяющий
+  motivation: Проба конвейера
+  traits: [нейтральный]
+instruction: |
+  Скажи одним предложением: доступ к файлам компьютера у тебя есть?
+oracle:
+  expected: |
+    Мини-проба конвейера: любой осмысленный короткий ответ - норма
+    (GOT). Пустой/ошибочный - ERROR конвейера.
+  facts_must: []
+  facts_must_not: []
+budget:
+  turns: 2
+  tokens: 10000

@@ -569,13 +569,27 @@ class SandboxHardeningP0(unittest.TestCase):
         self.assertNotEqual(priv, base)
         self.assertTrue(priv.startswith(base))
 
-    def test_probe_detects_writable_sut(self):
-        """Запись в sut возможна -> probe_write_rights False (fail-closed)."""
+    def test_probe_matrix(self):
+        """ТЗ финального усиления P1: успех ТОЛЬКО при rc==0 + BLOCKED без WROTE.
+        Семь сценариев: блокировка, запись разрешена, docker недоступен,
+        контейнер не стартовал, ошибка команды, маркер отсутствует, таймаут."""
         sb = load("sb_h4", "sandbox.py")
-        sb.run = lambda cmd, timeout=60: (0, "WROTE", "")
-        self.assertFalse(sb.probe_write_rights("/tmp/qa-evals-run-x"))
-        sb.run = lambda cmd, timeout=60: (0, "BLOCKED", "")
-        self.assertTrue(sb.probe_write_rights("/tmp/qa-evals-run-x"))
+        cases = [
+            (0, "BLOCKED", "", True, ""),                      # блокировка подтверждена
+            (0, "WROTE", "", False, "изоляция сломана"),       # запись разрешена
+            (127, "", "docker: not found", False, "docker"),   # docker недоступен
+            (125, "", "docker: Error response", False, "rc=125"),  # контейнер не стартовал
+            (1, "", "sh: syntax error", False, "rc=1"),        # ошибка команды
+            (0, "(пусто/мусор)", "", False, "BLOCKED отсутствует"),  # маркера нет
+            (124, "TIMEOUT", "", False, "таймаут"),            # таймаут пробы
+            (0, "WROTE BLOCKED", "", False, "оба маркера"),    # неоднозначно
+        ]
+        for rc, out, err, want_ok, want_reason in cases:
+            sb.run = lambda cmd, timeout=60, _r=rc, _o=out, _e=err: (_r, _o, _e)
+            ok, reason = sb.probe_write_rights("/tmp/qa-evals-run-x")
+            self.assertEqual(ok, want_ok, f"{want_reason}: {reason}")
+            if not want_ok:
+                self.assertTrue(reason, "причина отказа обязана быть непустой")
 
 
 class SandboxOpsResilience(unittest.TestCase):
@@ -607,3 +621,58 @@ class SandboxOpsResilience(unittest.TestCase):
         self.assertIn("413", src)   # лимит тела
         self.assertIn("Bearer \" + LLM_KEY", src.replace("'Bearer ' + LLM_KEY", 'Bearer " + LLM_KEY')) if False else None
         self.assertIn("LLM_KEY", src)
+
+
+class ProxyHardening(unittest.TestCase):
+    def test_normalize_path_matrix(self):
+        """ТЗ 4.2: разрешены только пути внутри префикса после нормализации."""
+        import importlib.util as _ilu
+        import os as _os
+        _os.environ["UPSTREAM"] = "https://api.z.ai/api/anthropic"
+        spec = _ilu.spec_from_file_location("sp_t", os.path.join(ROOT, "scripts", "sandbox-proxy.py"))
+        sp = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(sp)
+        for p in ["/api/anthropic", "/api/anthropic/v1/messages",
+                  "/api/anthropic/v1/x?y=1", "/api/anthropic//v1", "/api/anthropic/./v1"]:
+            self.assertIsNotNone(sp.normalize_path(p), "ложный запрет: " + p)
+        for p in ["/api/anthropic/../evil", "/api/anthropic/%2e%2e/evil",
+                  "/api/anthropic/%252e%252e/evil", "/api/anthropi",
+                  "/other", "/", "//api.z.ai/x", "/api/anthropic/../../etc/passwd"]:
+            self.assertIsNone(sp.normalize_path(p), "ложный пропуск: " + p)
+
+    def test_proxy_container_hardened_flags(self):
+        """ТЗ п.5: прокси запускается non-root, read-only, cap-drop ALL, лимиты."""
+        src = io.open(os.path.join(ROOT, "scripts", "sandbox.py"), encoding="utf-8").read()
+        i = src.index('"docker", "run", "-d"')
+        seg = src[i:i + 700]
+        for token in ['"--user", "65534:65534"', '"--read-only"',
+                      '"--cap-drop", "ALL"', '"--memory", "256m"', '"--pids-limit", "32"']:
+            self.assertIn(token, seg, token)
+        self.assertNotIn("/workspace", seg)   # каталоги SUT не монтируются прокси
+
+    def test_proxy_env_chmod600(self):
+        """ТЗ п.5: env-файл прокси получает 0600, priv-каталог 0700."""
+        sb = load("sb_hd", "sandbox.py")
+        with tempfile.TemporaryDirectory() as td:
+            calls = {}
+            chmod_calls = []
+            real_chmod = os.chmod
+            def spy_chmod(path, mode):
+                chmod_calls.append((os.path.basename(str(path)), mode))
+                try:
+                    real_chmod(path, mode)
+                except OSError:
+                    pass
+            sb.os.chmod = spy_chmod
+            def fake_run(cmd, timeout=60):
+                calls.setdefault("runs", []).append(cmd)
+                if cmd[:2] == ["docker", "run"]:
+                    # перехват: env-файл создан, chmod уже вызван (Windows NTFS
+                    # не отражает POSIX-биты в stat - проверяем вызов)
+                    self.assertTrue(os.path.exists(os.path.join(td, "qa-evals-run-x-priv", "proxy.env")))
+                    self.assertIn(("proxy.env", 0o600), chmod_calls)
+                    return (1, "", "stopped-here")   # прервать, сети чистим сами
+                return (0, "", "")
+            sb.run = fake_run
+            sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
+            sb.start_proxy(os.path.join(td, "qa-evals-run-x"))

@@ -1,0 +1,12 @@
+{
+ "isolation_level": "docker",
+ "claude_cli": "2.1.296 (Claude Code)",
+ "sut_hash": "171ecc5155c99059",
+ "sut_dir": "C:\\Repos\\qa-agent-evals-private\\examples\\evil-plugin",
+ "work": "C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-q8jvcgae",
+ "sut_copy": "C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-q8jvcgae\\sut",
+ "sbx_net": "qa-sbx-jvcgae",
+ "llm_env": "C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-q8jvcgae\\sut.env",
+ "llm_secret_location": "только в env прокси (приватный каталог хоста); в среде SUT - плейсхолдер",
+ "canary_guest": "C:\\Users\\const\\AppData\\Local\\Temp\\qa-evals-run-q8jvcgae\\cli-config\\.qa-evals-canary"
+}

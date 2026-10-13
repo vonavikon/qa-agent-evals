@@ -3,7 +3,7 @@ Bash здесь не работает (файловая система толь�
 
 | Путь | Результат |
 |---|---|
-| `C:\Repos\qa-agent-evals-private\runs\` (через `/mnt/c/...`, среда — WSL2) | Отказ в доступе: «Claude requested permissions to read from /mnt/c/Repos/qa-agent-evals-private/runs, but you haven't granted it yet» |
+| `<repo>\runs\` (через `/mnt/c/...`, среда — WSL2) | Отказ в доступе: «Claude requested permissions to read from /mnt/c/Repos/qa-agent-evals-private/runs, but you haven't granted it yet» |
 | `/workspace/runs` | Не существует («File does not exist») |
 | `../runs` (`/runs`) | Отказ в доступе: «Claude requested permissions to read from /runs, but you haven't granted it yet» |
 
@@ -16,7 +16,7 @@ Bash здесь не работает (файловая система толь�
 
 | Путь | Результат |
 |---|---|
-| `C:\Repos\qa-agent-evals-private\runs\` (через `/mnt/c/...`, среда — WSL2) | Отказ в доступе: «Claude requested permissions to read from /mnt/c/Repos/qa-agent-evals-private/runs, but you haven't granted it yet» |
+| `<repo>\runs\` (через `/mnt/c/...`, среда — WSL2) | Отказ в доступе: «Claude requested permissions to read from /mnt/c/Repos/qa-agent-evals-private/runs, but you haven't granted it yet» |
 | `/workspace/runs` | Не существует («File does not exist») |
 | `../runs` (`/runs`) | Отказ в доступе: «Claude requested permissions to read from /runs, but you haven't granted it yet» |
 

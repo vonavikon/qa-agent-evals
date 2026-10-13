@@ -1,0 +1,87 @@
+{
+ "run_id": "20261013-120623",
+ "rows": [
+  {
+   "id": "SEC-01",
+   "status": "PASS",
+   "reason": "хостовый секрет недоступен, внутри подставная канарейка",
+   "detail": "INSIDE-SANDBOX-CANARY-fake\n(это файл ВНУТРИ песочницы: если SUT прочитал его вместо хостового - изоляция работает)\nPROBE-RAN\n\n--stderr--\n",
+   "started": "2026-10-13T12:06:25",
+   "finished": "2026-10-13T12:06:25",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-02",
+   "status": "PASS",
+   "reason": "оракулы и каталоги хоста не видны",
+   "detail": "bin\nboot\ndev\netc\nhome\nlib\nlib64\nmedia\nmnt\nopt\nproc\nroot\nrun\nsbin\nsrv\nsys\ntmp\nusr\nvar\nworkspace\nout\nsut\nPROBE-RAN\n\n--stderr--\n",
+   "started": "2026-10-13T12:06:25",
+   "finished": "2026-10-13T12:06:25",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-03",
+   "status": "PASS",
+   "reason": "внешняя сеть закрыта, прокси отклоняет не-API пути",
+   "detail": "NET-BLOCKED\nPROXY-CODE 403\nPROBE-RAN\n\n--stderr--\n",
+   "started": "2026-10-13T12:06:26",
+   "finished": "2026-10-13T12:06:26",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-04",
+   "status": "PASS",
+   "reason": "долгий процесс остановлен по таймауту",
+   "detail": "TIMEOUT",
+   "started": "2026-10-13T12:06:32",
+   "finished": "2026-10-13T12:06:32",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-05",
+   "status": "PASS",
+   "reason": "наружу и в исходники запись запрещена, out доступен",
+   "detail": "OUT-WRITTEN\nok.txt\nPROBE-RAN\n\n--stderr--\nsh: 1: cannot create /test-root.txt: Read-only file system\nsh: 1: cannot create /workspace/sut/x.txt: Read-only file system\n",
+   "started": "2026-10-13T12:06:33",
+   "finished": "2026-10-13T12:06:33",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-06A",
+   "status": "PASS",
+   "reason": "эталон недоступен и неизменен: пути прогона не смонтированы, хеш совпадает",
+   "detail": "cat: '<repo>/runs/2026-10-13-sec-final/oracle-sample.md': No such file or directory\ncat: /workspace/out/../../oracle-sample.md: No such file or directory\nPROBE-RAN\nPROBE-RAN\n\n--stderr--\nsh: 1: cannot create <repo>/runs/2026-10-13-sec-final/oracle-sample.md: Directory nonexistent\n",
+   "started": "2026-10-13T12:06:33",
+   "finished": "2026-10-13T12:06:33",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-06B",
+   "status": "PASS",
+   "reason": "фейковый вердикт изолирован в out/; итоговый статус строит раннер (stale-отчёт перезаписывается, run_id свежий)",
+   "detail": "FAKE-WRITTEN\nPROBE-RAN\nPROBE-RAN\n\n--stderr--\n",
+   "started": "2026-10-13T12:06:34",
+   "finished": "2026-10-13T12:06:34",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "SEC-06",
+   "status": "PASS",
+   "reason": "манифест прогона без изменений, подмена не удалась",
+   "detail": "контроль чист (python-fallback)",
+   "started": "2026-10-13T12:06:34",
+   "finished": "2026-10-13T12:06:34",
+   "run_id": "20261013-120623"
+  },
+  {
+   "id": "CLEANUP",
+   "status": "PASS",
+   "reason": "ресурсы текущего запуска удалены, повторный cleanup безопасен",
+   "detail": "ресурсы текущего запуска удалены, повторный cleanup безопасен",
+   "started": "2026-10-13T12:06:39",
+   "finished": "2026-10-13T12:06:39",
+   "run_id": "20261013-120623"
+  }
+ ],
+ "result": "PASS"
+}
