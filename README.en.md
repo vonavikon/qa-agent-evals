@@ -8,7 +8,7 @@ A Claude Code plugin for acceptance testing of LLM systems with role-playing sub
 
 Three things separate it from running prompts by hand: every card has its expected answer written down before the run (the oracle), a machine layer grep-checks facts before the judge ever sees the answer, and the judge itself runs on a different model and is calibrated against a control sample with known-correct verdicts. Verdicts are asymmetric: FAIL proves a defect, GOT only means "not refuted".
 
-![How it works: the plugin studies the system, writes tasks, an actor plays the user, a judge scores the answers, the report shows the result](assets/concept.gif)
+![How it works: the plugin studies the system, writes tasks, an actor plays the user, an untrusted plugin runs behind glass, a judge scores the answers, the report shows the result](assets/concept.en.gif)
 
 *A pet project: understand acceptance evals by building a working instrument and running it on itself.*
 
