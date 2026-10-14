@@ -5,6 +5,7 @@
 корпораза не нужны.
 """
 
+import base64
 import importlib.util
 import io
 import json
@@ -28,6 +29,11 @@ check_facts = load("check_facts", "check-facts.py")
 build_index = load("build_index_mod", "build-index.py")
 judge_control = load("judge_control_mod", "judge-control.py")
 cost_report = load("cost_report_mod", "cost-report.py")
+av = load("av", "annotate-visuals.py")
+
+# Валидный PNG 1x1 - содержимое не важно, важен факт файла для валидатора.
+PNG_1PX = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
 CARD = """id: T-01
 type: critical
@@ -332,6 +338,97 @@ class FeedbackHtml(unittest.TestCase):
             self.assertIn("DET_LEAK", page)
             self.assertIn("Ответ системы.", page)
             self.assertNotIn("</script>\n</script>", page)  # инъекция данных не рвёт тег
+
+    def test_page_embeds_screenshots_and_findings(self):
+        m = load("cfv", "collect-feedback.py")
+        with tempfile.TemporaryDirectory() as td:
+            io.open(os.path.join(td, "index.jsonl"), "w", encoding="utf-8").write(json.dumps({
+                "id": "T-01", "type": "critical", "feature": "f",
+                "verdicts": {"1": "FAIL"}, "result": "FAIL"}) + "\n")
+            os.makedirs(os.path.join(td, "карточки"))
+            os.makedirs(os.path.join(td, "прогоны"))
+            io.open(os.path.join(td, "карточки", "T-01.yaml"), "w", encoding="utf-8").write(
+                "id: T-01\ninstruction: |\n  Вопрос?\noracle:\n  expected: |\n    Ответ.\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.txt"), "w", encoding="utf-8").write(
+                "Ответ системы.")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.png"), "wb").write(PNG_1PX)
+            io.open(os.path.join(td, "визуальный-ревью.json"), "w", encoding="utf-8").write(
+                json.dumps({"screenshots": [{"file": "T-01-r1.png", "findings": [
+                    {"bbox": [5, 10, 50, 40], "severity": "risk",
+                     "comment": "счёт блеклый"}]}]}, ensure_ascii=False))
+            page = io.open(m.build_feedback_html(td), encoding="utf-8").read()
+            self.assertIn('"shots": [{"file": "T-01-r1.png"', page)
+            self.assertIn("Скриншоты", page)
+            self.assertIn("счёт блеклый", page)
+            # битая находка не роняет страницу: снимок остаётся без разметки
+            io.open(os.path.join(td, "визуальный-ревью.json"), "w", encoding="utf-8").write(
+                '{"screenshots": [{"file": "T-01-r1.png", "findings": '
+                '[{"bbox": [1], "severity": "wat"}]}, {"file": 3}]}')
+            page = io.open(m.build_feedback_html(td), encoding="utf-8").read()
+            self.assertIn('"shots": [{"file": "T-01-r1.png", "findings": []}]', page)
+
+
+class VisualReview(unittest.TestCase):
+    def fixture(self, td, review=None):
+        os.makedirs(os.path.join(td, "прогоны"))
+        io.open(os.path.join(td, "прогоны", "GA-01-r1.png"), "wb").write(PNG_1PX)
+        if review is None:
+            review = {"screenshots": [{"file": "GA-01-r1.png", "findings": [
+                {"bbox": [10, 20, 40, 30], "severity": "defect",
+                 "comment": "плитки перекрывают счёт"}]}]}
+        io.open(os.path.join(td, av.REVIEW_NAME), "w", encoding="utf-8").write(
+            json.dumps(review, ensure_ascii=False))
+
+    def test_validate_and_render(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.fixture(td)
+            review = av.load_review(td)
+            self.assertEqual(av.validate_review(review, td), [])
+            page = io.open(av.render_html(td, review), encoding="utf-8").read()
+            self.assertIn("GA-01-r1.png", page)
+            self.assertIn("left:10%", page)
+            self.assertIn("s-defect", page)
+            self.assertIn("плитки перекрывают счёт", page)
+            self.assertIn("вердикты не меняет", page)
+
+    def test_validate_rejects_bad_bbox_severity_missing_file_dupes(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.fixture(td, {"screenshots": [
+                {"file": "GA-01-r1.png", "findings": [
+                    {"bbox": [120, 0, 0, 30], "severity": "wat", "comment": " "}]},
+                {"file": "GA-01-r9.png", "findings": []},
+                {"file": "GA-01-r1.png"}]})
+            errs = av.validate_review(av.load_review(td), td)
+            text = "\n".join(errs)
+            self.assertIn("bbox", text)
+            self.assertIn("severity", text)
+            self.assertIn("пустой комментарий", text)
+            self.assertIn("файла нет", text)
+            self.assertIn("больше одного раза", text)
+
+    def test_publish_copies_samples_and_manifest(self):
+        with tempfile.TemporaryDirectory() as repo:
+            rd = os.path.join(repo, "runs", "2026-10-20-2048")
+            os.makedirs(rd)
+            self.fixture(rd)
+            self.assertEqual(av.publish(rd, ["GA-01"], repo_root=repo), ["GA-01"])
+            dst = os.path.join(repo, "docs", "visual-samples", "2026-10-20-2048")
+            self.assertTrue(os.path.exists(os.path.join(dst, "GA-01-r1.png")))
+            md = io.open(os.path.join(dst, "GA-01.md"), encoding="utf-8").read()
+            self.assertIn("плитки перекрывают счёт", md)
+            rm = io.open(os.path.join(repo, "docs", "visual-samples", "README.md"),
+                         encoding="utf-8").read()
+            self.assertIn("2026-10-20-2048", rm)
+            # повторный publish не дублирует строку манифеста
+            av.publish(rd, ["GA-01"], repo_root=repo)
+            rm2 = io.open(os.path.join(repo, "docs", "visual-samples", "README.md"),
+                          encoding="utf-8").read()
+            self.assertEqual(rm2, rm)
+
+    def test_quiet_when_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.assertIsNone(av.load_review(td))
+            self.assertEqual(av.validate_review({"screenshots": []}, td), [])
 
 
 class CheckFactsArtifacts(unittest.TestCase):

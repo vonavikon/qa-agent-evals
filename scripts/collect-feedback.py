@@ -114,8 +114,36 @@ def next_id(repo_root):
     return mx + 1
 
 
+def visual_shots(run_dir):
+    """Скриншоты с разметкой ревьюера по карточкам: {id: [{file, findings}]}.
+    Нет визуальный-ревью.json - пустой словарь (шаг необязательный).
+    Битые находки отбрасываются, а не валят страницу: валидатор схемы -
+    scripts/annotate-visuals.py."""
+    path = os.path.join(run_dir, "визуальный-ревью.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        review = json.loads(io.open(path, encoding="utf-8").read())
+    except ValueError:
+        return {}
+    out = {}
+    for s in review.get("screenshots", []):
+        if not isinstance(s, dict) or not isinstance(s.get("file"), str):
+            continue
+        m = re.match(r"^([\w-]+)-r\d+(?:-k\d+)?\.png$", s["file"])
+        if not m or not os.path.exists(os.path.join(run_dir, "прогоны", s["file"])):
+            continue
+        finds = [f for f in s.get("findings", [])
+                 if isinstance(f, dict) and isinstance(f.get("comment"), str)
+                 and f.get("severity") in ("defect", "risk", "note")
+                 and isinstance(f.get("bbox"), list)]
+        out.setdefault(m.group(1), []).append({"file": s["file"], "findings": finds})
+    return out
+
+
 def load_entries(run_dir):
     """Данные прогона для страницы разметки: карточка + итог судьи + ответ."""
+    shots = visual_shots(run_dir)
     entries = []
     index_path = os.path.join(run_dir, "index.jsonl")
     for line in io.open(index_path, encoding="utf-8"):
@@ -140,6 +168,7 @@ def load_entries(run_dir):
             "verdicts": "; ".join(f"r{k}: {v}" for k, v in sorted(reps.items())),
             "result": r.get("result", ""),
             "det": det_str,
+            "shots": shots.get(cid, []),
         })
     return entries
 
@@ -181,6 +210,16 @@ input[type=text]{font:inherit;flex:1;min-width:200px;border:1px solid var(--line
 #toast{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;background:var(--sel);color:#fff;border-radius:8px;padding:10px 18px;opacity:0;transition:opacity .3s;pointer-events:none;font-size:14px}
 #toast.show{opacity:1}
 .hint{color:var(--mut);font-size:13px;margin-top:8px}
+.fig{position:relative;display:inline-block;max-width:100%;margin-top:8px}
+.fig img{max-width:100%;display:block;border:1px solid var(--line);border-radius:8px}
+.figblock ul{margin:8px 0 0;padding-left:20px}
+.box{position:absolute;border:2px solid;border-radius:4px;pointer-events:none}
+.box i{position:absolute;top:-11px;left:-2px;font-style:normal;font-size:12px;line-height:1;color:#fff;background:#1f2d3a;border-radius:3px;padding:2px 5px}
+.s-defect{border-color:#b3261e;background:rgba(179,38,30,.12)}
+.s-risk{border-color:#b26a00;background:rgba(178,106,0,.12)}
+.s-note{border-color:#1f6fb2;background:rgba(31,111,178,.12)}
+.sev{font-weight:700;font-size:13px}
+.t-defect{color:#b3261e}.t-risk{color:#b26a00}.t-note{color:#1f6fb2}
 </style></head><body><div class="wrap">
 <h1>Обратная связь по приёмке</h1>
 <p class="sub">{{RUN}} — подтвердите или исправьте вердикты судьи. Пустая карточка = пропустить. Отметки сохраняются в браузере, кнопка внизу собирает feedback.yaml.</p>
@@ -231,6 +270,38 @@ function render(){
       det.appendChild(s); det.appendChild(body); d.appendChild(det);
     }
     sec('Вопрос', c.question); sec('Ожидание (записано до прогона)', c.expected); sec('Ответ системы', c.answer);
+    if(c.shots && c.shots.length){
+      var vd=document.createElement('details'); var vs=document.createElement('summary');
+      vs.textContent='Скриншоты ('+c.shots.length+') - разметка ассистента, вердикт она не меняет'; vd.appendChild(vs);
+      c.shots.forEach(function(sh){
+        var fb=document.createElement('div'); fb.className='figblock';
+        var fig=document.createElement('div'); fig.className='fig';
+        var img=document.createElement('img'); img.loading='lazy'; img.src='прогоны/'+sh.file;
+        fig.appendChild(img);
+        (sh.findings||[]).forEach(function(f,i){
+          if(!f.bbox||f.bbox.length!==4) return;
+          var b=document.createElement('div'); b.className='box s-'+f.severity;
+          b.style.left=f.bbox[0]+'%'; b.style.top=f.bbox[1]+'%';
+          b.style.width=f.bbox[2]+'%'; b.style.height=f.bbox[3]+'%';
+          var n=document.createElement('i'); n.textContent=String(i+1); b.appendChild(n);
+          fig.appendChild(b);
+        });
+        fb.appendChild(fig);
+        if(sh.findings && sh.findings.length){
+          var ul=document.createElement('ul');
+          sh.findings.forEach(function(f,i){
+            var li=document.createElement('li');
+            var sv=document.createElement('span'); sv.className='sev t-'+f.severity;
+            sv.textContent=(i+1)+'. '+f.severity;
+            li.appendChild(sv); li.appendChild(document.createTextNode(': '+f.comment));
+            ul.appendChild(li);
+          });
+          fb.appendChild(ul);
+        }
+        vd.appendChild(fb);
+      });
+      d.appendChild(vd);
+    }
     var row=document.createElement('div'); row.className='row';
     row.appendChild(chip('Согласен', 'ok', st.v==='ok', function(){
       if(st.v==='ok'){ delete state[c.id]; } else { state[c.id]={v:'ok',c:st.c||''}; } save(); }));

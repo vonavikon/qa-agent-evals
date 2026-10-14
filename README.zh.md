@@ -59,6 +59,7 @@ skills/acceptance-test/       五阶段流水线（编排器）
 agents/analyst.md             SUT 画像
 agents/role-user.md           角色执行者
 agents/judge.md               两步裁判（绑定另一个模型）
+agents/visual-reviewer.md     截图可视化评审（标注只给人看）
 knowledge/taxonomy.md         5 种卡片类型、模式、参考 YAML
 knowledge/adapters.md         CLI 与浏览器（Playwright）适配器、环境隔离
 knowledge/oracle.md           oracle、裁定量表、报告模板
@@ -71,6 +72,7 @@ scripts/check-facts.py        机器事实核查（转录 + SUT 写出的文件�
 scripts/judge-batch.py        裁判批量调用 + 自相矛盾自动重判
 scripts/judge-control.py      裁判对照样本（golden 集）
 scripts/collect-feedback.py   人工反馈：标注页面 + golden 候选
+scripts/annotate-visuals.py   可视化评审：校验标注、生成带框页面、挑选发布样本（--publish）
 scripts/build-index.py        机器可读的运行索引（index.jsonl）
 scripts/cost-report.py        运行成本与时长
 scripts/judge-metrics.py      裁判在语料上的一致性指标
@@ -95,13 +97,15 @@ runs/                         自验收与第三方运行的产物（原始会�
 
 ## 状态
 
-v0.5.2。流水线在第三方系统和它自己身上长大。
+v0.6.0。流水线在第三方系统和它自己身上长大。
+
+v0.6.0 为浏览器验收加了一层可视化：适配器在转录旁边截取各状态截图，评审子代理在图上框出缺陷（框 + 严重度 + 评论），反馈页面把带标注的截图展示在裁定旁边。标注只给人看：裁判永远看不到，裁定不变，截图绝不进入 oracle 或机器层。只有所有者亲手挑选的样本才会发布（`annotate-visuals.py --publish`）。
 
 先做了四次自验收（v1-v4，报告见 [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)）：v1 找到 3 个真实缺陷（适用范围、承诺未实现的功能、审批控制）；之后每次运行验证上一轮的修复，并寻找新缺陷。
 
 然后是第三方系统：一个文字编辑 skill（两次运行并对比版本，[runs/](runs/2026-10-11-stop-slop-r2/report.md)）、一个带内容注入的幻灯片生成器、一个技术英语改写 skill、经浏览器适配器运行的经典 2048 游戏（确定性的非 LLM SUT），以及来自封闭范围的一些系统（细节保密）。这些运行长出了 v0.3-v0.4：机器事实层（grep 抓到泄露，包括 SUT 自己写的文件）、基于开放数据集的裁判对照样本（TruthfulQA 45/45；HH-RLHF 攻击）、带标注页面的 Growing-Golden 反馈闭环、自相矛盾自动重判，以及实测的运行成本：一次典型验收在 SUT 侧花费 $0.6-1.8，裁判每次调用约 $0.4，因为裁判的 CLI 调用带着约 75K token 的会话前导。
 
-v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，基础设施故障与插件缺陷从此分开（BLOCKED/ERROR 状态）。v0.5.1 和 v0.5.2 对其加固：网关密钥只存放在代理容器内；插件源码只读挂载并做基于证据的写入探测；代理路径归一化封堵 /../ 穿越；增加频率/容量/时长限额；代理以非 root 且无 capabilities 运行。安全套件（`python scripts/sec-checks.py docker`）在 Windows 和 Linux CI runner 上均为绿色（runs/2026-10-13-sec/）；集成测试用真实的 Claude Code 跑活流水线（runs/2026-10-13-secint/）。合计 47 个单元测试和 9 个实跑测试。
+v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，基础设施故障与插件缺陷从此分开（BLOCKED/ERROR 状态）。v0.5.1 和 v0.5.2 对其加固：网关密钥只存放在代理容器内；插件源码只读挂载并做基于证据的写入探测；代理路径归一化封堵 /../ 穿越；增加频率/容量/时长限额；代理以非 root 且无 capabilities 运行。安全套件（`python scripts/sec-checks.py docker`）在 Windows 和 Linux CI runner 上均为绿色（runs/2026-10-13-sec/）；集成测试用真实的 Claude Code 跑活流水线（runs/2026-10-13-secint/）。合计 52 个测试：43 个流水线单元测试和 9 个代理实跑测试。
 
 尚未做到：只实现了 CLI 和浏览器适配器；隔离切断了 skills 的调用，但切不断对它们存在的认知；裁判需要手动指定（显式 `--model`，或在阶段 B 由人选择），因为 agent 的 `model` 字段并非在所有环境都生效。
 

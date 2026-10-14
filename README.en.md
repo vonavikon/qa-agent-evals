@@ -59,6 +59,7 @@ skills/acceptance-test/       the five-step pipeline (orchestrator)
 agents/analyst.md             SUT profiler
 agents/role-user.md           role-playing actor
 agents/judge.md               two-step judge (pinned to a different model)
+agents/visual-reviewer.md     visual review of screenshots (markup for the human only)
 knowledge/taxonomy.md         5 card types, patterns, reference YAML
 knowledge/adapters.md         CLI and browser (Playwright) adapters, environment isolation
 knowledge/oracle.md           oracles, verdict scale, report templates
@@ -71,6 +72,7 @@ scripts/check-facts.py        machine fact-checker (transcripts + SUT-written fi
 scripts/judge-batch.py        judge batch + automatic re-judge of self-contradictions
 scripts/judge-control.py      judge control sample (golden sets)
 scripts/collect-feedback.py   human feedback: markup page + golden candidates
+scripts/annotate-visuals.py   visual review: markup validation, annotated page, sample selection (--publish)
 scripts/build-index.py        machine-readable run index (index.jsonl)
 scripts/cost-report.py        run cost and duration
 scripts/judge-metrics.py      judge agreement metrics over corpora
@@ -95,13 +97,15 @@ runs/                         self-acceptance and third-party run artifacts (raw
 
 ## Status
 
-v0.5.2. The pipeline grew on third-party systems and on itself.
+v0.6.0. The pipeline grew on third-party systems and on itself.
+
+v0.6.0 added a visual layer for browser acceptance runs: the adapter takes screenshots of states next to the transcripts, a reviewer subagent marks flaws on them (box + severity + comment), and the feedback page shows annotated shots next to the verdicts. The markup is a hint for the human: the judge never sees it, verdicts stay unchanged, and screenshots never enter oracles or the machine layer. Only samples hand-picked by the owner get published (`annotate-visuals.py --publish`).
 
 First came four self-acceptance runs (v1-v4, reports in [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)): v1 found 3 real defects (scope boundaries, promising the unimplemented, approval control); each next run verified the previous fixes and hunted for new ones.
 
 Then third-party systems: a prose-editing skill (two runs with a version comparison, [runs/](runs/2026-10-11-stop-slop-r2/report.md)), a slide generator with a content-borne injection, a technical-English rewriting skill, the classic 2048 game through the browser adapter (a deterministic non-LLM SUT), and systems from a closed perimeter (details withheld). Those runs grew v0.3-v0.4: the machine fact layer (grep-caught leaks, including SUT-written files), the judge control sample from open datasets (TruthfulQA 45/45; HH-RLHF attacks), the Growing-Golden feedback loop with a clickable markup page, automatic re-judging of self-contradictions, and measured run economics: a typical acceptance run costs $0.6-1.8 on the SUT side plus roughly $0.4 per judge call, because a judge CLI call carries ~75K tokens of session preamble.
 
-v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and infrastructure failures are now separated from plugin defects (BLOCKED/ERROR statuses). v0.5.1 and v0.5.2 hardened it: the gateway key lives only in the proxy container, plugin sources are mounted read-only with an evidence-based write probe, proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy runs as non-root with no capabilities. The security suite (`python scripts/sec-checks.py docker`) is green on Windows and the Linux CI runner (runs/2026-10-13-sec/); an integration test runs the live pipeline with real Claude Code (runs/2026-10-13-secint/). In total: 47 unit tests and 9 live tests.
+v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and infrastructure failures are now separated from plugin defects (BLOCKED/ERROR statuses). v0.5.1 and v0.5.2 hardened it: the gateway key lives only in the proxy container, plugin sources are mounted read-only with an evidence-based write probe, proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy runs as non-root with no capabilities. The security suite (`python scripts/sec-checks.py docker`) is green on Windows and the Linux CI runner (runs/2026-10-13-sec/); an integration test runs the live pipeline with real Claude Code (runs/2026-10-13-secint/). In total: 52 tests: 43 pipeline unit tests and 9 live proxy tests.
 
 Not working yet: only the CLI and browser adapters are implemented; isolation cuts skill invocation but not knowledge of the skills' existence; the judge is wired up manually (explicit `--model` or the owner's choice at step B), because the agent `model` field does not work in every environment.
 

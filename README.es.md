@@ -59,6 +59,7 @@ skills/acceptance-test/       el pipeline de cinco pasos (orquestador)
 agents/analyst.md             perfilador del SUT
 agents/role-user.md           actor que interpreta roles
 agents/judge.md               juez de dos pasos (anclado a otro modelo)
+agents/visual-reviewer.md     revisión visual de capturas (marcado solo para el humano)
 knowledge/taxonomy.md         5 tipos de tarjetas, patrones, YAML de referencia
 knowledge/adapters.md         adaptadores CLI y navegador (Playwright), aislamiento del entorno
 knowledge/oracle.md           oráculos, escala de veredictos, plantillas de informe
@@ -71,6 +72,7 @@ scripts/check-facts.py        verificador de hechos de máquina (transcripciones
 scripts/judge-batch.py        lote del juez + re-juzgado automático de autocontradicciones
 scripts/judge-control.py      muestra de control del juez (conjuntos golden)
 scripts/collect-feedback.py   feedback humano: página de marcado + candidatos golden
+scripts/annotate-visuals.py   revisión visual: valida el marcado, página anotada, selección de muestras (--publish)
 scripts/build-index.py        índice de corrida legible por máquina (index.jsonl)
 scripts/cost-report.py        costo y duración de la corrida
 scripts/judge-metrics.py      métricas de acuerdo del juez sobre corpus
@@ -95,13 +97,15 @@ runs/                         artefactos de auto-aceptación y corridas de terce
 
 ## Estado
 
-v0.5.2. El pipeline creció sobre sistemas de terceros y sobre sí mismo.
+v0.6.0. El pipeline creció sobre sistemas de terceros y sobre sí mismo.
+
+v0.6.0 añadió una capa visual para las aceptaciones de navegador: el adaptador toma capturas de los estados junto a las transcripciones, un subagente revisor marca defectos en ellas (recuadro + severidad + comentario) y la página de feedback muestra las capturas anotadas junto a los veredictos. El marcado es una pista para el humano: el juez jamás lo ve, los veredictos no cambian y las capturas nunca entran en oráculos ni en la capa de máquina. Solo se publican muestras elegidas a mano por el dueño (`annotate-visuals.py --publish`).
 
 Primero vinieron cuatro auto-aceptaciones (v1-v4, informes en [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)): v1 encontró 3 defectos reales (límites de alcance, prometer lo no implementado, control de aprobación); cada corrida siguiente verificaba las correcciones anteriores y buscaba otras nuevas.
 
 Luego sistemas de terceros: un skill de edición de prosa (dos corridas con comparación de versiones, [runs/](runs/2026-10-11-stop-slop-r2/report.md)), un generador de diapositivas con una inyección vía contenido, un skill de inglés técnico, el clásico 2048 a través del adaptador de navegador (un SUT determinista sin LLM) y sistemas de un perímetro cerrado (detalles reservados). Esas corridas hicieron crecer v0.3-v0.4: la capa de máquina de hechos (fugas cazadas por grep, incluidos archivos escritos por el SUT), la muestra de control del juez con datasets abiertos (TruthfulQA 45/45; ataques HH-RLHF), el bucle de feedback Growing-Golden con página de marcado, el re-juzgado automático de autocontradicciones y la economía medida: una aceptación típica cuesta $0.6-1.8 del lado del SUT más unos $0.4 por llamada del juez, porque una llamada CLI del juez arrastra ~75K tokens de preámbulo de sesión.
 
-v0.5.0 añadió el aislamiento de ejecución (host/docker) con pruebas vivas contra evil-plugin, y los fallos de infraestructura ya se separan de los defectos del plugin (estados BLOCKED/ERROR). v0.5.1 y v0.5.2 lo endurecieron: la clave de la pasarela vive solo en el contenedor proxy, las fuentes se montan de solo lectura con una prueba de escritura basada en evidencia, la normalización de rutas del proxy cierra traversals con /../, límites de frecuencia/volumen/tiempo añadidos, y el proxy corre como non-root sin capabilities. La suite de seguridad (`python scripts/sec-checks.py docker`) está en verde en Windows y en el runner de CI de Linux (runs/2026-10-13-sec/); un test de integración corre el pipeline vivo con Claude Code real (runs/2026-10-13-secint/). En total: 47 tests unitarios y 9 vivos.
+v0.5.0 añadió el aislamiento de ejecución (host/docker) con pruebas vivas contra evil-plugin, y los fallos de infraestructura ya se separan de los defectos del plugin (estados BLOCKED/ERROR). v0.5.1 y v0.5.2 lo endurecieron: la clave de la pasarela vive solo en el contenedor proxy, las fuentes se montan de solo lectura con una prueba de escritura basada en evidencia, la normalización de rutas del proxy cierra traversals con /../, límites de frecuencia/volumen/tiempo añadidos, y el proxy corre como non-root sin capabilities. La suite de seguridad (`python scripts/sec-checks.py docker`) está en verde en Windows y en el runner de CI de Linux (runs/2026-10-13-sec/); un test de integración corre el pipeline vivo con Claude Code real (runs/2026-10-13-secint/). En total: 52 tests: 43 unitarios del pipeline y 9 vivos de proxy.
 
 Aún no funciona: solo están implementados los adaptadores CLI y de navegador; el aislamiento corta la invocación de skills pero no el conocimiento de su existencia; el juez se conecta a mano (`--model` explícito o elección del dueño en el paso B), porque el campo `model` del agente no funciona en todos los entornos.
 
