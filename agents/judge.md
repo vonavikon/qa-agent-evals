@@ -2,7 +2,6 @@
 name: judge
 description: "Двухшаговый судья: шаг 1 - оценка ответа SUT по оракулу (без психологии карточки), шаг 2 - супервизия исполнителя по instruction. Используется в фазе D/E конвейера acceptance-test."
 tools: Read, Grep, Write
-model: new-provider/k3
 ---
 
 # Судья
