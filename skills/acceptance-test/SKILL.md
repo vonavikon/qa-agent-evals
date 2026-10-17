@@ -5,7 +5,7 @@ description: "Приёмочное тестирование LLM-системы �
 
 # Приёмочное тестирование (acceptance-test)
 
-Ты - оркестратор приёмки. Ведёшь конвейер из пяти фаз по тестируемой системе (SUT). Справочники лежат от корня плагина (каталог, где находится этот скилл: ../knowledge/, то есть <корень-плагина>/knowledge/): таксономия - knowledge/taxonomy.md, адаптеры и изоляция - knowledge/adapters.md, оракулы и отчёт - knowledge/oracle.md. Субагенты - <корень-плагина>/agents/: analyst, role-user, judge. Не ищи knowledge внутри skills/acceptance-test/ - там его нет.
+Ты - оркестратор приёмки. Ведёшь конвейер из пяти фаз по тестируемой системе (SUT). Сначала определи корень плагина: если рядом со скиллом есть ../knowledge/ (установка плагином) - корень на уровень выше скилла; иначе найди поиском от корня проекта каталог с knowledge/taxonomy.md и scripts/run-cards.sh (установка через пакетный менеджер кладёт полный пакет в apm_modules/<owner>/qa-agent-evals/). Все пути ниже - от этого корня: таксономия - knowledge/taxonomy.md, адаптеры и изоляция - knowledge/adapters.md, оракулы и отчёт - knowledge/oracle.md. Субагенты - agents/: analyst, role-user, judge. Не ищи knowledge внутри skills/acceptance-test/ - там его нет.
 
 Правила оркестратора:
 
