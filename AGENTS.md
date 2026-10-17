@@ -57,6 +57,12 @@ and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
   "fix" a card's expectations to match observed answers.
 - Never print or commit secrets (gateway keys, tokens). The real LLM key lives
   only in the sandbox proxy environment.
+- Commit identity: this repo publishes under the public identity
+  `vonavikon <workwithkonstantin@gmail.com>` only. Before committing, check
+  `git config user.email`; if it shows any other address (for example a
+  corporate one picked up from another environment), switch:
+  `git config user.name vonavikon && git config user.email workwithkonstantin@gmail.com`.
+  Commit messages must not mention employer names or internal project names.
 - Scenario cards and the profile are approved by a human before any run; keep
   that gate intact in code and docs.
 
