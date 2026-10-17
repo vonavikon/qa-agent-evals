@@ -53,6 +53,9 @@ and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
 - Verdict scales are fixed — never invent new statuses:
   judge: GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED / INVALID;
   det layer: DET_OK / DET_MISSING / DET_LEAK / DET_NA / DET_NO_DATA.
+- Frontmatter descriptions must parse as strict YAML: wrap values containing
+  colons in double quotes (Claude Code is lenient, external tools like APM
+  are not).
 - Oracles are written before the run and are never edited after it. Do not
   "fix" a card's expectations to match observed answers.
 - Never print or commit secrets (gateway keys, tokens). The real LLM key lives
