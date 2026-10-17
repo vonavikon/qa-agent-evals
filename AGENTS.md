@@ -5,25 +5,32 @@ Guidance for coding agents working in this repository.
 ## What this repo is
 
 qa-agent-evals is a Claude Code plugin that runs acceptance testing for LLM systems
-(a SUT, "system under test": plugins, skills, bots). An analyst subagent profiles
-the SUT, scenario cards are generated and approved by a human, executor subagents
-play user roles against the SUT in an isolated environment, a deterministic grep
-layer checks facts before a judge subagent (running on a different model) issues
-verdicts, and reports go back to the human.
+(a SUT, "system under test": plugins, skills, bots, browser apps). An analyst
+subagent profiles the SUT, scenario cards are generated and approved by a human,
+executor subagents play user roles against the SUT in an isolated environment,
+a deterministic grep layer checks facts before a judge subagent (running on a
+different model) issues verdicts, and reports go back to the human. Browser
+acceptances (v0.6.0) add a visual layer: state screenshots next to transcripts,
+a visual-reviewer subagent marks flaws with severity frames — the judge never
+sees that markup and verdicts do not change.
 
-Docs are Russian-first: `README.md` (RU) · `README.en.md` (EN) · `docs/spec.md` ·
-`docs/architecture.md` (+ interactive `docs/architecture.html`).
+Docs: `README.md` (RU, canonical) with EN/ZH/ES/FR translations (`README.en.md`
+and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
+`docs/architecture.html`).
 
 ## Layout
 
 - `skills/acceptance-test/SKILL.md` — orchestrator instructions, five phases A–E
-- `agents/` — role definitions: analyst, role-user (executor), judge
+- `agents/` — role definitions: analyst, role-user (executor), judge,
+  visual-reviewer (marks browser screenshots; judge-blind by design)
 - `knowledge/` — taxonomy (5 card types), adapters and environment isolation,
   oracle (verdict scale), sandbox levels, golden control sets
 - `scripts/` — deterministic machinery: `run-cards.sh` (headless runs),
   `parse-events.py`, `check-facts.py` (fact grep before the judge),
   `judge-batch.py` / `judge-control.py`, `sandbox.py` + `sandbox-proxy.py`
-  (docker isolation, fail-closed), `sec-checks.py`
+  (docker isolation, fail-closed), `sec-checks.py`, `annotate-visuals.py`
+  (validates visual markup, builds the visual review page, publishes named
+  samples)
 - `runs/` — acceptance artifacts (cards, transcripts, facts, verdicts, reports).
   Case policy: third-party runs are published only with the owner's consent —
   ask before committing any.
@@ -41,8 +48,8 @@ Docs are Russian-first: `README.md` (RU) · `README.en.md` (EN) · `docs/spec.md
 
 ## Conventions
 
-- Working language for docs and commits: Russian. RU is canonical; keep
-  `README.en.md` in sync when changing `README.md`.
+- Working language for docs and commits: Russian. RU README is canonical; keep
+  the EN/ZH/ES/FR translations in sync when changing it.
 - Verdict scales are fixed — never invent new statuses:
   judge: GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED / INVALID;
   det layer: DET_OK / DET_MISSING / DET_LEAK / DET_NA / DET_NO_DATA.
