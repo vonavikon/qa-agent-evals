@@ -43,7 +43,7 @@ Hardened in v0.5.1: plugin sources are mounted read-only with a boot-time write 
 
 Requirements: Claude Code, bash, python3. On Windows use Git Bash or WSL.
 
-Install the plugin (with `--plugin-dir <path>` at session start or via a marketplace), open a session in the tested system's directory, and write:
+Install the plugin (with `--plugin-dir <path>` at session start, via a marketplace, or via APM: `pip install apm-cli`, then `apm install vonavikon/qa-agent-evals`), open a session in the tested system's directory, and write:
 
 ```
 run acceptance testing on <path to SUT>

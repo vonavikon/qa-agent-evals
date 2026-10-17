@@ -43,7 +43,7 @@ Durci en v0.5.1 : les sources du plugin sont montées en lecture seule avec une 
 
 Prérequis : Claude Code, bash, python3. Sous Windows, utilisez Git Bash ou WSL.
 
-Installez le plugin (avec `--plugin-dir <chemin>` au lancement de la session ou via un marketplace), ouvrez une session dans le répertoire du système testé et écrivez :
+Installez le plugin (avec `--plugin-dir <chemin>` au lancement de la session, via un marketplace ou via APM : `pip install apm-cli`, puis `apm install vonavikon/qa-agent-evals`), ouvrez une session dans le répertoire du système testé et écrivez :
 
 ```
 lance les tests d'acceptation sur <chemin du SUT>

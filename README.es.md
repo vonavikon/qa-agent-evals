@@ -43,7 +43,7 @@ Endurecido en v0.5.1: las fuentes del plugin se montan de solo lectura con una p
 
 Requisitos: Claude Code, bash, python3. En Windows usa Git Bash o WSL.
 
-Instala el plugin (con `--plugin-dir <ruta>` al iniciar la sesión o vía un marketplace), abre una sesión en el directorio del sistema probado y escribe:
+Instala el plugin (con `--plugin-dir <ruta>` al iniciar la sesión, vía un marketplace o vía APM: `pip install apm-cli` y luego `apm install vonavikon/qa-agent-evals`), abre una sesión en el directorio del sistema probado y escribe:
 
 ```
 ejecuta las pruebas de aceptación en <ruta al SUT>

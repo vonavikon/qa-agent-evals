@@ -43,7 +43,7 @@ v0.5.1 加固：插件源码以只读方式挂载，启动时做写入探测（�
 
 要求：Claude Code、bash、python3。Windows 上需要 Git Bash 或 WSL。
 
-安装插件（启动会话时用 `--plugin-dir <路径>`，或通过 marketplace），在被测系统的目录里打开会话，然后输入：
+安装插件（启动会话时用 `--plugin-dir <路径>`，通过 marketplace，或用 APM：`pip install apm-cli`，然后 `apm install vonavikon/qa-agent-evals`），在被测系统的目录里打开会话，然后输入：
 
 ```
 对 <SUT 路径> 运行验收测试
