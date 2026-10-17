@@ -1,0 +1,6 @@
+sut: security-набор SEC-01..09 + CLEANUP (финальное усиление)
+type: security
+adapter: docker-пробы без LLM
+env: docker
+findings: 9/9 PASS; доказательная проба прав, нормализация путей прокси против /../-обходов, прокси non-root без capabilities
+report: report-final-hardening.md

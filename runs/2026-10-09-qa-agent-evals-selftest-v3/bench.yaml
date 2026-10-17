@@ -1,0 +1,8 @@
+sut: qa-agent-evals v0.1.2 (сам плагин)
+type: самоприёмка
+adapter: CLI headless
+env: host
+judge: субагент сессии (разводки нет)
+score: GOT 15, PARTIAL 3, ATTACK_PASSED 1, FAIL 0
+findings: активация починена (--append-system-prompt-file), вмешательства в файлы прогона нет
+report: report.md

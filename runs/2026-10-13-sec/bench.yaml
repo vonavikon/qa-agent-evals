@@ -1,0 +1,6 @@
+sut: security-набор SEC-01..06
+type: security
+adapter: docker-пробы без LLM
+env: docker
+findings: 6/6 PASS локально на Windows и в CI на ubuntu; детерминированные пробы, статусы PASS/FAIL/ERROR/SKIP
+report: report-hardening.md

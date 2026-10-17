@@ -773,3 +773,50 @@ class ProxyHardening(unittest.TestCase):
             sb.run = fake_run
             sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
             sb.start_proxy(os.path.join(td, "qa-evals-run-x"))
+
+
+class TestBuildBenchmarks(unittest.TestCase):
+    """Журнал приёмок: сайдкар + машинные артефакты -> строка таблицы; защитный фильтр."""
+
+    def setUp(self):
+        self.bb = load("build_benchmarks", "build-benchmarks.py")
+        td = tempfile.mkdtemp(prefix="bench-")
+        self.addCleanup(lambda: __import__("shutil").rmtree(td, ignore_errors=True))
+        run = os.path.join(td, "2026-10-12-example")
+        os.makedirs(run)
+        with io.open(os.path.join(run, "bench.yaml"), "w", encoding="utf-8") as f:
+            f.write("sut: example (author) - публичный скилл\n"
+                    "type: приёмка\nadapter: CLI+ASP\nenv: host\n"
+                    "findings: граница сломана\n")
+        with io.open(os.path.join(run, "index.jsonl"), "w", encoding="utf-8") as f:
+            f.write(json.dumps({"id": "EX-01", "result": "GOT", "repeats": ["1", "2"],
+                                "meta": {"judge_model": "glm-5.3-flash"}}) + "\n"
+                    + json.dumps({"id": "EX-02", "result": "FAIL", "repeats": ["1", "2"],
+                                  "meta": {"judge_model": "glm-5.3-flash"}}) + "\n")
+        with io.open(os.path.join(run, "cost.md"), "w", encoding="utf-8") as f:
+            f.write("# Стоимость\n\n**Прогон целиком: $1.234** (SUT $1.0 + судья $0.234).\n")
+        with io.open(os.path.join(run, "report.md"), "w", encoding="utf-8") as f:
+            f.write("# отчёт\n")
+        self.td, self.run = td, run
+
+    def test_row_derives_counts_and_cost(self):
+        row = self.bb.build_row("2026-10-12-example", self.run)
+        self.assertIn("2 × 2", row)            # карточки × повторы из index.jsonl
+        self.assertIn("GOT 1, FAIL 1", row)    # счёт результатов
+        self.assertIn("glm-5.3-flash", row)    # модель судьи из meta
+        self.assertIn("$1.234", row)           # стоимость без жадной точки
+        self.assertNotIn("$1.234.", row)
+        self.assertIn("[report](../runs/2026-10-12-example/report.md)", row)
+
+    def test_guard_blocks_private_markers(self):
+        hits = self.bb.guard("автор kivanov, путь C:\\Users\\const, ключ sk-abcdefgh1234")
+        self.assertTrue(hits, "приватные маркеры обязаны ловиться")
+        self.assertFalse(self.bb.guard("чистая строка: ste100, docker, $1.38"))
+
+    def test_selftest_positive_control(self):
+        self.assertTrue(self.bb.selftest())
+
+    def test_build_refuses_run_without_sidecar(self):
+        os.remove(os.path.join(self.run, "bench.yaml"))
+        page = self.bb.build(self.td)
+        self.assertIn("Без сайдкара bench.yaml в журнал не попали", page)

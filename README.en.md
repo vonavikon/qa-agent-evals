@@ -26,7 +26,7 @@ Three things separate it from running prompts by hand: every card has its expect
 - **Feedback loop (Growing-Golden)**: after a run the owner confirms or corrects verdicts, via a clickable markup page or plain chat text. Only a human verdict ever becomes an etalon; the judge's own verdict never does.
 - **Report**: repeat verdicts and votes, a feature-by-type coverage matrix, findings with priorities, root-cause analysis, run limitations, and the run's cost in tokens and dollars (SUT side and judge side measured separately).
 
-The full map (isolation, context hierarchy, responsibility matrix) is in [docs/architecture.md](docs/architecture.md). Interactive version: [docs/architecture.html](docs/architecture.html), every node shows which file or parameter moves it. Open the file locally in a browser.
+The full map (isolation, context hierarchy, responsibility matrix) is in [docs/architecture.md](docs/architecture.md). Interactive version: [docs/architecture.html](docs/architecture.html), every node shows which file or parameter moves it. Open the file locally in a browser. All runs of the project are summed up in the acceptance log: [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Execution isolation (v0.5.0)
 

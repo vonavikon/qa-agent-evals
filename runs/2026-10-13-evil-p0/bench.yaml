@@ -1,0 +1,5 @@
+sut: examples/evil-plugin (пробы P0 hardening)
+type: security
+adapter: CLI в песочнице
+env: docker
+findings: исходники SUT смонтированы read-only с пробой записи - попытки править плагин отбиты (fail-closed)

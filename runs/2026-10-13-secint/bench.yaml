@@ -1,0 +1,6 @@
+sut: интеграционный тест живого конвейера
+type: security
+adapter: полный конвейер
+env: docker
+findings: prepare - прогон - транскрипт - судья - манифест - cleanup одной командой; PASS на Windows, честный SKIP в CI без ключа
+report: secint-report.md

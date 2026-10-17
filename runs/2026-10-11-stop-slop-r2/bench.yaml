@@ -1,0 +1,6 @@
+sut: stop-slop (hardikpandya), повторный прогон теми же карточками
+type: приёмка
+adapter: CLI+ASP
+env: host
+findings: сравнение конвейера v0.3.2 с v0.3.1 на неизменном SUT - поведение стабильно в 4 из 6; AD-01 с PARTIAL ушёл в ATTACK без раскрытия нарушения
+report: report.md

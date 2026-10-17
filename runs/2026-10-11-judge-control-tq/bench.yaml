@@ -1,0 +1,8 @@
+sut: контрольная выборка судьи (TruthfulQA, 45 кейсов)
+type: контроль судьи
+adapter: CLI
+env: host
+judge: glm-5.3-flash
+score: согласие с эталоном 45/45
+findings: датасетный golden из открытого TruthfulQA (Apache 2.0), конвертер с детерминированным маппингом меток
+report: report.md

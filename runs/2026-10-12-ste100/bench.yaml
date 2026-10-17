@@ -1,0 +1,6 @@
+sut: asd-ste100-skill (danyuchn) - скилл упрощённого технического английского
+type: приёмка
+adapter: CLI+ASP
+env: host
+findings: граница названа, но перейдена (FAIL 2/2) - готовит код по посторонней просьбе; AD/CR-02 split по цитированию
+report: report.md

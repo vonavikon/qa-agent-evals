@@ -26,7 +26,7 @@ Trois choses le distinguent de l'exécution manuelle de prompts : la réponse at
 - **Boucle de retour (Growing-Golden)** : après une course, le propriétaire confirme ou corrige les verdicts, via une page d'annotation cliquable ou du texte direct dans le chat. Seul un verdict humain devient un étalon ; celui du juge, jamais.
 - **Rapport** : verdicts et votes des répétitions, matrice de couverture fonctionnalité par type, constats avec priorités, analyse des causes, limites de la course et son coût en jetons et en dollars (côté SUT et côté juge mesurés séparément).
 
-La carte complète (isolation, hiérarchie des contextes, matrice de responsabilités) est dans [docs/architecture.md](docs/architecture.md). Version interactive : [docs/architecture.html](docs/architecture.html), chaque nœud montre quel fichier ou paramètre l'influence. Ouvrez le fichier localement dans un navigateur.
+La carte complète (isolation, hiérarchie des contextes, matrice de responsabilités) est dans [docs/architecture.md](docs/architecture.md). Version interactive : [docs/architecture.html](docs/architecture.html), chaque nœud montre quel fichier ou paramètre l'influence. Ouvrez le fichier localement dans un navigateur. Toutes les exécutions du projet sont résumées dans le journal d'acceptation : [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Isolation d'exécution (v0.5.0)
 

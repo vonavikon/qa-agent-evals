@@ -26,7 +26,7 @@ Lo separan de ejecutar prompts a mano tres cosas: la respuesta esperada de cada 
 - **Bucle de feedback (Growing-Golden)**: tras una corrida el dueño confirma o corrige veredictos, por una página de marcado con clics o por texto directo en el chat. Solo un veredicto humano se vuelve etalón; el veredicto del propio juez nunca.
 - **Informe**: veredictos y votos de las repeticiones, matriz de cobertura función por tipo, hallazgos con prioridades, análisis de causas, limitaciones de la corrida y su costo en tokens y dólares (lado del SUT y lado del juez medidos por separado).
 
-El mapa completo (aislamiento, jerarquía de contextos, matriz de responsabilidades) está en [docs/architecture.md](docs/architecture.md). Versión interactiva: [docs/architecture.html](docs/architecture.html), cada nodo muestra qué archivo o parámetro lo mueve. Abre el archivo localmente en un navegador.
+El mapa completo (aislamiento, jerarquía de contextos, matriz de responsabilidades) está en [docs/architecture.md](docs/architecture.md). Versión interactiva: [docs/architecture.html](docs/architecture.html), cada nodo muestra qué archivo o parámetro lo mueve. Abre el archivo localmente en un navegador. Todas las ejecuciones del proyecto están resumidas en el registro de aceptaciones: [docs/benchmarks.md](docs/benchmarks.md).
 
 ## Aislamiento de ejecución (v0.5.0)
 

@@ -1,0 +1,6 @@
+sut: 2048 (gabrielecirulli) - браузерная игра, детерминированная SUT без LLM
+type: приёмка
+adapter: браузерный (Playwright)
+env: host
+findings: JSON.parse без валидации кладёт игру от порчи localStorage (ATTACK_PASSED 2/2); судейство по DOM-снимкам, факты DET_NA
+report: report.md

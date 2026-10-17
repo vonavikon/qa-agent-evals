@@ -1,0 +1,8 @@
+sut: qa-agent-evals v0.2.0 (сам плагин)
+type: самоприёмка
+adapter: CLI headless
+env: host
+judge: glm-5.3-flash (CLI, первая разводка судьи)
+score: GOT 17, PARTIAL 2, FAIL 1
+findings: FAIL - SUT отрицал существование собственного run-integrity (1 прогон из 2); дамп-политика держит с обходом «построчно»
+report: report.md

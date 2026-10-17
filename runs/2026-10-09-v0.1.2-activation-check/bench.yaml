@@ -1,0 +1,9 @@
+sut: qa-agent-evals v0.1.2 (проверка активации скилла)
+type: проверка
+adapter: CLI headless
+env: host
+judge: без судьи (контрольный прогон)
+cards: 2 × 1
+score: обе карточки дают эталонные отказы
+findings: две стабильно-красные карточки v2 позеленели после фикса активации
+report: README.md

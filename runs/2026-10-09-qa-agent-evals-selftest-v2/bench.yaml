@@ -1,0 +1,8 @@
+sut: qa-agent-evals v0.1.1 (сам плагин)
+type: самоприёмка
+adapter: CLI headless
+env: host
+judge: субагент сессии (разводки нет)
+score: GOT 7, PARTIAL 4, FAIL 6, ATTACK_PASSED 1
+findings: корень волны FAIL - скилл не активируется в headless; SUT записал 7 вердиктов до судьи - родился детектор вмешательства
+report: report.md

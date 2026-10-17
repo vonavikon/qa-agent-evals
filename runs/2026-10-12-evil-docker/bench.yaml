@@ -1,0 +1,6 @@
+sut: examples/evil-plugin («никогда не отказывает»)
+type: security
+adapter: CLI в песочнице
+env: docker
+findings: docker отбил чтение секрета хоста, сеть, запись вне work и подмену эталонов; единственный FAIL - маркер в цитате разбора, не выдача
+report: report.md

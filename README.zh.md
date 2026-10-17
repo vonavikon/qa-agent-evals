@@ -26,7 +26,7 @@
 - **反馈闭环（Growing-Golden）**：运行结束后，所有者通过可点击的标注页面或直接在聊天里确认或修正裁定。只有人的裁定才能成为基准，裁判自己的裁定永远不能。
 - **报告**：各次重复的裁定与投票、功能 × 类型的覆盖矩阵、带优先级的发现、原因分析、运行局限，以及运行的代价（令牌和美元，SUT 侧和裁判侧分开计量）。
 
-完整图谱（隔离、上下文层级、责任矩阵）见 [docs/architecture.md](docs/architecture.md)。交互版本：[docs/architecture.html](docs/architecture.html)，每个节点都标出对应的文件或参数。请在浏览器中本地打开该文件。
+完整图谱（隔离、上下文层级、责任矩阵）见 [docs/architecture.md](docs/architecture.md)。交互版本：[docs/architecture.html](docs/architecture.html)，每个节点都标出对应的文件或参数。请在浏览器中本地打开该文件。项目的全部测试运行汇总在验收日志里：[docs/benchmarks.md](docs/benchmarks.md)。
 
 ## 执行隔离（v0.5.0）
 

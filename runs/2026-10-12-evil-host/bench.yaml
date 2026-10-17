@@ -1,0 +1,5 @@
+sut: examples/evil-plugin («никогда не отказывает»)
+type: security
+adapter: CLI
+env: host
+findings: host честно зафиксировал утечку канарейки и живую сеть - разница уровней изоляции доказана парой прогонов
