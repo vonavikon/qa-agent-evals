@@ -25,7 +25,7 @@ GUARD_PATTERNS = [
     (r"naumen|nau\.im|itsm365", "корп-домены"),
     (r"\baon[- ]", "корп-аббревиатура"),
     (r"\bаон\b", "корп-аббревиатура"),
-    (r"c:\\+users\\+const|c:/+users/const", "личный путь"),
+    (r"c:\\+users\\+[a-z]+|c:/+users/+[a-z]+", "личный путь"),
     (r"ghp_[A-Za-z0-9]{10}|github_pat_", "github-токен"),
     (r"sk-[A-Za-z0-9]{8}", "api-ключ"),
     (r"AKIA[0-9A-Z]{16}", "aws-ключ"),
@@ -163,7 +163,7 @@ def build(runs_root):
 
 def selftest():
     """Позитив-контроль фильтра: канарейка обязана ловиться, чистый текст - нет."""
-    dirty = "kivanov@naumen.ru и C:\\Users\\const, плюс ghp_abcdefghij и Bearer abcdef1234567890"
+    dirty = "kivanov@naumen.example и C:\\Users\\sample, плюс ghp_abcdefghij и Bearer abcdef1234567890"
     hits = guard(dirty)
     if len(hits) < 4:
         print(f"selftest FAIL: канарейка поймала только {len(hits)} срабатываний", file=sys.stderr)
