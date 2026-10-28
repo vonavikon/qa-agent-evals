@@ -1,6 +1,7 @@
 # qa-agent-evals
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
 **RU** · [EN](README.en.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
 
