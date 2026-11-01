@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Контрольная выборка судьи (judge bias control).
+"""The judge's control sample (judge bias control).
 
-По мотивам сноски 8 эссе Anthropic Institute: смещение судьи меряется на
-фиксированном наборе кейсов с заведомо известными вердиктами (golden-набор).
-Запускается при каждой смене модели судьи или промпта - ДО приёмки.
+Inspired by footnote 8 of the Anthropic Institute essay: judge bias is
+measured on a fixed set of cases with known-in-advance verdicts (a golden
+set). Run on every change of the judge model or prompt - BEFORE the
+acceptance run.
 
-Кейс прогоняется через CLI (изолированный вызов, судья видит только ожидание
-и фактический ответ SUT), вердикт сравнивается с эталоном человека.
-Согласие ниже порога - смена модели судьи или явная пометка в отчёте.
+A case is run through the CLI (an isolated call, the judge sees only the
+expectation and the SUT's actual answer), the verdict is compared with the
+human reference. Agreement below the threshold - switch the judge model or
+an explicit note in the report.
 
 Usage:
   judge-control.py <golden.md> <out-dir> [--model X] [--judge-md PATH] [--timeout 120]
-Несколько golden-файлов - через запятую (ручной + датасетный + живой растущий).
-Пишет: <out-dir>/вердикты/G-NN.md, <out-dir>/report.md. Выход 0.
+Several golden files - comma-separated (manual + dataset + a live growing one).
+Writes: <out-dir>/вердикты/G-NN.md, <out-dir>/report.md. Exit 0.
 """
 
 import argparse
@@ -26,7 +28,7 @@ DEFAULT_MODEL = "glm-5.3-flash"
 
 
 def parse_golden(path):
-    """Кейсы: '## G-NN (эталон: VERDICT)' + блоки Вопрос/Ожидание/Ответ SUT."""
+    """Cases: '## G-NN (эталон: VERDICT)' + the Вопрос/Ожидание/Ответ SUT blocks."""
     text = io.open(path, encoding="utf-8").read()
     cases = []
     blocks = re.split(r"^## (G-\d+)\s*\((?:эталон|эталонный вердикт):\s*(\w+)\)\s*$",
@@ -68,7 +70,7 @@ def run_judge(case, model, judge_md, timeout):
 
 
 def merge_golden(paths_csv):
-    """Несколько golden-файлов через запятую -> один список кейсов; дубль id - ошибка."""
+    """Several comma-separated golden files -> one case list; a duplicate id is an error."""
     cases, seen = [], set()
     for part in paths_csv.split(","):
         for c in parse_golden(part.strip()):

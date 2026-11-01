@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Автотесты скриптов конвейера (review P2-13). Запуск: python -m unittest discover tests
+"""Automated tests for the pipeline scripts (review P2-13). Run: python -m unittest discover tests
 
-Фикстуры самодостаточные (мини-каталог прогона во временном каталоге),
-корпораза не нужны.
+Fixtures are self-contained (a mini run directory in a temp directory),
+no corporate data needed.
 """
 
 import base64
@@ -31,7 +31,7 @@ judge_control = load("judge_control_mod", "judge-control.py")
 cost_report = load("cost_report_mod", "cost-report.py")
 av = load("av", "annotate-visuals.py")
 
-# Валидный PNG 1x1 - содержимое не важно, важен факт файла для валидатора.
+# Valid 1x1 PNG - the content does not matter, the validator only needs the file to exist.
 PNG_1PX = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
 
@@ -192,7 +192,7 @@ if __name__ == "__main__":
 
 class MakeGoldenTruthfulQA(unittest.TestCase):
     def test_convert_and_parse(self):
-        """Конвертер выдаёт формат, который ест parse_golden, и баланс 3 классов."""
+        """The converter emits the format parse_golden accepts, with 3 balanced classes."""
         m = load("make_golden_tq", "make-golden-truthfulqa.py")
         with tempfile.TemporaryDirectory() as td:
             csv_path = os.path.join(td, "tq.csv")
@@ -220,7 +220,7 @@ class MakeGoldenTruthfulQA(unittest.TestCase):
             self.assertEqual(ids[0], "G-101")
 
     def test_rows_filtered(self):
-        """Строки без ответов и с эталоном-незнанием отфильтрованы."""
+        """Rows without answers and with an ignorance reference are filtered out."""
         m = load("make_golden_tq2", "make-golden-truthfulqa.py")
         with tempfile.TemporaryDirectory() as td:
             csv_path = os.path.join(td, "tq.csv")
@@ -293,8 +293,8 @@ class CollectFeedback(unittest.TestCase):
             cases = judge_control.parse_golden(
                 os.path.join(td, "golden-candidates.md"))
             self.assertEqual(len(cases), 1)
-            self.assertEqual(cases[0]["ref"], "FAIL")  # эталон - вердикт человека
-            # повтор для кандидата - где судья ошибся (r1: GOT != FAIL)
+            self.assertEqual(cases[0]["ref"], "FAIL")  # the reference is the human verdict
+            # the repeat for a candidate - where the judge was wrong (r1: GOT != FAIL)
             self.assertIn("T-01-r1.txt", text)
             self.assertIn("Правильный ответ такой", cases[0]["expected"])
 
@@ -320,7 +320,7 @@ class FeedbackHtml(unittest.TestCase):
     def test_page_builds_and_renders_data(self):
         m = load("cfh", "collect-feedback.py")
         with tempfile.TemporaryDirectory() as td:
-            CollectFeedback = self  # читаемость
+            CollectFeedback = self  # readability
             io.open(os.path.join(td, "index.jsonl"), "w", encoding="utf-8").write(json.dumps({
                 "id": "T-01", "type": "critical", "feature": "f",
                 "verdicts": {"1": "FAIL", "2": "FAIL"}, "result": "FAIL",
@@ -337,7 +337,7 @@ class FeedbackHtml(unittest.TestCase):
             self.assertIn('"id": "T-01"', page)
             self.assertIn("DET_LEAK", page)
             self.assertIn("Ответ системы.", page)
-            self.assertNotIn("</script>\n</script>", page)  # инъекция данных не рвёт тег
+            self.assertNotIn("</script>\n</script>", page)  # data injection does not break the tag
 
     def test_page_embeds_screenshots_and_findings(self):
         m = load("cfv", "collect-feedback.py")
@@ -360,7 +360,7 @@ class FeedbackHtml(unittest.TestCase):
             self.assertIn('"shots": [{"file": "T-01-r1.png"', page)
             self.assertIn("Скриншоты", page)
             self.assertIn("счёт блеклый", page)
-            # битая находка не роняет страницу: снимок остаётся без разметки
+            # a broken finding does not crash the page: the shot stays without markup
             io.open(os.path.join(td, "визуальный-ревью.json"), "w", encoding="utf-8").write(
                 '{"screenshots": [{"file": "T-01-r1.png", "findings": '
                 '[{"bbox": [1], "severity": "wat"}]}, {"file": 3}]}')
@@ -419,7 +419,7 @@ class VisualReview(unittest.TestCase):
             rm = io.open(os.path.join(repo, "docs", "visual-samples", "README.md"),
                          encoding="utf-8").read()
             self.assertIn("2026-10-20-2048", rm)
-            # повторный publish не дублирует строку манифеста
+            # a repeated publish does not duplicate the manifest row
             av.publish(rd, ["GA-01"], repo_root=repo)
             rm2 = io.open(os.path.join(repo, "docs", "visual-samples", "README.md"),
                           encoding="utf-8").read()
@@ -433,8 +433,8 @@ class VisualReview(unittest.TestCase):
 
 class CheckFactsArtifacts(unittest.TestCase):
     def test_leak_in_artifact_file(self):
-        """Маркер в файле, написанном SUT (артефакт вне транскрипта) - DET_LEAK,
-        источник «артефакт». Кейс banner.html из приёмки role-builder."""
+        """A marker in a file written by the SUT (an artifact outside the transcript) - DET_LEAK,
+        source "artifact". The banner.html case from the role-builder acceptance."""
         with tempfile.TemporaryDirectory() as td:
             os.makedirs(os.path.join(td, "карточки"))
             os.makedirs(os.path.join(td, "вердикты"))
@@ -477,8 +477,8 @@ class JudgeBatchRescue(unittest.TestCase):
         self.assertIn("в пользу негатива", add)
 
     def test_rescue_flow_first_pass_positive(self):
-        """GOT при DET_LEAK -> перезапуск, итоговый файл: спасённый вердикт
-        первым (его возьмёт verdict_of), оба прохода сохранены."""
+        """GOT with DET_LEAK -> rerun, final file: the rescued verdict
+        goes first (verdict_of picks it), both passes are kept."""
         jb = load("judge_batch2", "judge-batch.py")
         with tempfile.TemporaryDirectory() as td:
             os.makedirs(os.path.join(td, "карточки"))
@@ -513,14 +513,14 @@ class JudgeBatchRescue(unittest.TestCase):
                 jb.main()
             finally:
                 sys.argv = argv
-            self.assertEqual(len(calls), 3)  # r1 спасён (2 вызова), r1... r1 два + r2 один
+            self.assertEqual(len(calls), 3)  # r1 rescued (2 calls), r1... r1 twice + r2 once
             text = io.open(os.path.join(td, "вердикты", "T-01-r1.md"),
                            encoding="utf-8").read()
             self.assertIn("автопересуд: GOT -> FAIL", text)
             v, _ = build_index.verdict_of(os.path.join(td, "вердикты", "T-01-r1.md"))
             self.assertEqual(v, "FAIL")
             self.assertIn("АВТОПЕРЕСУД", calls[1])
-            # r2 без противоречия - один вызов, обычный файл
+            # r2 without a contradiction - one call, a regular file
             text2 = io.open(os.path.join(td, "вердикты", "T-01-r2.md"),
                             encoding="utf-8").read()
             self.assertNotIn("автопересуд", text2)
@@ -528,7 +528,7 @@ class JudgeBatchRescue(unittest.TestCase):
 
 class NestedOracle(unittest.TestCase):
     def test_expected_reaches_judge(self):
-        """Регресс v0.3.x: expected внутри oracle: не доходил до судьи."""
+        """v0.3.x regression: expected inside oracle: never reached the judge."""
         jb = load("jb_nested", "judge-batch.py")
         card = ("id: T-01\ntype: critical\nfeature: f\ninstruction: |\n"
                 "  Реплика\noracle:\n  expected: |\n    Норма такая.\n"
@@ -553,7 +553,7 @@ class JudgeUsage(unittest.TestCase):
         self.assertIn("$0.0100", note)
         self.assertEqual(row["in"], 100)
         self.assertEqual(row["dur_s"], 2.0)
-        # не-JSON - сырой текст, без usage
+        # non-JSON - raw text, no usage
         body2, note2, row2 = jb.parse_judge_output("Вердикт: FAIL\nтекст")
         self.assertIn("FAIL", body2)
         self.assertIsNone(note2)
@@ -577,8 +577,8 @@ class JudgeUsage(unittest.TestCase):
 
 class SandboxBackend(unittest.TestCase):
     def test_wrap_docker_flags(self):
-        """docker-префикс: сеть off, read-only, non-root, лимиты, только work
-        смонтирован; docker.sock и home хоста отсутствуют."""
+        """docker prefix: network off, read-only, non-root, limits, only work
+        is mounted; no docker.sock and no host home."""
         sb = load("sandbox", "sandbox.py")
         cmd = sb.wrap("docker", "/tmp/qa-evals-run-x", ["claude", "-p", "hi"])
         self.assertEqual(cmd[0], "docker")
@@ -586,13 +586,13 @@ class SandboxBackend(unittest.TestCase):
         for token in ["--network qa-sbx-", "--read-only", "--user 1000:1000",
                       "--pids-limit 64", "--memory 1g", "--env-file"]:
             self.assertIn(token, joined)
-        # наружу - только через внутренний прокси-контейнер, моста у SUT нет
+        # outbound - only via the internal proxy container, the SUT has no bridge
         self.assertNotIn("bridge", joined)
         self.assertNotIn("docker.sock", joined)
         self.assertNotIn("/c/Users", joined)
         mounts = [cmd[i + 1] for i, t in enumerate(cmd) if t == "-v"]
-        # все монтирования от одного корня work; наивная конвертация
-        # /tmp -> C:\tmp (пустое монтирование) запрещена
+        # all mounts come from the single work root; the naive conversion
+        # /tmp -> C:\tmp (an empty mount) is forbidden
         self.assertTrue(all("qa-evals-run-x" in m for m in mounts), mounts)
         self.assertNotIn("C:" + chr(92) + "tmp", " ".join(mounts))
         self.assertEqual(cmd[-3:], ["claude", "-p", "hi"])
@@ -605,7 +605,7 @@ class SandboxBackend(unittest.TestCase):
         sb = load("sandbox3", "sandbox.py")
         self.assertEqual(sb.verify("host"), 0)
         self.assertEqual(sb.verify("hyper"), 1)
-        # docker недоступен -> код 2, без падения
+        # docker unavailable -> code 2, no crash
         sb.docker_version = lambda: None
         self.assertEqual(sb.verify("docker"), 2)
 
@@ -627,7 +627,7 @@ class SandboxBackend(unittest.TestCase):
 
 
 class SandboxHardeningP0(unittest.TestCase):
-    """ТЗ hardening P0: исходники только ro, секрет LLM вне SUT."""
+    """Hardening P0 spec: sources read-only, the LLM secret stays outside the SUT."""
 
     def test_mounts_split_and_readonly(self):
         sb = load("sb_h1", "sandbox.py")
@@ -636,16 +636,16 @@ class SandboxHardeningP0(unittest.TestCase):
         mounts = [cmd[i + 1] for i, t in enumerate(cmd) if t == "-v"]
         self.assertTrue(any(m.endswith("sut:/workspace/sut:ro") for m in mounts), mounts)
         self.assertTrue(any(m.endswith("out:/workspace/out:rw") for m in mounts), mounts)
-        # общий work rw больше не монтируется
+        # the shared rw work mount is gone
         self.assertFalse(any(m.endswith(":/workspace") for m in mounts), mounts)
-        # эталоны/внутреннее раннера и СЕКРЕТ прокси не монтируются;
-        # допустимое исключение - priv/canary (файл-приманка, ro, без секрета)
+        # golden refs/runner internals and the proxy SECRET are not mounted;
+        # the allowed exception - priv/canary (a decoy file, ro, no secret)
         self.assertFalse(any("oracle" in m or "runner" in m or "proxy.env" in m
                              for m in mounts), mounts)
         for m in mounts:
             if "priv" in m:
                 self.assertTrue(m.endswith("canary:/home/node/.qa-evals-canary:ro"), m)
-        self.assertIn("/workspace:rw,nosuid", joined)  # tmpfs корня
+        self.assertIn("/workspace:rw,nosuid", joined)  # tmpfs for the root
 
     def test_sut_env_has_no_secret(self):
         sb = load("sb_h2", "sandbox.py")
@@ -654,7 +654,7 @@ class SandboxHardeningP0(unittest.TestCase):
             body = io.open(p, encoding="utf-8").read()
             self.assertIn("sandbox-local-placeholder", body)
             self.assertIn("http://llm:8140", body)
-            # ни настоящий ключ, ни env-файл прокси
+            # neither the real key nor the proxy env file
             self.assertNotIn("sk-", body)
             self.assertNotIn("proxy.env", body)
             self.assertEqual(os.path.basename(p), "sut.env")
@@ -667,19 +667,19 @@ class SandboxHardeningP0(unittest.TestCase):
         self.assertTrue(priv.startswith(base))
 
     def test_probe_matrix(self):
-        """ТЗ финального усиления P1: успех ТОЛЬКО при rc==0 + BLOCKED без WROTE.
-        Семь сценариев: блокировка, запись разрешена, docker недоступен,
-        контейнер не стартовал, ошибка команды, маркер отсутствует, таймаут."""
+        """Final P1 hardening spec: success ONLY with rc==0 + BLOCKED and no WROTE.
+        Seven scenarios: blocked, write allowed, docker unavailable,
+        container did not start, command error, marker missing, timeout."""
         sb = load("sb_h4", "sandbox.py")
         cases = [
-            (0, "BLOCKED", "", True, ""),                      # блокировка подтверждена
-            (0, "WROTE", "", False, "изоляция сломана"),       # запись разрешена
-            (127, "", "docker: not found", False, "docker"),   # docker недоступен
-            (125, "", "docker: Error response", False, "rc=125"),  # контейнер не стартовал
-            (1, "", "sh: syntax error", False, "rc=1"),        # ошибка команды
-            (0, "(пусто/мусор)", "", False, "BLOCKED отсутствует"),  # маркера нет
-            (124, "TIMEOUT", "", False, "таймаут"),            # таймаут пробы
-            (0, "WROTE BLOCKED", "", False, "оба маркера"),    # неоднозначно
+            (0, "BLOCKED", "", True, ""),                      # blocking confirmed
+            (0, "WROTE", "", False, "изоляция сломана"),       # write allowed
+            (127, "", "docker: not found", False, "docker"),   # docker unavailable
+            (125, "", "docker: Error response", False, "rc=125"),  # container did not start
+            (1, "", "sh: syntax error", False, "rc=1"),        # command error
+            (0, "(пусто/мусор)", "", False, "BLOCKED отсутствует"),  # no marker
+            (124, "TIMEOUT", "", False, "таймаут"),            # probe timeout
+            (0, "WROTE BLOCKED", "", False, "оба маркера"),    # ambiguous
         ]
         for rc, out, err, want_ok, want_reason in cases:
             sb.run = lambda cmd, timeout=60, _r=rc, _o=out, _e=err: (_r, _o, _e)
@@ -691,7 +691,7 @@ class SandboxHardeningP0(unittest.TestCase):
 
 class SandboxOpsResilience(unittest.TestCase):
     def test_parallel_works_disjoint(self):
-        """Два параллельных запуска: work-пути и имена ресурсов уникальны."""
+        """Two parallel runs: work paths and resource names are unique."""
         sb = load("sb_r1", "sandbox.py")
         w1 = "C:" + chr(92) + "tmp" + chr(92) + "qa-evals-run-aa11bb"
         w2 = "C:" + chr(92) + "tmp" + chr(92) + "qa-evals-run-cc22dd"
@@ -702,27 +702,27 @@ class SandboxOpsResilience(unittest.TestCase):
         self.assertNotEqual(sb.priv_dir_of(w1), sb.priv_dir_of(w2))
 
     def test_cleanup_idempotent(self):
-        """Повторный cleanup не падает и не трогает чужое."""
+        """A repeated cleanup does not crash and does not touch other runs' data."""
         sb = load("sb_r2", "sandbox.py")
         sb.run = lambda cmd, timeout=60: (0, "", "")
-        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # первый
-        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # повтор
+        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # first
+        sb.stop_proxy("C:" + chr(92) + "x" + chr(92) + "qa-evals-run-zz99zz")  # repeat
         self.assertTrue(True)
 
     def test_proxy_rejects_wrong_path(self):
-        """Прокси-логика: не-API путь отклоняется (юнит по коду ответа 403)."""
+        """Proxy logic: a non-API path is rejected (a unit test on the 403 status code)."""
         src = io.open(os.path.join(ROOT, "scripts", "sandbox-proxy.py"),
                       encoding="utf-8").read()
         self.assertIn("only the LLM API path is allowed", src)
-        self.assertIn("429", src)   # лимит запросов
-        self.assertIn("413", src)   # лимит тела
+        self.assertIn("429", src)   # request limit
+        self.assertIn("413", src)   # body limit
         self.assertIn("Bearer \" + LLM_KEY", src.replace("'Bearer ' + LLM_KEY", 'Bearer " + LLM_KEY')) if False else None
         self.assertIn("LLM_KEY", src)
 
 
 class ProxyHardening(unittest.TestCase):
     def test_normalize_path_matrix(self):
-        """ТЗ 4.2: разрешены только пути внутри префикса после нормализации."""
+        """Spec 4.2: only paths inside the prefix are allowed after normalization."""
         import importlib.util as _ilu
         import os as _os
         _os.environ["UPSTREAM"] = "https://api.z.ai/api/anthropic"
@@ -738,17 +738,17 @@ class ProxyHardening(unittest.TestCase):
             self.assertIsNone(sp.normalize_path(p), "ложный пропуск: " + p)
 
     def test_proxy_container_hardened_flags(self):
-        """ТЗ п.5: прокси запускается non-root, read-only, cap-drop ALL, лимиты."""
+        """Spec item 5: the proxy runs non-root, read-only, cap-drop ALL, with limits."""
         src = io.open(os.path.join(ROOT, "scripts", "sandbox.py"), encoding="utf-8").read()
         i = src.index('"docker", "run", "-d"')
         seg = src[i:i + 700]
         for token in ['"--user", "65534:65534"', '"--read-only"',
                       '"--cap-drop", "ALL"', '"--memory", "256m"', '"--pids-limit", "32"']:
             self.assertIn(token, seg, token)
-        self.assertNotIn("/workspace", seg)   # каталоги SUT не монтируются прокси
+        self.assertNotIn("/workspace", seg)   # SUT directories are not mounted into the proxy
 
     def test_proxy_env_chmod600(self):
-        """ТЗ п.5: env-файл прокси получает 0600, priv-каталог 0700."""
+        """Spec item 5: the proxy env file gets 0600, the priv directory 0700."""
         sb = load("sb_hd", "sandbox.py")
         with tempfile.TemporaryDirectory() as td:
             calls = {}
@@ -764,11 +764,11 @@ class ProxyHardening(unittest.TestCase):
             def fake_run(cmd, timeout=60):
                 calls.setdefault("runs", []).append(cmd)
                 if cmd[:2] == ["docker", "run"]:
-                    # перехват: env-файл создан, chmod уже вызван (Windows NTFS
-                    # не отражает POSIX-биты в stat - проверяем вызов)
+                    # interception: the env file exists, chmod was already called
+                    # (Windows NTFS does not expose POSIX bits in stat - we check the call)
                     self.assertTrue(os.path.exists(os.path.join(td, "qa-evals-run-x-priv", "proxy.env")))
                     self.assertIn(("proxy.env", 0o600), chmod_calls)
-                    return (1, "", "stopped-here")   # прервать, сети чистим сами
+                    return (1, "", "stopped-here")   # abort, we clean up networks ourselves
                 return (0, "", "")
             sb.run = fake_run
             sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
@@ -776,7 +776,7 @@ class ProxyHardening(unittest.TestCase):
 
 
 class TestBuildBenchmarks(unittest.TestCase):
-    """Журнал приёмок: сайдкар + машинные артефакты -> строка таблицы; защитный фильтр."""
+    """Acceptance log: sidecar + machine artifacts -> a table row; a guard filter."""
 
     def setUp(self):
         self.bb = load("build_benchmarks", "build-benchmarks.py")
@@ -801,10 +801,10 @@ class TestBuildBenchmarks(unittest.TestCase):
 
     def test_row_derives_counts_and_cost(self):
         row = self.bb.build_row("2026-10-12-example", self.run)
-        self.assertIn("2 × 2", row)            # карточки × повторы из index.jsonl
-        self.assertIn("GOT 1, FAIL 1", row)    # счёт результатов
-        self.assertIn("glm-5.3-flash", row)    # модель судьи из meta
-        self.assertIn("$1.234", row)           # стоимость без жадной точки
+        self.assertIn("2 × 2", row)            # cards × repeats from index.jsonl
+        self.assertIn("GOT 1, FAIL 1", row)    # result tally
+        self.assertIn("glm-5.3-flash", row)    # judge model from meta
+        self.assertIn("$1.234", row)           # cost without a greedy dot
         self.assertNotIn("$1.234.", row)
         self.assertIn("[report](../runs/2026-10-12-example/report.md)", row)
 

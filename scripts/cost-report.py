@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Cost-агрегатор прогона (review P1-8): токены, длительность, стоимость.
+"""A run's cost aggregator (review P1-8): tokens, duration, cost.
 
-Читает result-события из прогоны/*.events.jsonl (usage/duration_ms/total_cost_usd
-пишет CLI), агрегирует по карточкам и прогону. Лимит бюджета (USD) - через
---budget: превышение помечается в отчёте (раннер продолжает; жёсткая остановка
-не реализована - решение за человеком, см. асимметрию выводов).
+Reads result events from прогоны/*.events.jsonl (usage/duration_ms/
+total_cost_usd are written by the CLI), aggregates per card and per run.
+A budget limit (USD) via --budget: exceeding it is flagged in the report
+(the runner continues; a hard stop is not implemented - the decision stays
+with the human, see the conclusion asymmetry).
 
 Usage: cost-report.py <run-dir> [--budget 10]
-Пишет: <run-dir>/cost.md. Выход 0.
+Writes: <run-dir>/cost.md. Exit 0.
 """
 
 import argparse
@@ -19,7 +20,7 @@ import re
 
 
 def run_stats(path):
-    """Статистика одного events.jsonl: последнее result-событие."""
+    """One events.jsonl's stats: the last result event."""
     for line in reversed(list(io.open(path, encoding="utf-8", errors="replace"))):
         try:
             ev = json.loads(line)
@@ -38,8 +39,9 @@ def run_stats(path):
 
 
 def judge_stats(rd):
-    """Сумма вызовов судьи из вердикты/judge-usage.jsonl (judge-batch, v0.4.1).
-    Нет файла (прогон до инструментации) - судейская экономика не измерена."""
+    """The sum of judge calls from вердикты/judge-usage.jsonl (judge-batch,
+    v0.4.1). No file (a pre-instrumentation run) - the judge's economics
+    are unmeasured."""
     path = os.path.join(rd, "вердикты", "judge-usage.jsonl")
     if not os.path.exists(path):
         return None

@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""Разбор лога прогона SUT-сессии (events.jsonl -> txt/prov/diag).
+"""Parse a SUT session run log (events.jsonl -> txt/prov/diag).
 
-Модуль логирования приёмки: единая точка превращения потока событий
-headless-сессии (claude -p --output-format stream-json --verbose) в три
-артефакта прогона. Используется раннером run-cards.sh и исполнителями
-многоходовых карточек (после каждого хода).
+The acceptance logging module: a single point that turns the event stream
+of a headless session (claude -p --output-format stream-json --verbose)
+into three run artifacts. Used by the run-cards.sh runner and by the
+multi-turn card executors (after every turn).
 
 Usage: parse-events.py <run-dir> <id> <rep>
-  <run-dir> - каталог прогона (Windows- или POSIX-путь: /c/... конвертируется)
-Пишет в <run-dir>/прогоны/<id>-r<rep>:
-  .txt      - текст ответа SUT (промежуточные assistant-блоки + финальный result;
-              при max-turns/ошибке result бывает пуст - промежуточные спасают)
-  .prov.txt - провенанс: уникальные "Read: <путь>" по tool-вызовам Read/Grep/Glob
-  .diag.txt - диагностика класса ошибки (см. adapters.md, «Диагностика прогона»)
+  <run-dir> - the run directory (a Windows or POSIX path: /c/... is converted)
+Writes into <run-dir>/прогоны/<id>-r<rep>:
+  .txt      - the SUT's answer text (intermediate assistant blocks + the
+              final result; on max-turns/error the result can be empty -
+              the intermediate blocks save it)
+  .prov.txt - provenance: unique "Read: <path>" from Read/Grep/Glob tool calls
+  .diag.txt - error-class diagnostics (see adapters.md, "Run diagnostics")
 
-Выход: 0 - артефакты записаны; 1 - events.jsonl отсутствует/пуст (диагностика
-«сессия не стартовала» всё равно записана).
+Exit: 0 - artifacts written; 1 - events.jsonl missing/empty (the
+"session did not start" diagnostic is still written).
 """
 
 import io
@@ -25,7 +26,7 @@ import sys
 
 
 def norm(path: str) -> str:
-    """POSIX-путь Git Bash (/c/...) -> Windows (C:\\...); прочее как есть."""
+    """A Git Bash POSIX path (/c/...) -> Windows (C:\\...); anything else as is."""
     if len(path) >= 3 and path[0] == "/" and path[2] == "/" and path[1].isalpha():
         return path[1] + ":\\" + path[3:].replace("/", "\\")
     return path

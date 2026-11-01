@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Машиночитаемый индекс прогона (runs/<дата>-<sut>/index.jsonl).
+"""A machine-readable run index (runs/<date>-<sut>/index.jsonl).
 
-По образцу .eval-лога Inspect AI: одна строка JSON на прогон - вердикты,
-редьюсер-итог, пути артефактов. Открывает re-scoring (пересуд по протоколам
-без новых прогонов), программные сводки и сравнение приёмок.
+Modeled after the Inspect AI .eval log: one JSON line per run - verdicts,
+the reducer outcome, artifact paths. It enables re-scoring (re-judging
+from protocols without new runs), programmatic summaries and acceptance
+comparison.
 
 Usage: build-index.py <run-dir> [--reducer majority|unanimous|at_least_k]
-  majority  - итог за большинством повторов, расхождение = "split"
-  unanimous - итог только при единодушии, иначе "split" (дефолт N=2)
-Читает: карточки/*.yaml, вердикты/*.md (строка «- Вердикт: X»), прогоны/ (наличие),
-        facts/index-facts.jsonl (если есть - колонка det: детерминированный слой).
-Пишет: index.jsonl. Выход 0.
+  majority  - the outcome by the majority of repeats, a disagreement = "split"
+  unanimous - the outcome only with unanimity, otherwise "split" (default N=2)
+Reads: карточки/*.yaml, вердикты/*.md (the "- Вердикт: X" line), прогоны/
+       (presence), facts/index-facts.jsonl (if present - the det column:
+       the deterministic layer).
+Writes: index.jsonl. Exit 0.
 """
 
 import argparse
@@ -26,7 +28,7 @@ DET_NEG = {"DET_LEAK", "DET_MISSING"}
 
 
 def det_judge_tag(det, judge):
-    """Согласие слоёв по направлению (survey: комитеты показывают расхождение)."""
+    """Directional layer agreement (a survey: committees show disagreement)."""
     if det == "-" or det in ("DET_NA", "DET_NO_DATA"):
         return "NA"
     dn, jn = det in DET_NEG, judge in NEG
@@ -93,7 +95,7 @@ def main():
         if os.path.exists(pj):
             a.plugin_version = json.load(io.open(pj, encoding="utf-8")).get("version", "")
     reducer = a.reducer
-    # sandbox-meta (уровень изоляции, версия CLI, хеш SUT) - в meta строк
+    # sandbox meta (isolation level, CLI version, SUT hash) - into the rows' meta
     sbx = {}
     sbx_path = os.path.join(run_dir, 'meta-sandbox.json')
     if os.path.exists(sbx_path):

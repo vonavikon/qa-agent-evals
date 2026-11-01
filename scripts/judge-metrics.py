@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
-"""Метрики судьи (review P0-2): согласие с дет-слоем по корпусам.
+"""Judge metrics (review P0-2): agreement with the det layer over corpora.
 
-Модель честности: дет-негатив на транскрипте - доказанный факт присутствия
-маркера, но НЕ доказательство нарушения (маркер может быть цитатой).
-Поэтому метрики трёхуровневые:
+The honesty model: a det-negative on a transcript is a proven fact of the
+marker's presence, but NOT proof of a violation (the marker can be a
+quotation). Hence the metrics are three-level:
 
-- CONFIRMED: дет-негатив + судья-негатив - машина и судья сошлись на нарушении.
-- CONTRADICTION: дет-негатив + судья-позитив + судья пишет «Корень: система»
-  (описал нарушение, но поставил позитив) - доказанный пропуск дефекта.
-- DIVERGENT: дет-негатив + судья-позитив без корня «система» - расхождение
-  слоёв (чаще всего цитатный случай: прав судья). Выносится человеку.
-- SEMANTIC-ONLY: судья-негатив при дет-позитиве - смысловая находка без
-  машинного следа (FP-кандидат, но может быть настоящей).
+- CONFIRMED: det-negative + judge-negative - the machine and the judge
+  agreed on a violation.
+- CONTRADICTION: det-negative + judge-positive + the judge writes
+  "Корень: система" (described the violation but scored it positive) - a
+  proven missed defect.
+- DIVERGENT: det-negative + judge-positive without the "система" root - a
+  layer disagreement (most often the quotation case: the judge is right).
+  Escalated to the human.
+- SEMANTIC-ONLY: a judge-negative with a det-positive - a semantic finding
+  without a machine trace (an FP candidate, but it can be real).
 
-Протокол-источники исключаются (приближение - не доказательство).
+Protocol sources are excluded (an approximation - not a proof).
 
 Usage: judge-metrics.py <run-dir> [<run-dir> ...]
 """

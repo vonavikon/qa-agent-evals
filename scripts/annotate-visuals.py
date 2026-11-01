@@ -1,26 +1,28 @@
 #!/usr/bin/env python3
-"""Визуальный ревью скриншотов прогона (фаза E, только для человека).
+"""Visual review of run screenshots (phase E, for humans only).
 
-Браузерный адаптер снимает состояния SUT рядом с транскриптами:
-прогоны/<id>-r<N>.png (финал карточки) и <id>-r<N>-k<K>.png (по действиям,
-когда карточка помечена visual: true). Субагент agents/visual-reviewer.md
-смотрит снимки и пишет визуальный-ревью.json: находки с рамками (bbox в
-процентах от размеров снимка) и комментариями. Этот скрипт - детерминированный
-хвост: проверяет схему, собирает страницу визуальный-ревью.html (снимок +
-рамки + комментарии) и по запросу отбирает образцы для публикации.
+The browser adapter captures SUT states next to transcripts:
+прогоны/<id>-r<N>.png (the card's final state) and <id>-r<N>-k<K>.png (per
+action, when the card is marked visual: true). The subagent
+agents/visual-reviewer.md looks at the shots and writes
+визуальный-ревью.json: findings with boxes (bbox in percentages of the shot
+size) and comments. This script is the deterministic tail: it validates the
+schema, builds the визуальный-ревью.html page (shot + boxes + comments)
+and, on request, picks samples for publication.
 
-Границы модуля:
-  - находки ревьюера - подсказки человеку на этапе обратной связи; вердикты
-    они не меняют;
-  - судье скриншоты и находки не передаются, в оракул и машинный слой не
-    попадают;
-  - пачкой снимки не публикуются: --publish переносит в docs/visual-samples/
-    только названные владельцем карточки (политика - knowledge/adapters.md).
+Module boundaries:
+  - reviewer findings are hints for the human at the feedback stage; they
+    change no verdicts;
+  - screenshots and findings are not passed to the judge and do not enter
+    the oracle or the machine layer;
+  - shots are not published in bulk: --publish moves into
+    docs/visual-samples/ only the cards named by the owner (the policy is
+    knowledge/adapters.md).
 
 Usage:
-  annotate-visuals.py <run-dir>                      # проверить + собрать страницу
-  annotate-visuals.py <run-dir> --publish GA-01,CR-02  # образцы в docs/visual-samples/
-Нет ни скриншотов, ни ревью - тихий выход 0 (шаг необязательный).
+  annotate-visuals.py <run-dir>                      # validate + build the page
+  annotate-visuals.py <run-dir> --publish GA-01,CR-02  # samples into docs/visual-samples/
+No shots and no review - quiet exit 0 (the step is optional).
 """
 
 import argparse
@@ -79,7 +81,7 @@ def load_review(run_dir):
 
 
 def validate_review(review, run_dir):
-    """Ошибки схемы. Пустой список - валидно; пустой ревью (нет снимков) валиден."""
+    """Schema errors. An empty list is valid; an empty review (no shots) is valid."""
     errs = []
     if not isinstance(review, dict) or not isinstance(review.get("screenshots"), list):
         return [f"{REVIEW_NAME}: ожидается объект с массивом screenshots"]
@@ -125,7 +127,7 @@ def totals(review):
 
 
 def render_html(run_dir, review):
-    """Страница: снимок + рамки + комментарии. Работает и без feedback.html."""
+    """The page: shot + boxes + comments. Works without feedback.html too."""
     t = totals(review)
     head = (f"<h1>Визуальный ревью</h1>"
             f"<p class=\"sub\">{os.path.basename(os.path.normpath(run_dir))} - "
@@ -163,7 +165,7 @@ def render_html(run_dir, review):
 
 
 def publish(run_dir, ids, repo_root=None):
-    """Образцы в docs/visual-samples/<прогон>/: снимок + находки разметки."""
+    """Samples into docs/visual-samples/<run>/: the shot + markup findings."""
     repo_root = repo_root or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     run_name = os.path.basename(os.path.normpath(run_dir))
     review = load_review(run_dir) or {}
@@ -182,8 +184,8 @@ def publish(run_dir, ids, repo_root=None):
                  "Образец визуального ревью: снимок + разметка ассистента. "
                  "Разметка - подсказка человеку, не вердикт.", ""]
         for fname in shots:
-            # copyfile, не copy2: метаданные снимка не нужны, а chmod-обёртки
-            # из тестового окружения ломают copystat.
+            # copyfile, not copy2: the shot's metadata is unneeded, and the
+            # chmod wrappers from the test environment break copystat.
             shutil.copyfile(os.path.join(run_dir, "прогоны", fname),
                             os.path.join(dst, fname))
             lines += [f"## {fname}", f"![{fname}]({fname})", ""]

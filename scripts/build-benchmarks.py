@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
-"""Журнал приёмок: собирает docs/benchmarks.md из runs/*/.
+"""Acceptance log: builds docs/benchmarks.md from runs/*/.
 
-Источник строки прогона - сайдкар runs/<дата>-<sut>/bench.yaml (то, что не выводится
-машинно: имя SUT, тип, адаптер, среда, находки) плюс машинные артефакты того же прогона:
-index.jsonl (число карточек, повторы, счёт результатов, модель судьи) и cost.md ($).
+The run row's source is the sidecar runs/<date>-<sut>/bench.yaml (what is
+not machine-derivable: the SUT name, type, adapter, environment, findings)
+plus the machine artifacts of the same run: index.jsonl (card count,
+repeats, result tally, judge model) and cost.md ($).
 
-Страница генерируется целиком, руками её не правят: python scripts/build-benchmarks.py.
-Приватные прогоны в журнал не попадают: он собирается только из каталога публичного
-репо, и генератор отказывается записывать страницу, если защитный фильтр находит
-приватные маркеры. Проверка фильтра позитив-контролем: --selftest.
+The page is generated in full and not edited by hand:
+python scripts/build-benchmarks.py. Private runs do not get into the log:
+it is built only from the public repo directory, and the generator refuses
+to write the page if the guard filter finds private markers. The filter's
+positive control check: --selftest.
 """
 
 import argparse
@@ -18,8 +20,8 @@ import os
 import re
 import sys
 
-# Защитный фильтр: генератор не выпускает страницу, если в собранном тексте
-# есть приватные маркеры (корп-личность, личные пути, формы секретов).
+# Guard filter: the generator does not release the page if the collected
+# text contains private markers (a corporate identity, personal paths, secret shapes).
 GUARD_PATTERNS = [
     (r"kivanov", "корп-логин"),
     (r"naumen|nau\.im|itsm365", "корп-домены"),
@@ -35,7 +37,7 @@ GUARD_PATTERNS = [
 
 
 def guard(text):
-    """Список (паттерн, объяснение) по срабатываниям; пустой = чисто."""
+    """A list of (pattern, explanation) for the hits; empty = clean."""
     hits = []
     for pat, why in GUARD_PATTERNS:
         m = re.search(pat, text, flags=re.IGNORECASE)
@@ -45,7 +47,7 @@ def guard(text):
 
 
 def parse_bench(run_dir):
-    """Сайдкар bench.yaml: плоские строки «ключ: значение»."""
+    """The bench.yaml sidecar: flat "key: value" lines."""
     out = {}
     path = os.path.join(run_dir, "bench.yaml")
     if not os.path.exists(path):
@@ -60,7 +62,7 @@ def parse_bench(run_dir):
 
 
 def parse_index(run_dir):
-    """Машинный слой: карточки, повторы, счёт результатов, модель судьи."""
+    """The machine layer: cards, repeats, result tally, judge model."""
     path = os.path.join(run_dir, "index.jsonl")
     if not os.path.exists(path):
         return None
@@ -79,7 +81,7 @@ def parse_index(run_dir):
 
 
 def parse_cost(run_dir):
-    """Итог прогона из cost.md: сначала «Прогон целиком», иначе SUT-строка."""
+    """The run's total from cost.md: first "Прогон целиком", else the SUT line."""
     path = os.path.join(run_dir, "cost.md")
     if not os.path.exists(path):
         return ""
@@ -162,7 +164,7 @@ def build(runs_root):
 
 
 def selftest():
-    """Позитив-контроль фильтра: канарейка обязана ловиться, чистый текст - нет."""
+    """The filter's positive control: the canary must be caught, clean text must not."""
     dirty = "kivanov@naumen.example и C:\\Users\\sample, плюс ghp_abcdefghij и Bearer abcdef1234567890"
     hits = guard(dirty)
     if len(hits) < 4:

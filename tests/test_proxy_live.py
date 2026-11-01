@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Живые тесты LLM-прокси песочницы (ТЗ финального усиления, п.4).
+"""Live tests of the sandbox LLM proxy (final hardening spec, item 4).
 
-Поднимают scripts/sandbox-proxy.py локально с DUMMY-ключом и проверяют
-весь контракт безопасности без реальных секретов и без docker (годится
-для CI). Никакие настоящие ключи не используются.
+They start scripts/sandbox-proxy.py locally with a DUMMY key and check the
+whole security contract without real secrets and without docker (fits CI).
+No real keys are used.
 
-Запуск: python -m unittest tests.test_proxy_live -v
+Run: python -m unittest tests.test_proxy_live -v
 """
 
 import http.client
@@ -56,7 +56,7 @@ class ProxyLive(unittest.TestCase):
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(40):
             try:
-                _req("GET", "/api/anthropic/bad")   # любой ответ = поднялся
+                _req("GET", "/api/anthropic/bad")   # any response = it is up
                 return
             except OSError:
                 time.sleep(0.25)
@@ -76,54 +76,55 @@ class ProxyLive(unittest.TestCase):
             self.assertEqual(_req("GET", p)[0], 403, p)
 
     def test_03_path_traversal_denied(self):
-        """Обход ограничения пути кодированием/нормализацией закрыт (ТЗ 4.2)."""
+        """Bypassing the path restriction via encoding/normalization is closed (spec 4.2)."""
         for p in ("/api/anthropic/../evil", "/api/anthropic/%2e%2e/evil",
                   "/api/anthropic/%252e%252e/evil",
                   "/api/anthropic/../../etc/passwd"):
             self.assertEqual(_req("GET", p)[0], 403, p)
 
     def test_04_allowed_path_forwarded(self):
-        """Разрешённый путь уходит к upstream (dummy-ключ => 401/403 от API,
-        но НЕ 403 прокси: прокси пропустил)."""
+        """An allowed path goes to upstream (a dummy key => 401/403 from the
+        API, but NOT a proxy 403: the proxy let it through)."""
         code, body = _req("GET", "/api/anthropic/v1/models")
         self.assertNotEqual(code, 403, body)
         self.assertNotEqual(code, 405, body)
 
     def test_05_body_limit(self):
-        """Прокси отвечает 413 не дочитывая тело и рвёт соединение - клиент
-        видит BrokenPipe. Это и есть отклонение oversized-запроса."""
+        """The proxy answers 413 without reading the body and drops the
+        connection - the client sees BrokenPipe. That is exactly the
+        oversized-request rejection."""
         big = "x" * (5 * 1024 * 1024)
         try:
             code, _ = _req("POST", "/api/anthropic/v1/messages", body=big,
                            headers={"Content-Length": str(len(big))})
         except (BrokenPipeError, ConnectionResetError):
-            return  # сервер закрыл соединение сразу после 413
+            return  # the server closed the connection right after the 413
         self.assertEqual(code, 413)
 
     def test_06_error_hides_secret(self):
-        """Ошибка upstream (недостижим/отказ) не раскрывает ключ и env (ТЗ 4.2)."""
+        """An upstream error (unreachable/refused) does not disclose the key or env (spec 4.2)."""
         code, body = _req("GET", "/api/anthropic/v1/models")
         self.assertNotIn("ci-dummy-key", body)
         self.assertNotIn("LLM_KEY", body)
         self.assertNotIn("Bearer", body)
 
     def test_07_stale_placeholder_not_forwarded_verbatim(self):
-        """Клиентский Authorization (плейсхолдер) не попадает в ответ прокси."""
+        """The client's Authorization (a placeholder) does not appear in the proxy's response."""
         code, body = _req("GET", "/api/anthropic/v1/models",
                           headers={"Authorization": "Bearer sandbox-local-placeholder"})
         self.assertNotIn("sandbox-local-placeholder", body)
 
     def test_08_downstream_cannot_reach_upstream_directly(self):
-        """Прямой адрес upstream изнутри песочницы - это SEC-03 (docker);
-        здесь проверяем обратное: прокси не сообщает клиенту адрес upstream
-        при отказе (никаких внутренних деталей)."""
+        """Reaching the upstream address directly from inside the sandbox is
+        SEC-03 (docker); here we check the reverse: the proxy does not tell
+        the client the upstream address on refusal (no internal details)."""
         code, body = _req("GET", "/api/anthropic/v1/models")
         low = body.lower()
         self.assertNotIn("api.z.ai", low)
         self.assertNotIn("upstream host", low)
 
     def test_09_normalize_unit(self):
-        """Дублируем юнит-матрицу на живом модуле (защита от рассинхрона)."""
+        """Duplicate the unit matrix on the live module (protection against desync)."""
         for p in ("/api/anthropic", "/api/anthropic/v1/messages?x=1"):
             self.assertIsNotNone(self.mod.normalize_path(p), p)
         for p in ("/api/anthropic/../x", "/api/anthropic/%2e%2e/x"):

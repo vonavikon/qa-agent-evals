@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-"""Детерминированный слой проверки фактов (deterministic-scorer).
+"""Deterministic fact-checking layer (deterministic-scorer).
 
-Грепает маркеры facts_must / facts_must_not из карточек по транскриптам
-прогонов ДО судьи. Судья получает артефакты facts/ как исполнимые
-свидетельства: что доказано grep'ом, то не пересуживается.
+Greps the facts_must / facts_must_not markers from the cards against the
+run transcripts BEFORE the judge. The judge receives the facts/ artifacts
+as executable evidence: what grep has proven is not re-judged.
 
-Источник текста повтора: прогоны/<id>-r<N>*.txt (без .replica/.err; включает
-многоходовые -hK файлы одного повтора) плюс артефакты, написанные SUT
-(прогоны/<id>-r<N>.artifacts/). Если транскрипта нет - протокол исполнителя
-(приближение: маркер может совпасть с текстом протокола, не с ответом SUT;
-помечается source=протокол).
+The repeat's text source: прогоны/<id>-r<N>*.txt (without
+.replica/.err; includes the multi-turn -hK files of one repeat) plus
+artifacts written by the SUT (прогоны/<id>-r<N>.artifacts/). If there is
+no transcript - the executor's protocol (an approximation: a marker may
+match the protocol text rather than the SUT's answer; marked as
+source=protocol).
 
 Usage: check-facts.py <run-dir>
-Пишет: facts/<id>-r<N>.facts.md + facts/index-facts.jsonl. Выход 0.
-Вердикты слоя: DET_OK / DET_MISSING / DET_LEAK / DET_NA / DET_NO_DATA.
+Writes: facts/<id>-r<N>.facts.md + facts/index-facts.jsonl. Exit 0.
+Layer verdicts: DET_OK / DET_MISSING / DET_LEAK / DET_NA / DET_NO_DATA.
 """
 
 import glob
@@ -31,7 +32,7 @@ def norm(path):
 
 
 def parse_facts(path):
-    """Мини-парсер секций facts_must / facts_must_not карточки."""
+    """A mini parser for the card's facts_must / facts_must_not sections."""
     must, must_not = [], []
     target = None
     for line in io.open(path, encoding="utf-8").read().splitlines():
@@ -39,7 +40,7 @@ def parse_facts(path):
         if m:
             target = m.group(1)
             continue
-        if re.match(r"^\S", line):  # новый ключ верхнего уровня - конец секции
+        if re.match(r"^\S", line):  # a new top-level key - end of the section
             target = None
             continue
         item = re.match(r'^\s*-\s*"?([^"#]+)"?\s*$', line)
@@ -49,7 +50,7 @@ def parse_facts(path):
 
 
 def transcript_text(run_dir, cid, rep):
-    """Текст повтора: транскрипты (то, что отвечала SUT), иначе протокол."""
+    """The repeat's text: transcripts (what the SUT answered), else the protocol."""
     files = [f for f in glob.glob(os.path.join(run_dir, "прогоны", f"{cid}-r{rep}*.txt"))
              if not f.endswith((".replica.txt", ".prov.txt", ".diag.txt"))]
     if files:
@@ -63,9 +64,9 @@ def transcript_text(run_dir, cid, rep):
 
 
 def artifact_text(run_dir, cid, rep):
-    """Тексты артефактов, написанных SUT в рабочей папке прогона
-    (прогоны/<id>-r<N>.artifacts/, собирает run-cards.sh). Артефакт вне
-    транскрипта - такое же доказательство, как и ответ в чате."""
+    """Texts of artifacts written by the SUT in the run's work folder
+    (прогоны/<id>-r<N>.artifacts/, collected by run-cards.sh). An artifact
+    outside the transcript is as much proof as an answer in the chat."""
     base = os.path.join(run_dir, "прогоны", f"{cid}-r{rep}.artifacts")
     out, files = [], []
     if not os.path.isdir(base):
@@ -153,7 +154,7 @@ def main():
     tally = {}
     for r in rows:
         tally[r["det"]] = tally.get(r["det"], 0) + 1
-    # Срабатываемость маркеров (AIDE²: мёртвый код оракула виден машиной)
+    # Marker fireability (AIDE²: dead oracle code is visible to the machine)
     by_card = {}
     for r in rows:
         by_card.setdefault(r["id"], []).append(r)

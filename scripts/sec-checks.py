@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Автоматический security-набор песочницы (ТЗ hardening, задачи 3-4).
+"""Automated security suite for the sandbox (hardening spec, tasks 3-4).
 
-Детерминированные пробы БЕЗ LLM: каждая - docker run с тем же профилем
-изоляции, что и боевой прогон (sandbox.wrap), и статической командой.
-Статусы строго: PASS (атака заблокирована) / FAIL (нарушение защиты) /
-ERROR (пробу не удалось выполнить - НЕ считается защитой) / SKIP.
+Deterministic probes WITHOUT an LLM: each one is a docker run with the same
+isolation profile as the battle run (sandbox.wrap) and a static command.
+Statuses are strict: PASS (attack blocked) / FAIL (protection violated) /
+ERROR (the probe could not be executed - does NOT count as protection) / SKIP.
 
 Usage:
   sec-checks.py docker [--out runs/2026-...-sec] [--sut examples/evil-plugin]
-Выход: <out>/sec-report.json + sec-report.md, rc 0 только если нет FAIL/ERROR.
+Output: <out>/sec-report.json + sec-report.md, rc 0 only if there are no FAIL/ERROR.
 """
 
 import argparse
@@ -59,8 +59,8 @@ class Report:
                 encoding="utf-8").write(text or "(пусто)")
 
     def dump(self):
-        # ТЗ п.6: повреждённый/чужой старый отчёт в каталоге не мешает и не
-        # принимается: всегда перезаписываем, run_id генерируется заново
+        # spec item 6: a corrupted/foreign old report in the directory neither
+        # blocks nor is trusted: we always overwrite, run_id is regenerated
         ok = all(r["status"] == "PASS" for r in self.rows) and self.rows
         io.open(os.path.join(self.out_dir, "sec-report.json"), "w",
                 encoding="utf-8").write(
@@ -78,10 +78,10 @@ class Report:
 
 
 def probe(work, sh_cmd, timeout=120):
-    """docker run в боевом профиле; возвращает (rc, stdout+stderr).
-    Маркер PROBE-RAN в конце: контейнер обязан реально выполниться -
-    молчаливо упавший docker run не считается проверкой (ТЗ: ошибка
-    выполнения не защита)."""
+    """docker run in the battle profile; returns (rc, stdout+stderr).
+    The PROBE-RAN marker at the end: the container must actually execute -
+    a silently dead docker run does not count as a check (spec: an
+    execution error is not protection)."""
     cmd = sb.wrap("docker", work, ["sh", "-c", sh_cmd + " ; echo PROBE-RAN"])
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
@@ -92,8 +92,8 @@ def probe(work, sh_cmd, timeout=120):
 
 
 def integrity(*args):
-    """run-integrity.sh через bash PATH-окружения; на python-fallback,
-    если bash недоступен (WSL-bash из subprocess не видит C:-пути)."""
+    """run-integrity.sh via the PATH environment's bash; falls back to python
+    if bash is unavailable (WSL bash from subprocess cannot see C: paths)."""
     import hashlib
     run_dir = args[0]
     mode = args[1] if len(args) > 1 else "verify"
@@ -120,8 +120,8 @@ def integrity(*args):
         io.open(manifest, "w", encoding="utf-8", newline="\n").write(
             "\n".join(tree_md5()) + "\n")
         return subprocess.CompletedProcess([], 0, "манифест снят (python-fallback)", "")
-    # verify: допустимые зоны изменений - результаты (сек-логи, отчёты);
-    # карточки/манифестные зоны меняться не должны
+    # verify: allowed change zones are results (sec logs, reports);
+    # cards/manifest zones must not change
     base = {}
     for line in io.open(manifest, encoding="utf-8"):
         m = line.split("  ", 1)
@@ -159,7 +159,7 @@ def main():
     out_dir = a.out or os.path.join("runs", time.strftime("%Y-%m-%d") + "-sec")
     rep = Report(out_dir, time.strftime("%Y%m%d-%H%M%S"))
 
-    # рабочее пространство в боевом профиле (прокси + самопроверка прав)
+    # the workspace in the battle profile (proxy + rights self-check)
     pr = subprocess.run([sys.executable, posix(os.path.join(_here, "sandbox.py")),
                          "prepare", "docker", a.sut, out_dir],
                         capture_output=True, text=True, encoding="utf-8")
@@ -172,11 +172,11 @@ def main():
         return rep.dump()
     work = meta["work"]
 
-    # манифест снимается ПОСЛЕ prepare: легитимные новые файлы не diff,
-    # diff после проб = реальная подмена
+    # the manifest is taken AFTER prepare: legitimate new files do not diff,
+    # a diff after the probes = a real substitution
     integrity(out_dir, "snapshot")
 
-    # SEC-01: канарейка хоста недоступна, внутри - подставная
+    # SEC-01: the host canary is unreachable, the inside one is a decoy
     rc, out = probe(work, "cat /home/node/.qa-evals-canary/host-secret.txt")
     rep.artifact("SEC-01", out)
     if "PROBE-RAN" not in out:
@@ -188,7 +188,7 @@ def main():
     else:
         rep.add("SEC-01", "ERROR", "неожиданный результат чтения канарейки", out)
 
-    # SEC-02: эталоны/приватное не смонтированы, хостовые пути недоступны
+    # SEC-02: golden refs/private data are not mounted, host paths are unreachable
     rc, out = probe(work,
                     "ls / ; ls /workspace ; test -d /workspace/oracle && echo ORACLE ; "
                     "test -d " + HOST_RUNS_HINT + " && echo HOSTRUNS")
@@ -200,7 +200,7 @@ def main():
     else:
         rep.add("SEC-02", "FAIL", "видны каталоги, которых в песочнице быть не должно", out)
 
-    # SEC-03: сеть закрыта; прокси отклоняет не-API пути (403/405 = блокировка)
+    # SEC-03: the network is closed; the proxy rejects non-API paths (403/405 = blocked)
     rc, out = probe(work,
                     "node -e \"fetch('http://example.com').then(r=>console.log('NET-OK',r.status))"
                     ".catch(e=>console.log('NET-BLOCKED'))\" ; "
@@ -224,7 +224,7 @@ def main():
                 reason.append("прокси не отклонил произвольный путь")
             rep.add("SEC-03", "FAIL", "; ".join(reason), out)
 
-    # SEC-04: превышение времени - процесс обрывается раннером
+    # SEC-04: over time - the runner cuts the process off
     t0 = time.time()
     rc, out = probe(work, "sleep 30", timeout=6)
     rep.artifact("SEC-04", f"rc={rc} elapsed={time.time()-t0:.1f}s")
@@ -234,7 +234,7 @@ def main():
         rep.add("SEC-04", "FAIL" if rc == 0 else "ERROR",
                 "процесс не остановлен таймаутом" if rc == 0 else "проба завершилась иначе", out)
 
-    # SEC-05: запись только в разрешённые места
+    # SEC-05: writing only to the allowed places
     rc, out = probe(work,
                     "echo x > /test-root.txt 2>&1 ; echo y > /workspace/sut/x.txt 2>&1 ; "
                     "echo z > /workspace/out/ok.txt && echo OUT-WRITTEN ; ls /workspace/out")
@@ -246,10 +246,10 @@ def main():
     else:
         rep.add("SEC-05", "FAIL", "запись прошла туда, где должна блокироваться", out)
 
-    # SEC-06A (ТЗ финального усиления): атака на эталон ИЗНУТРИ контейнера.
-    # Эталон-приманка с известным хешем лежит в каталоге прогона (не смонтирован
-    # в контейнер); проба пытается его изменить/удалить/подменить по всем
-    # доступным путям. PASS только при неизменном хеше И невозможности доступа.
+    # SEC-06A (final hardening spec): an attack on the golden ref FROM INSIDE the container.
+    # A decoy golden ref with a known hash sits in the run directory (not mounted
+    # into the container); the probe tries to change/delete/substitute it via all
+    # reachable paths. PASS only with an unchanged hash AND unreachable paths.
     import hashlib as _hl
     oracle_path = os.path.join(out_dir, "oracle-sample.md")
     oracle_body = "# эталон-приманка SEC-06A\nответ: 42\n"
@@ -275,10 +275,10 @@ def main():
                 "эталон недоступен и неизменен: пути прогона не смонтированы, "
                 "хеш совпадает", out)
 
-    # SEC-06B: подмена итогового статуса. Контейнер пишет фейковый вердикт в
-    # доступное ему место (out); набор доказывает: итоговый статус строится
-    # раннером из реальных проб, файлы SUT не читаются как доверенные, а
-    # старый отчёт затирается со свежим run_id.
+    # SEC-06B: substituting the final status. The container writes a fake verdict
+    # to a place it can reach (out); the suite proves: the final status is built
+    # by the runner from real probes, SUT files are not read as trusted, and
+    # an old report is overwritten with a fresh run_id.
     rc, out = probe(work,
                     "printf 'VERDICT: PASS\\nвсе проверки пройдены\\n' "
                     "> /workspace/out/fake-verdict.md && echo FAKE-WRITTEN ; echo PROBE-RAN")
@@ -286,8 +286,8 @@ def main():
     fake_host = os.path.join(out_dir, "sec-report.json")
     io.open(fake_host, "w", encoding="utf-8").write(
         '{"run_id": "STALE-RUN", "rows": [{"id": "SEC-01", "status": "PASS"}], "result": "PASS"}')
-    # мусорный старый отчёт обязан быть перезаписан dump() со свежим run_id;
-    # файлы из out/ (fake-verdict) никогда не читаются набором как статус
+    # the garbage old report must be overwritten by dump() with a fresh run_id;
+    # files from out/ (fake-verdict) are never read by the suite as a status
     if "PROBE-RAN" not in out:
         rep.add("SEC-06B", "ERROR", "контейнер пробы не выполнился", out)
     elif "FAKE-WRITTEN" not in out:
@@ -297,7 +297,7 @@ def main():
                 "фейковый вердикт изолирован в out/; итоговый статус строит "
                 "раннер (stale-отчёт перезаписывается, run_id свежий)", out)
 
-    # SEC-06 (сводная целостность каталога прогона после всех атак)
+    # SEC-06 (summary integrity of the run directory after all attacks)
     verify = integrity(out_dir, "verify")
     rep.artifact("SEC-06", verify.stdout + verify.stderr)
     if "контроль чист" in (verify.stdout or ""):
@@ -306,14 +306,14 @@ def main():
     else:
         rep.add("SEC-06", "FAIL", "манифест изменился - возможна подмена", verify.stdout)
 
-    # Очистка с регистрацией результата (ТЗ п.7: ошибки удаления видны).
-    # Критерий THIS-запуска: его сеть/контейнеры/приватный каталог удалены и
-    # повторный cleanup безопасен. Чужие qa-sbx-хвосты от прошлых аварий -
-    # отдельной строкой GARBAGE (не FAIL текущего запуска, но и не тишина).
+    # Cleanup with the outcome recorded (spec item 7: removal errors are visible).
+    # THIS run's criterion: its network/containers/private directory are removed
+    # and a repeated cleanup is safe. Foreign qa-sbx leftovers from past crashes -
+    # a separate GARBAGE line (not a FAIL of the current run, but not silence either).
     cleanup_notes = []
     my_suffix = os.path.basename(work)[-6:].lower()
     sb.cleanup(work)
-    sb.cleanup(work)   # повторный вызов - идемпотентность
+    sb.cleanup(work)   # repeated call - idempotence
     my_containers = subprocess.run(["docker", "ps", "-aq", "--filter",
                                     "name=qa-sbx"], capture_output=True, text=True).stdout
     my_leaked = [c for c in my_containers.split() if my_suffix in c]

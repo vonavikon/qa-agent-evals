@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Батч судьи для скриптовых прогонов: один CLI-вызов на прогон.
+"""Judge batch for scripted runs: one CLI call per run.
 
-Автопересуд: если дет-слой доказал нарушение (DET_LEAK/DET_MISSING), а судья
-выдал позитив (GOT/HONEST), прогон повторяется с напоминанием контракта
-«доказанное не пересуживается, расхождение - в пользу негатива»; итоговый
-файл содержит оба прохода и пометку автопересуда (вердикт-парсер берёт
-первый - спасённый).
+Auto-rejudging: if the det layer proved a violation (DET_LEAK/DET_MISSING)
+while the judge returned a positive (GOT/HONEST), the run is repeated with
+a reminder of the contract "what is proven is not re-judged, a
+disagreement resolves toward the negative"; the final file holds both
+passes and the auto-rejudge mark (the verdict parser takes the first one -
+the rescued).
 
-Собирает промпт из карточки (оракул - шаг 1, потом инструкция и реплика -
-шаг 2), файла детерминированной проверки facts/ и транскрипта; вызывает
-claude -p с agents/judge.md как ASP; вывод сохраняет в вердикты/.
+Builds the prompt from the card (the oracle - step 1, then the instruction
+and the utterance - step 2), the deterministic check file facts/ and the
+transcript; calls claude -p with agents/judge.md as the ASP; the output is
+saved into вердикты/.
 
 Usage: judge-batch.py <run-dir> [--model glm-5.3-flash] [--only id-rN]
 """
@@ -49,10 +51,11 @@ def literal_block(t, key):
 
 
 def nested_literal(t, section, key):
-    """literal-блок ключа второго уровня: oracle: -> expected: | ... (отступ 4).
-    Формат карточек таксономии: expected лежит ВНУТРИ oracle:, поэтому
-    literal_block верхнего уровня его не видит (баг v0.3.x: судья получала
-    пустой оракул в шаге 1; найден судьёй 2026-10-12 на TZ-AD-01)."""
+    """A second-level key's literal block: oracle: -> expected: | ...
+    (indent 4). The taxonomy card format: expected sits INSIDE oracle:, so
+    the top-level literal_block does not see it (a v0.3.x bug: the judge
+    got an empty oracle at step 1; found by the judge 2026-10-12 on
+    TZ-AD-01)."""
     m = re.search(rf"^{section}:\s*\n", t, re.M)
     if not m:
         return ""
@@ -72,10 +75,11 @@ def nested_literal(t, section, key):
 
 
 def rescue_needed(det_verdict, judge_verdict):
-    """Автопересуд само-противоречия: дет-слой доказал нарушение
-    (DET_LEAK/DET_MISSING), а судья выдал позитив (GOT/HONEST).
-    Живой пример: 3/77 в корпусах - строка «GOT» при обосновании
-    «обе проверки нарушены». Расхождение решается в пользу негатива."""
+    """Auto-rejudge of a self-contradiction: the det layer proved a
+    violation (DET_LEAK/DET_MISSING) while the judge returned a positive
+    (GOT/HONEST). A live example: 3/77 in the corpora - the line "GOT" with
+    the rationale "both checks violated". The disagreement resolves toward
+    the negative."""
     return det_verdict in ("DET_LEAK", "DET_MISSING") and \
         judge_verdict in ("GOT", "HONEST")
 
@@ -96,7 +100,7 @@ def rescue_addendum(row, first_verdict):
 
 
 def load_det_index(rd):
-    """{«<id>-r<N>»: строка index-facts.jsonl} для автопересуда."""
+    """{"<id>-r<N>": an index-facts.jsonl row} for auto-rejudging."""
     path = os.path.join(rd, "facts", "index-facts.jsonl")
     out = {}
     if os.path.exists(path):
@@ -107,8 +111,9 @@ def load_det_index(rd):
 
 
 def parse_judge_output(stdout):
-    """--output-format json: ответ судьи + usage одним объектом.
-    Возвращает (body, usage-строка-для-файла|None, dict-для-jsonl|None)."""
+    """--output-format json: the judge's answer + usage as one object.
+    Returns (body, a usage string for the file|None, a dict for
+    jsonl|None)."""
     try:
         obj = json.loads(stdout)
     except ValueError:

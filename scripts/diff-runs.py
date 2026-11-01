@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Diff двух прогонов одного SUT (review P1-6, как ВИД - не критерий).
+"""A diff of two runs of one SUT (review P1-6, a VIEW - not a criterion).
 
-Сравнивает index.jsonl двух прогонов по id карточек: смены итогов, новые
-негативы (кандидаты регрессии), закрытые негативы, изменения split.
-Принцип проекта неизменен: каждая приёмка самодостаточна, diff - отчёт
-о расхождении поведения, не вывод «стало лучше/хуже».
+Compares the index.jsonl of two runs by card id: outcome changes, new
+negatives (regression candidates), closed negatives, split changes. The
+project principle is unchanged: every acceptance run is self-contained;
+the diff is a report on diverging behavior, not a "got better/worse"
+verdict.
 
 Usage: diff-runs.py <run-a> <run-b>
-Пишет: stdout (markdown).
+Writes: stdout (markdown).
 """
 
 import io

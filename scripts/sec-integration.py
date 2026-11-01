@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
-"""Интеграционный security-тест: реальный eval-конвейер в docker-песочнице
-(ТЗ финального усиления, п.8).
+"""Integration security test: the real eval pipeline in a docker sandbox
+(final hardening spec, item 8).
 
-Детерминированные пробы sec-checks необходимы, но не заменяют полную цепочку:
-prepare -> run-cards (Claude Code в контейнере) -> факты -> судья -> манифест
--> cleanup. Здесь гоняем ОДНУ мини-карточку против examples/evil-plugin.
+The deterministic sec-checks probes are necessary but do not replace the
+full chain: prepare -> run-cards (Claude Code in a container) -> facts ->
+judge -> manifest -> cleanup. Here we run ONE mini-card against
+examples/evil-plugin.
 
-Статусы (не PASS при неопределённости):
-  PASS  - цепочка прошла: транскрипт живой, вердикт судьи есть, эталон цел,
-          ресурсы удалены.
-  SKIP  - среда не позволяет (нет Docker / нет LLM-ключа шлюза) - с причиной.
-  ERROR - цепочка оборвалась технически (rc!=0 на этапах).
-  FAIL  - защита нарушена (эталон изменён/подмена/утечка).
+Statuses (no PASS under uncertainty):
+  PASS  - the chain went through: a live transcript, a judge verdict, an
+          intact golden ref, resources removed.
+  SKIP  - the environment does not allow it (no Docker / no gateway LLM
+          key) - with the reason.
+  ERROR - the chain broke technically (rc!=0 at a stage).
+  FAIL  - protection violated (golden ref changed/substitution/leak).
 
-Usage: sec-integration.py [--out runs/<дата>-secint] [--keep]
+Usage: sec-integration.py [--out runs/<date>-secint] [--keep]
 """
 
 import argparse
@@ -30,8 +32,8 @@ ROOT = os.path.dirname(HERE)
 
 
 def git_bash():
-    """python-subprocess "bash" на этой машине = WSL (не видит C:);
-    реальный git-bash лежит в X:/Git. На linux возвращаем "bash"."""
+    """python-subprocess "bash" on this machine = WSL (cannot see C:);
+    the real git-bash lives in X:/Git. On linux return "bash"."""
     if os.name != "nt":
         return "bash"
     for cand in (r"X:/Git\usr\bin\bash.exe",
@@ -45,7 +47,7 @@ BASH = git_bash()
 
 
 def sh(cmd, timeout=1500, env=None):
-    # bash на Windows требует POSIX-пути для .sh
+    # bash on Windows requires POSIX paths for .sh
     e = dict(os.environ)
     if env:
         e.update(env)
@@ -74,7 +76,7 @@ def main():
     a = ap.parse_args()
     out_dir = os.path.join(ROOT, a.out)
 
-    # пре-чеки: docker + образ + ключ шлюза (без ключа - SKIP, не PASS)
+    # pre-checks: docker + image + gateway key (no key - SKIP, not PASS)
     os.makedirs(out_dir, exist_ok=True)
     rc, err = sh(["python", os.path.join(HERE, "sandbox.py"), "verify", "docker"])
     if rc != 0:
@@ -108,7 +110,7 @@ def main():
 
     rc, out = sh([BASH, os.path.join(HERE, "run-integrity.sh").replace(chr(92), "/"),
                   run_dir.replace(chr(92), "/"), "snapshot"])
-    # прогон (fail-closed: docker недоступен на prepare = rc!=0 -> ERROR/SKIP)
+    # the run (fail-closed: docker unavailable at prepare = rc!=0 -> ERROR/SKIP)
     rc, out = sh([BASH, os.path.join(HERE, "run-cards.sh").replace(chr(92), "/"), cards,
                   os.path.join(ROOT, "examples", "evil-plugin"), run_dir, "1", "8",
                   os.path.join(ROOT, "examples", "evil-plugin",
@@ -131,7 +133,7 @@ def main():
         return report(out_dir, "ERROR", "транскрипт почти пуст - LLM-цепочка "
                       "не прошла (см. runcards.log)", body)
 
-    # судья + факты
+    # judge + facts
     os.makedirs(os.path.join(run_dir, 'вердикты'), exist_ok=True)
     sh(["python", os.path.join(HERE, "check-facts.py"), run_dir])
     rc, out = sh(["python", os.path.join(HERE, "judge-batch.py"), run_dir,
@@ -144,7 +146,7 @@ def main():
     if "Вердикт" not in v:
         return report(out_dir, "ERROR", "вердикт без вердикт-строки", v[:300])
 
-    # целостность эталона после живого прогона
+    # golden ref integrity after the live run
     card_hash0 = hashlib.md5(io.open(os.path.join(cards, "INT-01.yaml"), "rb").read()).hexdigest()
     rc, out = sh([BASH, os.path.join(HERE, "run-integrity.sh").replace(chr(92), "/"),
                   run_dir.replace(chr(92), "/"), "verify"])
@@ -155,7 +157,7 @@ def main():
     if card_hash0 != card_hash1:
         return report(out_dir, "FAIL", "карточка-эталон изменена")
 
-    # ресурсы песочницы удалены (cleanup делает раннер; проверяем следы)
+    # sandbox resources removed (cleanup is done by the runner; we check the traces)
     leaks = []
     nets = subprocess.run(["docker", "network", "ls", "--filter", "name=qa-sbx",
                            "--format", "{{.Name}}"], capture_output=True,
@@ -163,7 +165,7 @@ def main():
     if nets:
         leaks.append("сети: " + ",".join(nets[:4]))
     if os.path.exists(os.path.join(os.environ.get("TEMP", "/tmp"))):
-        pass  # work уникален и затёрт раннером; priv проверяется суффиксом невозможным без work
+        pass  # work is unique and wiped by the runner; priv is checked by a suffix impossible without work
     status = "PASS" if not leaks else "FAIL"
     reason = ("полная цепочка прошла: docker-песочница -> Claude Code -> "
               "транскрипт -> судья; эталон цел" if not leaks

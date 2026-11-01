@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Конвертер Anthropic HH-RLHF (harmless-base) -> golden-кейсы ATTACK_PASSED.
+"""Anthropic HH-RLHF (harmless-base) converter -> ATTACK_PASSED golden cases.
 
-HH-RLHF (Bai et al. 2022, MIT, github.com/anthropics/hh-rlhf): пары диалогов
-chosen/rejected от платных разметчиков; в harmless-base rejected - вредный
-или менее безопасный ответ. Метки экспертные, не вердикты судьи плагина.
+HH-RLHF (Bai et al. 2022, MIT, github.com/anthropics/hh-rlhf):
+chosen/rejected dialogue pairs from paid annotators; in harmless-base the
+rejected reply is harmful or less safe. The labels are expert ones, not
+the plugin judge's verdicts.
 
-Механический фильтр (без суждения, только структура):
-  - последний ход Human - провокационный запрос;
-  - финальный ответ chosen НАЧИНАЕТСЯ с маркера отказа (безопасная линия);
-  - финальный ответ rejected НЕ начинается с отказа (уступка).
-Пара проходит фильтр -> кейс: запрос + норма-отказ vs уступка = ATTACK_PASSED
-(атака достигла цели: система выполнила вредную часть).
+A mechanical filter (no judgment, structure only):
+  - the last Human turn is a provocative request;
+  - the chosen final answer STARTS with a refusal marker (the safe line);
+  - the rejected final answer does NOT start with a refusal (a concession).
+A pair passes the filter -> a case: request + the refusal norm vs the
+concession = ATTACK_PASSED (the attack reached its goal: the system did
+the harmful part).
 
-ID с G-301 (ручные 1-8, TruthfulQA 101-145, живые 201+). Детерминирован.
+IDs from G-301 (manual 1-8, TruthfulQA 101-145, live 201+). Deterministic.
 
 Usage:
   make-golden-hhrlhf.py <harmless-base-train.jsonl> <out.md> [--n 15] [--seed 42] [--start-id 301]

@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Конвертер TruthfulQA -> драфт golden-кейсов для judge-control.py.
+"""TruthfulQA converter -> a golden-case draft for judge-control.py.
 
-TruthfulQA (Lin, Hilton, Evans 2021, Apache 2.0, github.com/sylinrl/TruthfulQA):
-817 вопросов, у каждого - эталонный правдивый ответ (Best Answer) и эталонный
-ложный ответ-заблуждение (Best Incorrect Answer). Метки проставлены авторами
-бенчмарка вручную, это экспертные метки, а не вердикты судьи плагина -
-требование ревью P0-2 соблюдено.
+TruthfulQA (Lin, Hilton, Evans 2021, Apache 2.0,
+github.com/sylinrl/TruthfulQA): 817 questions, each with a reference
+truthful answer (Best Answer) and a reference misconception answer (Best
+Incorrect Answer). The labels were assigned by the benchmark's authors by
+hand; they are expert labels, not the plugin judge's verdicts - the P0-2
+review requirement is met.
 
-Одна строка датасета даёт три кейса (одинаковый вопрос и оракул, разный ответ):
-  GOT    - ответ = Best Answer (полное попадание)
-  FAIL   - ответ = Best Incorrect Answer (заблуждение, противоречит оракулу)
-  HONEST - ответ = "I have no comment." (по методике бенчмарка это правдивое
-           незнание; в нашей шкале - честное незнание)
+One dataset row yields three cases (the same question and oracle, a
+different answer):
+  GOT    - answer = Best Answer (a full hit)
+  FAIL   - answer = Best Incorrect Answer (a misconception, contradicts
+           the oracle)
+  HONEST - answer = "I have no comment." (per the benchmark's methodology
+           this is truthful ignorance; in our scale - honest ignorance)
 
-ID идут с G-101, чтобы не пересекаться с ручным набором G-01..G-08.
-Скрипт детерминирован (фиксированный seed) - повторный запуск даёт тот же файл.
+IDs start at G-101, to not collide with the manual set G-01..G-08.
+The script is deterministic (a fixed seed) - a rerun produces the same
+file.
 
 Usage:
   make-golden-truthfulqa.py <TruthfulQA.csv> <out.md> [--per-class 15] [--seed 42] [--start-id 101]
@@ -59,7 +63,7 @@ def load_rows(csv_path):
             if not (q and best and wrong):
                 continue
             if "no comment" in best.lower():
-                continue  # эталон сам - незнание, кейс GOT вырождается
+                continue  # the reference itself is ignorance, the GOT case degenerates
             rows.append({"q": q, "best": best, "wrong": wrong})
     return rows
 

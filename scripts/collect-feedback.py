@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
-"""Обратная связь человека по итогам прогона (необязательный шаг фазы E).
+"""Human feedback on a run's outcomes (an optional phase E step).
 
-Человек подтверждает или исправляет вердикты файлом runs/<дата>-<sut>/feedback.yaml
-(строка на карточку: «id: ок» - согласен с итогом судьи, «id: FAIL» - вердикт
-человека). Скрипт:
+The human confirms or corrects verdicts via runs/<date>-<sut>/feedback.yaml
+(one line per card: "id: ok" - agrees with the judge's outcome, "id: FAIL" -
+the human's verdict). The script:
 
-  1. считает согласие судьи с человеком по живым кейсам (главная рабочая метрика
-     судьи: боевые кейсы, в отличие от контрольной выборки);
-  2. готовит golden-кандидаты: на каждый кейс с ответом человека - готовый кейс
-     контрольной выборки, эталон = вердикт ЧЕЛОВЕКА (вердикт судьи эталоном не
-     становится никогда - принцип Growing-Golden).
+  1. computes judge-human agreement over live cases (the judge's main
+     working metric: battle cases, as opposed to the control sample);
+  2. prepares golden candidates: for every case with a human answer - a
+     ready control-sample case, the reference = the HUMAN's verdict (the
+     judge's verdict never becomes the reference - the Growing-Golden
+     principle).
 
-Кандидаты (runs/<run>/golden-candidates.md) владелец просматривает и переносит
-в knowledge/golden-live.md - так контрольная выборка растёт из живых приёмок.
+The owner reviews the candidates (runs/<run>/golden-candidates.md) and moves
+them into knowledge/golden-live.md - this is how the control sample grows
+from live acceptances.
 
 Usage:
   collect-feedback.py <run-dir> [--feedback <path>] [--start-id N] [--html]
-Файла обратной связи нет - тихий выход 0 (шаг необязателен).
---html - собрать страницу разметки feedback.html (клики вместо yaml руками):
-отметил вердикты -> «Скачать feedback.yaml» -> файл в папку прогона.
+No feedback file - quiet exit 0 (the step is optional).
+--html - build the feedback.html markup page (clicks instead of hand-written yaml):
+mark the verdicts -> "Download feedback.yaml" -> drop the file into the run directory.
 """
 
 import argparse
@@ -39,7 +41,7 @@ def one_line(s):
 
 
 def parse_feedback(path):
-    """Строки «id: ок» или «id: ВЕРДИКТ». Возвращает {id: (value, is_ok)}."""
+    """Lines "id: ok" or "id: VERDICT". Returns {id: (value, is_ok)}."""
     if not os.path.exists(path):
         return None
     fb, bad = {}, []
@@ -64,7 +66,7 @@ def parse_feedback(path):
 
 
 def yaml_fields(card_path):
-    """Поля карточки: instruction (реплика) и oracle.expected (мини-парсер regex'ом)."""
+    """Card fields: instruction (the utterance) and oracle.expected (a mini regex parser)."""
     txt = io.open(card_path, encoding="utf-8").read()
     out = {"instruction": "", "expected": ""}
     m = re.search(r"^instruction:\s*\|\n((?:[ \t]+.*\n?)*)", txt, flags=re.M)
@@ -82,17 +84,18 @@ def yaml_fields(card_path):
 
 
 def dedup_transcript(s):
-    """Транскрипт собирает текст из промежуточных блоков и result - итоговое
-    сообщение может повториться дословно. Отсекаем повтор по второму вхождению
-    начального фрагмента (до 100 символов, но не более трети текста)."""
+    """The transcript collects text from intermediate blocks and result - the
+    final message can repeat verbatim. Cut the repeat at the second
+    occurrence of the leading fragment (up to 100 chars, but at most a
+    third of the text)."""
     probe = s[:min(100, max(20, len(s) // 3))]
     second = s.find(probe, 1)
     return s[:second].rstrip() if second > 0 else s
 
 
 def choose_rep(index_row, human_verdict):
-    """Повтор для golden-кандидата: где судья ошибся (самый поучительный),
-    иначе r1."""
+    """The repeat for a golden candidate: where the judge was wrong (the most
+    instructive), otherwise r1."""
     verdicts = index_row.get("verdicts", {})
     if human_verdict:
         for rep in sorted(verdicts):
@@ -102,8 +105,8 @@ def choose_rep(index_row, human_verdict):
 
 
 def next_id(repo_root):
-    """Свободный G-ID: максимум из golden-live.md и всех файлов кандидатов + 1.
-    Живые кейсы нумеруются с G-201 (TruthfulQA занял 101-145, ручные - 1-8)."""
+    """A free G-ID: the max across golden-live.md and all candidate files + 1.
+    Live cases are numbered from G-201 (TruthfulQA took 101-145, manual ones 1-8)."""
     mx = 200
     for path in ([os.path.join(repo_root, "knowledge", "golden-live.md")] +
                  glob.glob(os.path.join(repo_root, "runs", "*", "golden-candidates.md"))):
@@ -115,10 +118,10 @@ def next_id(repo_root):
 
 
 def visual_shots(run_dir):
-    """Скриншоты с разметкой ревьюера по карточкам: {id: [{file, findings}]}.
-    Нет визуальный-ревью.json - пустой словарь (шаг необязательный).
-    Битые находки отбрасываются, а не валят страницу: валидатор схемы -
-    scripts/annotate-visuals.py."""
+    """Screenshots with reviewer markup per card: {id: [{file, findings}]}.
+    No визуальный-ревью.json - an empty dict (the step is optional).
+    Broken findings are dropped instead of crashing the page: the schema
+    validator is scripts/annotate-visuals.py."""
     path = os.path.join(run_dir, "визуальный-ревью.json")
     if not os.path.exists(path):
         return {}
@@ -142,7 +145,7 @@ def visual_shots(run_dir):
 
 
 def load_entries(run_dir):
-    """Данные прогона для страницы разметки: карточка + итог судьи + ответ."""
+    """Run data for the markup page: card + judge outcome + answer."""
     shots = visual_shots(run_dir)
     entries = []
     index_path = os.path.join(run_dir, "index.jsonl")
@@ -350,8 +353,8 @@ render();
 
 
 def eco_lines(run_dir):
-    """Экономика прогона для страницы: сводка cost.md (SUT) + судья
-    (judge-usage.jsonl, с v0.4.1). Нет данных - пусто."""
+    """Run economics for the page: the cost.md summary (SUT) + the judge
+    (judge-usage.jsonl, since v0.4.1). No data - empty."""
     out = []
     cost_md = os.path.join(run_dir, "cost.md")
     if os.path.exists(cost_md):
@@ -458,7 +461,7 @@ def main():
     for cid, j, h, ok in cases:
         verdict = h if (h and not ok) else (j if j in VERDICTS else None)
         if not verdict:
-            continue  # «ок» при сплите/безвердиктии - эталон не определён
+            continue  # "ok" on a split/no-verdict - the reference is undefined
         card = os.path.join(run_dir, "карточки", f"{cid}.yaml")
         if not os.path.exists(card):
             continue
