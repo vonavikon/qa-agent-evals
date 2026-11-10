@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-[RU](README.md) · [EN](README.en.md) · [中文](README.zh.md) · [Español](README.es.md) · **Français**
+[EN](README.en.md) · [RU](README.md) · [中文](README.zh.md) · [Español](README.es.md) · **Français**
 
 Un plugin Claude Code pour les tests d'acceptation de systèmes LLM par des sous-agents jouant des rôles. Vous désignez le système à tester (SUT). Le plugin établit son profil, génère des cartes de scénarios de cinq types, les exécute via un adaptateur isolé, rend des verdicts avec un juge tournant sur un autre modèle, et assemble un rapport avec taux de réussite et matrice de couverture.
 

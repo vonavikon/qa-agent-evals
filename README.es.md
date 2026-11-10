@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-[RU](README.md) · [EN](README.en.md) · [中文](README.zh.md) · **Español** · [Français](README.fr.md)
+[EN](README.en.md) · [RU](README.md) · [中文](README.zh.md) · **Español** · [Français](README.fr.md)
 
 Un plugin de Claude Code para pruebas de aceptación de sistemas LLM con subagentes que interpretan roles. Tú señalas el sistema bajo prueba (SUT). El plugin construye su perfil, genera tarjetas de escenarios de cinco tipos, las ejecuta con subagentes actores a través de un adaptador aislado, emite veredictos con un juez que corre sobre otro modelo y arma un informe con tasa de aprobación y matriz de cobertura.
 

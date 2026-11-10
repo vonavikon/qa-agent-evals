@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-[RU](README.md) · **EN** · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
+**EN** · [RU](README.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
 
 A Claude Code plugin for acceptance testing of LLM systems with role-playing subagents. You point it at the system under test. The plugin profiles it, generates scenario cards of five types, runs them through an isolated adapter, hands down verdicts with a judge running on a different model, and assembles a report with pass rates and a coverage matrix.
 

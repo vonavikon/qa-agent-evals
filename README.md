@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-**RU** · [EN](README.en.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
+[EN](README.en.md) · **RU** · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
 
 Плагин Claude Code для приёмочного тестирования LLM-систем ролевыми субагентами. Вы указываете путь к тестируемой системе (SUT). Плагин строит её профиль, генерирует карточки-сценарии пяти типов, прогоняет их субагентами-исполнителями через изолированный адаптер, выносит вердикты судьи на другой модели и собирает отчёт с PASS-rate и матрицей покрытия.
 
