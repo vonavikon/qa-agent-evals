@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-[EN](README.en.md) · [RU](README.md) · **中文** · [Español](README.es.md) · [Français](README.fr.md)
+[EN](README.md) · [RU](README.ru.md) · **中文** · [Español](README.es.md) · [Français](README.fr.md)
 
 一个 Claude Code 插件，通过扮演角色的子代理对 LLM 系统做验收测试。你只需给出被测系统（SUT）的路径。插件会建立它的画像，生成五种类型的场景卡片，经隔离的适配器让执行子代理跑一遍，由运行在另一个模型上的裁判给出裁定，并汇总出带通过率和覆盖矩阵的报告。
 

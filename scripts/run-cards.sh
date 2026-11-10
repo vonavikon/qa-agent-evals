@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# CLI-раннер одноходовых карточек приёмки (фаза D).
-# Прогоняет obvious/critical/adversarial-карточки напрямую через адаптер
-# (knowledge/adapters.md), N повторов, транскрипты в runs/<дата>-<sut>/прогоны/.
-# Многоходовые convoluted-карточки раннером не гоняются - их ведёт субагент role-user.
+# CLI runner for single-turn acceptance cards (phase D).
+# Runs obvious/critical/adversarial cards directly through the adapter
+# (knowledge/adapters.md), N repeats, transcripts in runs/<date>-<sut>/прогоны/.
+# Multi-turn convoluted cards are not run by the runner - a role-user subagent drives them.
 #
 # Usage: run-cards.sh <cards-dir> <sut-plugin-dir> <run-dir> [repeats=2] [max-turns=20] [skill-md]
-#   skill-md - путь к SKILL.md тестируемого скилла: включает гарантированную
-#   активацию (--append-system-prompt-file). Для скилл-SUT обязателен.
-# Выход: 0 - все прогоны дали непустой транскрипт; 1 - были пустые (поднять max-turns).
+#   skill-md - path to the tested skill's SKILL.md: enables guaranteed
+#   activation (--append-system-prompt-file). Required for a skill SUT.
+# Exit: 0 - every run produced a non-empty transcript; 1 - some were empty (raise max-turns).
 
 set -u
 
-# Git Bash конвертирует POSIX-аргументы в Windows-пути (/workspace -> X:/Git/workspace)
-# и ломает аргументы контейнера; для этого скрипта конверсию отключаем
+# Git Bash converts POSIX arguments to Windows paths (/workspace -> X:/Git/workspace)
+# and breaks container arguments; disable the conversion for this script
 export MSYS_NO_PATHCONV=1
 
 CARDS_DIR="${1:?Usage: run-cards.sh <cards-dir> <sut-plugin-dir> <run-dir> [repeats] [max-turns] [skill-md]}"
@@ -22,8 +22,8 @@ REPEATS="${4:-2}"
 MAX_TURNS="${5:-20}"
 SKILL_MD="${6:-}"
 
-# Абсолютные пути: скрипт делает cd в рабочие папки прогонов -
-# относительные аргументы после этого ломаются. Пустой результат cd = каталога нет.
+# Absolute paths: the script cds into per-run working dirs, after which
+# relative arguments break. Empty cd result = no such directory.
 CARDS_DIR="$(cd "$CARDS_DIR" 2>/dev/null && pwd)" || true
 SUT_DIR="$(cd "$SUT_DIR" 2>/dev/null && pwd)" || true
 RUN_DIR="$(cd "$RUN_DIR" 2>/dev/null && pwd)" || true
@@ -34,14 +34,14 @@ RUN_DIR="$(cd "$RUN_DIR" 2>/dev/null && pwd)" || true
 
 ASP=()
 [ -n "$SKILL_MD" ] && ASP=(--append-system-prompt-file "$SKILL_MD")
-# Вызов: "${ASP[@]+${ASP[@]}}" - безопасное раскрытие пустого массива под set -u.
+# Invocation: "${ASP[@]+${ASP[@]}}" - safe expansion of an empty array under set -u.
 
 OUT_DIR="$RUN_DIR/прогоны"
 mkdir -p "$OUT_DIR"
 
-# Уровень изоляции (knowledge/sandbox.md): host - как раньше; docker -
-# контейнер, единый work на прогон (уникальный mktemp), копия SUT и конфиг
-# CLI внутри, сеть off. Fail-closed: docker недоступен - стоп.
+# Isolation level (knowledge/sandbox.md): host - as before; docker -
+# a container with one work dir per run (unique mktemp), a copy of the SUT
+# and the CLI config inside, network off. Fail-closed: docker unavailable - stop.
 SANDBOX="${QA_EVALS_SANDBOX:-host}"
 SB="$(dirname "$0")/sandbox.py"
 SBWORK=""
@@ -50,15 +50,15 @@ if [ "$SANDBOX" = "docker" ]; then
   SBWORK=$(python "$SB" prepare docker "$SUT_DIR" "$RUN_DIR" | python -c "import json,sys; print(json.load(sys.stdin)['work'])")
   [ -n "$SBWORK" ] || { echo "sandbox prepare не дал work" >&2; exit 1; }
   if [ -n "$SKILL_MD" ]; then
-    # ASP-файл - в ro-копию SUT: /workspace теперь tmpfs, sut смонтирован ro
+    # ASP file goes into the ro SUT copy: /workspace is now tmpfs, sut is mounted ro
     cp "$SKILL_MD" "$SBWORK/sut/qa-eval-skill.md"; SKILL_MD_INSIDE="/workspace/sut/qa-eval-skill.md"
   else SKILL_MD_INSIDE=""; fi
   echo "изоляция: docker, work=$SBWORK (meta-sandbox.json в прогоне)"
 fi
 
-# Извлечь поле из карточки: поле 2-го уровня YAML (скаляр или literal-блок).
-# Формат карточек фиксирован таксономией - простого парсера достаточно.
-yaml_field() { # $1=файл $2=имя поля
+# Extract a field from a card: a second-level YAML field (scalar or literal block).
+# The card format is fixed by the taxonomy - a simple parser is enough.
+yaml_field() { # $1=file $2=field name
   awk -v key="$2" '
     $0 ~ "^"key":" {
       val = substr($0, index($0, ":") + 1)
@@ -71,9 +71,9 @@ yaml_field() { # $1=файл $2=имя поля
   ' "$1"
 }
 
-# Извлечь ход 1 из instruction (строка «Ход 1: «...»»); если структура ходов
-# не найдена - вся инструкция считается одноходовой репликой.
-first_turn() { # $1=инструкция
+# Extract turn 1 from instruction (the «Ход 1: ...» line); if the turn structure
+# is not found - the whole instruction is treated as a single-turn message.
+first_turn() { # $1=instruction
   printf '%s\n' "$1" | awk '
     match($0, /Ход 1:/) {
       s = substr($0, RSTART + RLENGTH)
@@ -108,18 +108,18 @@ for card in "$CARDS_DIR"/*.yaml; do
       work="/tmp/qa-evals-run-$id-r$r"
       rm -rf "$work"; mkdir -p "$work"
     fi
-    # docker: /workspace - tmpfs, читаемые файлы кладём в монтируемые места
+    # docker: /workspace is tmpfs, put readable files into mounted locations
     if [ "$SANDBOX" = "docker" ]; then
       printf '{"mcpServers": {}}' > "$work/out/mcp-empty.json"
     else
       printf '{"mcpServers": {}}' > "$work/mcp-empty.json"
     fi
-    # Реплика - отдельным файлом: транскрипт хранит только ответы SUT,
-    # чтобы grep-маркеры не ловили слова самой реплики.
+    # The user message goes to a separate file: the transcript stores only SUT
+    # answers so grep markers do not match words from the message itself.
     printf '%s\n' "$turn" > "$OUT_DIR/$id-r$r.replica.txt"
-    # Лог прогона: поток событий сессии (tool-вызовы с путями - провенанс ответа).
-    # Env-очистка SUT-сессии (review P0-1): белый список переменных; секреты
-    # тестировщика (ключи шлюзов, токены) не наследуются. Выключить: QA_EVALS_SCRUB_ENV=0
+    # Run log: the session event stream (tool calls with paths - answer provenance).
+    # Env scrubbing for the SUT session (review P0-1): variable allowlist; the
+    # tester's secrets (gateway keys, tokens) are not inherited. Off: QA_EVALS_SCRUB_ENV=0
     SCRUB=()
     if [ "${QA_EVALS_SCRUB_ENV:-1}" = "1" ]; then
       SCRUB=(env -i PATH="$PATH" HOME="$HOME" USERPROFILE="$USERPROFILE" \
@@ -134,7 +134,7 @@ for card in "$CARDS_DIR"/*.yaml; do
         --disallowedTools Skill,WebFetch,WebSearch,webReader,webSearch --strict-mcp-config --mcp-config /workspace/out/mcp-empty.json \
         ${ASPD[@]+"${ASPD[@]}"} --output-format stream-json --verbose | \
         python -c "import json,sys; [print(x) for x in json.load(sys.stdin)]" | tr -d '\r')
-      # wall-time лимит сессии (SEC-04): застрявший процесс обрывается
+      # wall-time session limit (SEC-04): a stuck process gets cut off
       printf '%s\n' "$turn" | MSYS_NO_PATHCONV=1 timeout "${QA_EVALS_SUT_TIMEOUT:-900}" \
         "${DCMD[@]}" \
         > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err"
@@ -145,14 +145,14 @@ for card in "$CARDS_DIR"/*.yaml; do
           ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
           > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err" )
     fi
-    # Разбор лога: модуль scripts/parse-events.py пишет .txt/.prov.txt/.diag.txt
-    # (путь передаётся POSIX-скриптом, модуль сам конвертирует /c/... в C:\...).
+    # Log parsing: scripts/parse-events.py writes .txt/.prov.txt/.diag.txt
+    # (the path is passed POSIX-style by the script; the module converts /c/... to C:\... itself).
     python "$(dirname "$0")/parse-events.py" "$RUN_DIR" "$id" "r$r"
-    # Артефакты SUT из рабочей папки - в прогон (артефакт вне транскрипта -
-    # тоже доказательство), затем рабочую папку и сессионный лог CLI затереть:
-    # доказательства живут в runs/, в /tmp и профиле CLI копий не остаётся.
-    # docker: work общий на прогон (копия SUT внутри) - между повторами не
-    # трогаем, сессионных хвостов CLI нет (контейнер --rm).
+    # Move SUT artifacts from the work dir into the run (an artifact outside
+    # the transcript is also evidence), then wipe the work dir and the CLI
+    # session log: evidence lives in runs/, no copies stay in /tmp or the CLI profile.
+    # docker: work is shared per run (SUT copy inside) - not touched between
+    # repeats; no CLI session tails (container is --rm).
     arts="$OUT_DIR/$id-r$r.artifacts"
     if [ "$SANDBOX" = "docker" ]; then
       for f in "$work/out"/*; do
@@ -184,7 +184,7 @@ for card in "$CARDS_DIR"/*.yaml; do
   done
 done
 
-# docker: единый work живёт до конца прогона - затираем после всех карточек
+# docker: the single work dir lives until the end of the run - wiped after all cards
 if [ "$SANDBOX" = "docker" ] && [ -n "$SBWORK" ]; then
   python "$SB" cleanup "$SBWORK"
 fi

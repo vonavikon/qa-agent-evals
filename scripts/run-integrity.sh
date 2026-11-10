@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Детектор вмешательства SUT-сессий в каталог прогона (находка selftest-v2: SUT
-# записал 7 вердиктов до запуска судьи и перезапускал прогоны).
+# Detector for SUT-session tampering with the run directory (selftest-v2 finding:
+# the SUT wrote 7 verdicts before the judge ran and restarted runs).
 #
 # Usage:
-#   run-integrity.sh <run-dir> snapshot   - снять манифест контрольных сумм
-#   run-integrity.sh <run-dir> verify     - сверить; расхождения - в stdout
-# Выход verify: 0 - каталоr неизменен (или менялись только прогоны/протоколы/вердикты),
-#               1 - посторонние изменения (вмешательство или потеря файлов).
+#   run-integrity.sh <run-dir> snapshot   - take a checksum manifest
+#   run-integrity.sh <run-dir> verify     - compare; mismatches go to stdout
+# Exit verify: 0 - the directory is unchanged (or only прогоны/протоколы/вердикты
+#              changed), 1 - foreign changes (tampering or lost files).
 
 set -u
 
@@ -16,7 +16,7 @@ MANIFEST="$DIR/.integrity-manifest.txt"
 
 case "$MODE" in
 snapshot)
-  # md5sum в Linux/GitBash; на системах только с md5 - fallback.
+  # md5sum on Linux/GitBash; fallback to plain md5 where that is all there is.
   MD5=md5sum; command -v md5sum >/dev/null 2>&1 || MD5="md5 -r"
   ( cd "$DIR" && find . -type f ! -name ".integrity-manifest.txt" -print0 \
       | sort -z | xargs -0 $MD5 ) > "$MANIFEST"
@@ -27,8 +27,8 @@ verify)
   [ -f "$MANIFEST" ] || { echo "манифеста нет - снимите snapshot до прогона"; exit 1; }
   ( cd "$DIR" && find . -type f ! -name ".integrity-manifest.txt" -print0 \
       | sort -z | xargs -0 $MD5 ) > "$MANIFEST.new"
-  # Допустимые зоны изменения: результаты работы конвейера. Всё остальное
-  # (карточки, профиль, дым) менять после snapshot нельзя.
+  # Allowed change zones: pipeline outputs. Everything else
+  # (карточки/, профиль, дым) must not change after the snapshot.
   diff_out="$(diff "$MANIFEST" "$MANIFEST.new" | grep -E "^[<>]" || true)"
   violations="$(printf '%s\n' "$diff_out" | grep -E "^[<>] .*(карточки/|профиль|дым)" || true)"
   if [ -n "$violations" ]; then

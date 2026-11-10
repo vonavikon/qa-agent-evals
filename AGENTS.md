@@ -14,7 +14,7 @@ acceptances (v0.6.0) add a visual layer: state screenshots next to transcripts,
 a visual-reviewer subagent marks flaws with severity frames — the judge never
 sees that markup and verdicts do not change.
 
-Docs: `README.md` (RU, canonical) with EN/ZH/ES/FR translations (`README.en.md`
+Docs: `README.md` (EN, canonical) with RU/ZH/ES/FR translations (`README.ru.md`
 and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
 `docs/architecture.html`).
 
@@ -48,8 +48,8 @@ and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
 
 ## Conventions
 
-- Working language for docs and commits: Russian. RU README is canonical; keep
-  the EN/ZH/ES/FR translations in sync when changing it.
+- Working language for docs and commits: English. `README.md` (EN) is
+  canonical; keep the RU/ZH/ES/FR translations in sync when changing it.
 - Verdict scales are fixed — never invent new statuses:
   judge: GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED / INVALID;
   det layer: DET_OK / DET_MISSING / DET_LEAK / DET_NA / DET_NO_DATA.

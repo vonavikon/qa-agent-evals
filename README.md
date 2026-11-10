@@ -3,115 +3,115 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F75_clean-brightgreen)](https://www.virustotal.com/gui/file/2be21c1ca3e7e4c38667542ef561f0209494dbcd31d7eba476200572876e83ee)
 
-[EN](README.en.md) · **RU** · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
+**EN** · [RU](README.ru.md) · [中文](README.zh.md) · [Español](README.es.md) · [Français](README.fr.md)
 
-Плагин Claude Code для приёмочного тестирования LLM-систем ролевыми субагентами. Вы указываете путь к тестируемой системе (SUT). Плагин строит её профиль, генерирует карточки-сценарии пяти типов, прогоняет их субагентами-исполнителями через изолированный адаптер, выносит вердикты судьи на другой модели и собирает отчёт с PASS-rate и матрицей покрытия.
+A Claude Code plugin for acceptance testing of LLM systems with role-playing subagents. You point it at the system under test. The plugin profiles it, generates scenario cards of five types, runs them through an isolated adapter, hands down verdicts with a judge running on a different model, and assembles a report with pass rates and a coverage matrix.
 
-От ручного прогона промптов отличается цепочкой доверия: ожидание каждой карточки записано заранее и после прогона не правится, факты до судьи проверяет машина (grep по ответам и файлам, которые написала система), судья работает на другой модели и калибруется по контрольной выборке с заведомо известными вердиктами, а подтверждения человека после приёмки достраивают эту выборку. Среда изолирована от скиллов и MCP владельца. Вердикты асимметричны: FAIL доказывает дефект, GOT означает лишь «не опровергнуто».
+Three things separate it from running prompts by hand: every card has its expected answer written down before the run (the oracle), a machine layer grep-checks facts before the judge ever sees the answer, and the judge itself runs on a different model and is calibrated against a control sample with known-correct verdicts. Human confirmations after acceptance grow that sample. The environment is isolated from the owner's skills and MCP. Verdicts are asymmetric: FAIL proves a defect, GOT only means "not refuted".
 
-![Как это работает: плагин изучает систему, придумывает задания, актёр играет пользователя, чужой плагин за стеклом, судья оценивает ответы, отчёт показывает результат](assets/concept.gif)
+![How it works: the plugin studies the system, writes tasks, an actor plays the user, an untrusted plugin runs behind glass, a judge scores the answers, the report shows the result](assets/concept.en.gif)
 
-*Пет-проект: понять приёмочные evals, построив рабочий инструмент и прогнав его на самом себе.*
+*A pet project: understand acceptance evals by building a working instrument and running it on itself.*
 
-## Как это работает
-
-```
-[A: анализ SUT] → [B: адаптер + дым] → [C: карточки] → [D: прогон ×N повторов] → [E: отчёт]
-```
-
-- **Аналитик** (фаза A) читает SUT и строит профиль: реестр фич, карта рисков, поверхность атаки, точки неопределённости, варианты адаптеров.
-- **Карточки** (фаза C) пяти типов: obvious (happy path), convoluted (многоходовая неоднозначность), critical (зоны ущерба), adversarial (одна атака OWASP на карточку), out-of-scope (признаёт ли SUT, что запрос вне её зоны). Формат: YAML с персоной, инструкцией, оракулом (facts_must / facts_must_not + ожидание прозой) и бюджетом.
-- **Исполнитель role-user** отыгрывает персону против SUT через адаптер. Для CLI-SUT это изолированная headless-сессия: нейтральный cwd, без скиллов и MCP владельца. Для веб-SUT есть браузерный адаптер с поверхностью Playwright, см. `knowledge/adapters.md`. Повторы запускает `scripts/run-cards.sh`.
-- **Машинный слой** (`scripts/check-facts.py`) работает до судьи: грепает маркеры оракула по транскриптам и по файлам, которые система написала сама. Доказанное машиной судья не пересуживает, а само-противоречие (позитив при доказанном нарушении) перегоняется автоматически.
-- **Судья** работает на другой модели (`model:` в `agents/judge.md`) и оценивает в два шага: сначала сверяет ответ SUT с оракулом, не зная замысла карточки, затем проверяет, не подыграл ли исполнитель. Перед приёмочным прогоном судью калибруют на контрольной выборке: рукописные кейсы, кейсы из открытых датасетов (TruthfulQA, Apache 2.0; атаки HH-RLHF, MIT) и растущая живая секция из человеческого фидбека. Вердикты: GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED / INVALID.
-- **Отчёт**: PASS-rate повторов, матрица покрытия «фича × тип», находки с приоритетами, разбор причин, ограничения прогона, стоимость прогона в токенах и долларах (SUT и судья меряются отдельно).
-- **Обратная связь**: после приёмки владелец подтверждает или исправляет вердикты (страница с кликами или прямо в чате); эталоном становится только вердикт человека, не вердикт судьи.
-
-Схему работы, изоляцию контекстов и матрицу ответственности смотрите в [docs/architecture.md](docs/architecture.md). Интерактивная версия: [docs/architecture.html](docs/architecture.html), для каждого узла показано, как на него влиять. Файл открывайте в браузере локально. Все прогоны проекта сведены в журнал приёмок: [docs/benchmarks.md](docs/benchmarks.md).
-
-## Изоляция выполнения (v0.5.0)
-
-Тестируемый плагин запускается на одном из двух уровней, выбор фиксируется в отчёте каждого прогона:
-
-- **host** (по умолчанию): без Docker и дополнительных зависимостей. Изоляция окружения и конфигурации как раньше: белый список переменных, пустой MCP, нейтральный рабочий каталог, детектор вмешательства. Физического барьера файловой системы и сети нет, и уровень честно помечается в отчёте «не песочница». Достаточно для публичных плагинов из известных источников.
-- **docker** (для недоверенного материала): контейнер с монтированием только рабочей папки и копии плагина, read-only корень, non-root, лимиты ресурсов; сеть только через внутренний прокси-контейнер к LLM-шлюзу, наружу больше ничего. Docker недоступен, значит прогон не стартует (fail-closed), тихого переключения на небезопасный режим нет.
-
-Проверено живыми прогонами против собственного examples/evil-plugin (плагин, который никогда не отказывает): в docker отбиты чтение секрета хоста, сеть, запись вне рабочей папки и подмена доказательств; на host те же атаки честно фиксируются как риски уровня. Отдельная находка: серверные инструменты шлюза (web-чтение) приносят контент в закрытую сеть, в docker-режиме они запрещены.
-
-Усиление v0.5.1: исходники плагина смонтированы read-only со стартовой пробой записи (возможна запись, значит запуск запрещён); настоящий ключ шлюза знает только прокси-контейнер, тестируемый процесс получает заглушку; прокси принимает только пути LLM API и ограничивает запросы. Автоматический security-набор (`python scripts/sec-checks.py docker`) прогоняет все шесть проверек одной командой и в CI, зелёный на Windows и на Linux-раннере (runs/2026-10-13-sec/). Финальное усиление v0.5.2: доказательная проба прав (успех только при подтверждённой блокировке записи), нормализация путей прокси против /../-обходов, лимиты частоты/объёма/времени, сам прокси-контейнер non-root без capabilities; SEC-06 разделён на атаку эталона и подмену вердикта (обе с контролем хеша); интеграционный тест гоняет живой конвейер с реальным Claude Code (runs/2026-10-13-secint/).
-
-## Быстрый старт
-
-Требования: Claude Code, bash, python3. На Windows нужен Git Bash или WSL.
-
-Установите плагин (флагом `--plugin-dir <путь>` при запуске сессии, через marketplace или через APM: `pip install apm-cli`, затем `apm install vonavikon/qa-agent-evals`), откройте сессию в каталоге тестируемой системы и напишите:
+## How it works
 
 ```
-запусти приёмочное тестирование <путь к SUT>
+[A: analyze SUT] → [B: adapter + smoke test] → [C: scenario cards] → [D: runs × N repeats] → [E: report]
 ```
 
-Конвейер проведёт фазы A-E сам и один раз остановится перед утверждением карточек: покажет их вам и дождётся решения.
+- **Analyst** (step A) reads the SUT and builds a profile: feature registry, risk map, attack surface, ambiguity points, adapter options.
+- **Cards** (step C) come in five types: obvious (happy path), convoluted (multi-turn ambiguity), critical (damage zones), adversarial (one attack per card), out-of-scope (does the SUT admit what it doesn't know). Format: YAML with a persona, an instruction, an oracle (required and forbidden facts + prose expectation), and a budget.
+- **The role-user actor** plays the persona against the SUT through the adapter. For CLI systems that is an isolated headless session: neutral working directory, no access to the owner's skills or MCP. Web SUTs go through a browser adapter with a Playwright surface, see `knowledge/adapters.md`. Repeats are driven by `scripts/run-cards.sh`.
+- **The machine layer** (`scripts/check-facts.py`) runs before the judge: it greps the oracle markers over the transcripts and over the files the SUT wrote itself. What the machine proves, the judge does not re-adjudicate, and a self-contradiction (positive verdict over a proven violation) triggers an automatic re-judge.
+- **The judge** runs on a different model and works in two steps: first it scores the answer against the oracle without knowing the scenario's intent, then it supervises the actor. Before each acceptance run it is calibrated on a control sample: hand-written cases, open-dataset cases (TruthfulQA, Apache 2.0; HH-RLHF attacks, MIT), and a growing live section fed by human feedback.
+- **Feedback loop (Growing-Golden)**: after a run the owner confirms or corrects verdicts, via a clickable markup page or plain chat text. Only a human verdict ever becomes an etalon; the judge's own verdict never does.
+- **Report**: repeat verdicts and votes, a feature-by-type coverage matrix, findings with priorities, root-cause analysis, run limitations, and the run's cost in tokens and dollars (SUT side and judge side measured separately).
 
-## Состав
+The full map (isolation, context hierarchy, responsibility matrix) is in [docs/architecture.md](docs/architecture.md). Interactive version: [docs/architecture.html](docs/architecture.html), every node shows which file or parameter moves it. Open the file locally in a browser. All runs of the project are summed up in the acceptance log: [docs/benchmarks.md](docs/benchmarks.md).
+
+## Execution isolation (v0.5.0)
+
+The tested plugin runs at one of two isolation levels, recorded in every run report:
+
+- **host** (default): no Docker, no extra dependencies. Environment isolation as before: env allowlist, empty MCP, neutral working directory, tamper detector. There is no filesystem or network barrier, and the report honestly marks this level "not a sandbox". Good enough for public plugins from known sources.
+- **docker** (for untrusted material): a container mounting only the work directory and a copy of the plugin, read-only root, non-root user, resource limits; the only way out is an internal proxy container to the LLM gateway. If Docker is unavailable, the run refuses to start (fail-closed), with no silent fallback to the unsafe mode.
+
+Verified in live runs against our own examples/evil-plugin (a plugin that never refuses): under docker, reading a host secret, network access, writing outside the workspace, and evidence tampering were all blocked; on host, the same attacks are honestly recorded as level risks. Side finding: gateway server-side tools (web reading) deliver content into a closed network, so they are banned in docker mode.
+
+Hardened in v0.5.1: plugin sources are mounted read-only with a boot-time write probe (writable means the run is refused); the real gateway key lives only inside the proxy container while the tested process gets a placeholder; the proxy accepts LLM API paths only and enforces request limits. An automated security suite (`python scripts/sec-checks.py docker`) runs all six checks in one command and in CI, green on both Windows and the Linux runner (runs/2026-10-13-sec/). Final hardening in v0.5.2: the write probe is evidence-based (success only on a confirmed block), proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy container itself runs as non-root with no capabilities; SEC-06 is split into an oracle-tamper attack and a verdict-forgery attack (both hash-verified); an integration test runs the full live pipeline with real Claude Code (runs/2026-10-13-secint/).
+
+## Quick start
+
+Requirements: Claude Code, bash, python3. On Windows use Git Bash or WSL.
+
+Install the plugin (with `--plugin-dir <path>` at session start, via a marketplace, or via APM: `pip install apm-cli`, then `apm install vonavikon/qa-agent-evals`), open a session in the tested system's directory, and write:
 
 ```
-.claude-plugin/plugin.json    манифест
-skills/acceptance-test/       конвейер пяти фаз (оркестратор)
-agents/analyst.md             профиль SUT
-agents/role-user.md           ролевой исполнитель
-agents/judge.md               двухшаговый судья (за ним закреплена другая модель)
-agents/visual-reviewer.md     визуальный ревью скриншотов (разметка только для человека)
-knowledge/taxonomy.md         5 типов карточек, паттерны, эталонный YAML
-knowledge/adapters.md         CLI- и браузерный (Playwright) адаптеры, изоляция среды
-knowledge/oracle.md           оракулы, шкала вердиктов, шаблон отчёта
-knowledge/sandbox.md          уровни host/docker: контуры, прокси, проверки
-knowledge/golden-live.md      живая секция контрольной выборки (golden-кейсы из фидбека)
-scripts/run-cards.sh          CLI-раннер одноходовых карточек с повторами
-scripts/run-integrity.sh      детектор вмешательства SUT в каталог прогона
-scripts/parse-events.py       разбор events.jsonl: ответы, провенанс, диагностика
-scripts/check-facts.py        машинная проверка фактов до судьи (транскрипты + артефакты SUT)
-scripts/judge-batch.py        батч судьи + автопересуд само-противоречий
-scripts/judge-control.py      контрольная выборка судьи (golden-наборы)
-scripts/collect-feedback.py   обратная связь человека: страница разметки + golden-кандидаты
-scripts/annotate-visuals.py   визуальный ревью: валидация разметки, страница с рамками, отбор образцов (--publish)
-scripts/build-index.py        машиночитаемый индекс прогона (index.jsonl)
-scripts/cost-report.py        стоимость и длительность прогона
-scripts/judge-metrics.py      метрика судьи по корпусам (само-противоречия)
-scripts/diff-runs.py          сравнение двух прогонов одной SUT (вид, не критерий)
-scripts/make-golden-*.py      конвертеры открытых датасетов (TruthfulQA, HH-RLHF)
-scripts/sandbox.py            бэкенд уровней изоляции для запуска SUT-сессий
-scripts/sandbox-proxy.py      реверс-прокси LLM-шлюза для docker-уровня
-scripts/sec-checks.py         security-набор из шести проверок docker-изоляции
-scripts/sec-integration.py    интеграционный тест: живой конвейер в docker-песочнице
-scripts/Dockerfile.sandbox    образ контейнера изоляции
-examples/evil-plugin          плагин-мишень для проверки изоляции
-tests/                        unit-тесты и живые тесты конвейера
-docs/spec.md                  спецификация
-docs/plan.md                  план реализации
-docs/architecture.md          схема работы: конвейер, изоляция, ответственность
-docs/research-2026-10-09.md   разбор фреймворков-источников идей
-docs/research-2026-10-10-rsi.md  конспект источников по self-improvement
-docs/research-2026-10-11-kaggle-golden.md  открытые датасеты для golden-кейсов
-docs/reviews/                 внешние ревью спеки и code-review
-runs/                         артефакты самоприёмок и сторонних прогонов (сырые логи сессий и чувствительные данные вырезаны)
+run acceptance testing on <path to SUT>
 ```
 
-## Статус
+The pipeline walks steps A-E on its own and stops exactly once, before the card review: it shows you the cards and waits for your approval.
 
-v0.6.0. Конвейер вырос на чужих системах и на самом себе.
+## Contents
 
-В v0.6.0 появился визуальный слой для браузерных приёмок: адаптер снимает скриншоты состояний рядом с транскриптами, субагент-ревьюер размечает на них недочёты (рамка + severity + комментарий), а страница обратной связи показывает снимки с разметкой рядом с вердиктами. Разметка - подсказка человеку: судья её не видит, вердикты не меняет, в оракул и машинный слой скриншоты не попадают. В репозиторий публикуются только образцы, отобранные владельцем поимённо (`annotate-visuals.py --publish`).
+```
+.claude-plugin/plugin.json    manifest
+skills/acceptance-test/       the five-step pipeline (orchestrator)
+agents/analyst.md             SUT profiler
+agents/role-user.md           role-playing actor
+agents/judge.md               two-step judge (pinned to a different model)
+agents/visual-reviewer.md     visual review of screenshots (markup for the human only)
+knowledge/taxonomy.md         5 card types, patterns, reference YAML
+knowledge/adapters.md         CLI and browser (Playwright) adapters, environment isolation
+knowledge/oracle.md           oracles, verdict scale, report templates
+knowledge/sandbox.md          host/docker levels: boundaries, proxy, checks
+knowledge/golden-live.md      live section of the control sample (golden cases from feedback)
+scripts/run-cards.sh          CLI runner for single-turn cards with repeats
+scripts/run-integrity.sh      tamper detector for the run directory
+scripts/parse-events.py       events.jsonl parser: answers, provenance, diagnostics
+scripts/check-facts.py        machine fact-checker (transcripts + SUT-written files)
+scripts/judge-batch.py        judge batch + automatic re-judge of self-contradictions
+scripts/judge-control.py      judge control sample (golden sets)
+scripts/collect-feedback.py   human feedback: markup page + golden candidates
+scripts/annotate-visuals.py   visual review: markup validation, annotated page, sample selection (--publish)
+scripts/build-index.py        machine-readable run index (index.jsonl)
+scripts/cost-report.py        run cost and duration
+scripts/judge-metrics.py      judge agreement metrics over corpora
+scripts/diff-runs.py          two-run comparison (a view, not a criterion)
+scripts/make-golden-*.py      converters from open datasets (TruthfulQA, HH-RLHF)
+scripts/sandbox.py            isolation-level backend for SUT sessions
+scripts/sandbox-proxy.py      reverse proxy to the LLM gateway for the docker level
+scripts/sec-checks.py         security suite of six docker-isolation checks
+scripts/sec-integration.py    integration test: live pipeline inside the docker sandbox
+scripts/Dockerfile.sandbox    image for the isolation container
+examples/evil-plugin          target plugin for isolation verification
+tests/                        unit and live tests for the pipeline
+docs/spec.md                  specification
+docs/plan.md                  implementation plan
+docs/architecture.md          how it works: pipeline, isolation, responsibility
+docs/research-2026-10-09.md   review of source frameworks
+docs/research-2026-10-10-rsi.md  notes on self-improvement sources
+docs/research-2026-10-11-kaggle-golden.md  open datasets for golden cases
+docs/reviews/                 external spec reviews and code reviews
+runs/                         self-acceptance and third-party run artifacts (raw session logs and sensitive data stripped)
+```
 
-Сначала четыре самоприёмки (v1-v4, отчёты в [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)): в v1 нашлись 3 реальных дефекта (границы применения, обещание нереализованного, контроль утверждения), каждый следующий прогон проверял фиксы предыдущего и искал новые.
+## Status
 
-Затем сторонние системы: скилл редактирования прозы (два прогона со сравнением версий, [runs/](runs/2026-10-11-stop-slop-r2/report.md)), генератор слайдов со внедрением через контент, скилл технического английского, классическая 2048 через браузерный адаптер (детерминированная SUT без LLM) и системы из закрытого периметра (детали не раскрываю). Эти прогоны вырастили v0.3-v0.4: машинный слой фактов (grep ловит утечки, в том числе в файлах, написанных самой SUT), контрольная выборка судьи из открытых датасетов (TruthfulQA 45/45; атаки HH-RLHF), цикл обратной связи Growing-Golden со страницей разметки, автопересуд само-противоречий и измеренная экономика: типичная приёмка стоит $0.6-1.8 на стороне SUT плюс около $0.4 на вызов судьи, потому что CLI-вызов судьи тащит ~75K токенов преамбулы сессии.
+v0.6.0. The pipeline grew on third-party systems and on itself.
 
-В v0.5.0 появилась изоляция выполнения (host/docker) с живыми прогонами против examples/evil-plugin, инфраструктурные сбои разделены с дефектами плагина (статусы BLOCKED/ERROR). В v0.5.1 и v0.5.2 она усилена: ключ шлюза живёт только в прокси-контейнере, исходники смонтированы read-only с доказательной пробой записи, нормализация путей прокси закрывает /../-обходы, добавлены лимиты частоты/объёма/времени, прокси работает как non-root без capabilities. Security-набор (`python scripts/sec-checks.py docker`) зелёный на Windows и Linux CI (runs/2026-10-13-sec/), интеграционный тест гоняет живой конвейер с настоящим Claude Code (runs/2026-10-13-secint/). Всего 52 теста: 43 unit конвейера и 9 живых proxy.
+v0.6.0 added a visual layer for browser acceptance runs: the adapter takes screenshots of states next to the transcripts, a reviewer subagent marks flaws on them (box + severity + comment), and the feedback page shows annotated shots next to the verdicts. The markup is a hint for the human: the judge never sees it, verdicts stay unchanged, and screenshots never enter oracles or the machine layer. Only samples hand-picked by the owner get published (`annotate-visuals.py --publish`).
 
-Что пока не работает: реализованы CLI- и браузерный адаптеры; изоляция отрезает вызов скиллов, но не знание об их существовании; судью разводят вручную: CLI-вызовом с явной `--model` или выбором человека на фазе B, потому что поле `model` агента работает не во всех средах.
+First came four self-acceptance runs (v1-v4, reports in [runs/](runs/2026-10-08-qa-agent-evals-selftest/report.md)): v1 found 3 real defects (scope boundaries, promising the unimplemented, approval control); each next run verified the previous fixes and hunted for new ones.
 
-Спека: [docs/spec.md](docs/spec.md), план: [docs/plan.md](docs/plan.md).
+Then third-party systems: a prose-editing skill (two runs with a version comparison, [runs/](runs/2026-10-11-stop-slop-r2/report.md)), a slide generator with a content-borne injection, a technical-English rewriting skill, the classic 2048 game through the browser adapter (a deterministic non-LLM SUT), and systems from a closed perimeter (details withheld). Those runs grew v0.3-v0.4: the machine fact layer (grep-caught leaks, including SUT-written files), the judge control sample from open datasets (TruthfulQA 45/45; HH-RLHF attacks), the Growing-Golden feedback loop with a clickable markup page, automatic re-judging of self-contradictions, and measured run economics: a typical acceptance run costs $0.6-1.8 on the SUT side plus roughly $0.4 per judge call, because a judge CLI call carries ~75K tokens of session preamble.
 
-## Благодарности
+v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and infrastructure failures are now separated from plugin defects (BLOCKED/ERROR statuses). v0.5.1 and v0.5.2 hardened it: the gateway key lives only in the proxy container, plugin sources are mounted read-only with an evidence-based write probe, proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy runs as non-root with no capabilities. The security suite (`python scripts/sec-checks.py docker`) is green on Windows and the Linux CI runner (runs/2026-10-13-sec/); an integration test runs the live pipeline with real Claude Code (runs/2026-10-13-secint/). In total: 52 tests: 43 pipeline unit tests and 9 live proxy tests.
 
-<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate): первый внешний баг-репорт проекта, уборка каталогов песочницы при отказе прокси ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).
+Not working yet: only the CLI and browser adapters are implemented; isolation cuts skill invocation but not knowledge of the skills' existence; the judge is wired up manually (explicit `--model` or the owner's choice at step B), because the agent `model` field does not work in every environment.
+
+Spec: [docs/spec.md](docs/spec.md), plan: [docs/plan.md](docs/plan.md).
+
+## Contributors
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate): first external bug report, sandbox cleanup on proxy failure ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).
