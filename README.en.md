@@ -111,3 +111,7 @@ v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and 
 Not working yet: only the CLI and browser adapters are implemented; isolation cuts skill invocation but not knowledge of the skills' existence; the judge is wired up manually (explicit `--model` or the owner's choice at step B), because the agent `model` field does not work in every environment.
 
 Spec: [docs/spec.md](docs/spec.md), plan: [docs/plan.md](docs/plan.md).
+
+## Contributors
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate): first external bug report, sandbox cleanup on proxy failure ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).

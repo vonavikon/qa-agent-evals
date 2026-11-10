@@ -111,3 +111,7 @@ v0.5.0 añadió el aislamiento de ejecución (host/docker) con pruebas vivas con
 Aún no funciona: solo están implementados los adaptadores CLI y de navegador; el aislamiento corta la invocación de skills pero no el conocimiento de su existencia; el juez se conecta a mano (`--model` explícito o elección del dueño en el paso B), porque el campo `model` del agente no funciona en todos los entornos.
 
 Spec: [docs/spec.md](docs/spec.md), plan: [docs/plan.md](docs/plan.md).
+
+## Colaboradores
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate): primer informe de errores externo del proyecto, limpieza de los directorios del sandbox cuando falla el arranque del proxy ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).

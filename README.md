@@ -111,3 +111,7 @@ v0.6.0. Конвейер вырос на чужих системах и на с�
 Что пока не работает: реализованы CLI- и браузерный адаптеры; изоляция отрезает вызов скиллов, но не знание об их существовании; судью разводят вручную: CLI-вызовом с явной `--model` или выбором человека на фазе B, потому что поле `model` агента работает не во всех средах.
 
 Спека: [docs/spec.md](docs/spec.md), план: [docs/plan.md](docs/plan.md).
+
+## Благодарности
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate): первый внешний баг-репорт проекта, уборка каталогов песочницы при отказе прокси ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).

@@ -111,3 +111,7 @@ v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，�
 尚未做到：只实现了 CLI 和浏览器适配器；隔离切断了 skills 的调用，但切不断对它们存在的认知；裁判需要手动指定（显式 `--model`，或在阶段 B 由人选择），因为 agent 的 `model` 字段并非在所有环境都生效。
 
 规格：[docs/spec.md](docs/spec.md)，计划：[docs/plan.md](docs/plan.md)。
+
+## 贡献者
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate)：首个外部缺陷报告：代理启动失败后沙箱目录的清理（[#1](https://github.com/vonavikon/qa-agent-evals/issues/1)）。

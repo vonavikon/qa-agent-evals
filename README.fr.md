@@ -111,3 +111,7 @@ v0.5.0 a ajouté l'isolation d'exécution (host/docker) avec preuves réelles co
 Ne fonctionne pas encore : seuls les adaptateurs CLI et navigateur sont implémentés ; l'isolation coupe l'invocation des skills mais pas la connaissance de leur existence ; le juge est câblé à la main (`--model` explicite ou choix du propriétaire à l'étape B), car le champ `model` de l'agent ne fonctionne pas dans tous les environnements.
 
 Spec : [docs/spec.md](docs/spec.md), plan : [docs/plan.md](docs/plan.md).
+
+## Contributeurs
+
+<a href="https://github.com/mattabate"><img src="https://github.com/mattabate.png?size=64" width="64" alt="Matt Abate"></a> [Matt Abate](https://github.com/mattabate) : premier rapport de bug externe du projet, nettoyage des répertoires du bac à sable en cas d'échec du proxy ([#1](https://github.com/vonavikon/qa-agent-evals/issues/1)).
