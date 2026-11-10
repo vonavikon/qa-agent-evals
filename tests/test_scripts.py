@@ -774,6 +774,55 @@ class ProxyHardening(unittest.TestCase):
             sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
             sb.start_proxy(os.path.join(td, "qa-evals-run-x"))
 
+    def test_proxy_failure_removes_priv(self):
+        """issue #1: a failed docker run leaves no priv dir with proxy.env."""
+        sb = load("sb_pr", "sandbox.py")
+        with tempfile.TemporaryDirectory() as td:
+            seen_env = []
+
+            def fake_run(cmd, timeout=60):
+                if cmd[:2] == ["docker", "run"]:
+                    # mid-flight: the env file with the key existed before the failure
+                    seen_env.append(os.path.exists(
+                        os.path.join(td, "qa-evals-run-y-priv", "proxy.env")))
+                    return (1, "", "boom")
+                return (0, "", "")
+
+            sb.run = fake_run
+            sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
+            sb.start_proxy(os.path.join(td, "qa-evals-run-y"))
+            self.assertEqual(seen_env, [True])
+            self.assertFalse(os.path.exists(os.path.join(td, "qa-evals-run-y-priv")),
+                             "priv with the key must not outlive a failed docker run")
+
+    def test_prepare_proxy_fail_cleans_work_and_priv(self):
+        """issue #1: proxy failure in prepare -> rc=4, meta in run_dir, work and priv removed."""
+        sb = load("sb_pf", "sandbox.py")
+        sut = tempfile.mkdtemp(prefix="sut-")
+        run_dir = tempfile.mkdtemp(prefix="run-")
+        self.addCleanup(lambda: __import__("shutil").rmtree(sut, ignore_errors=True))
+        self.addCleanup(lambda: __import__("shutil").rmtree(run_dir, ignore_errors=True))
+        io.open(os.path.join(sut, "a.txt"), "w", encoding="utf-8").write("SUT")
+
+        def fake_run(cmd, timeout=60):
+            if cmd[:2] == ["docker", "run"]:
+                return (1, "", "boom")
+            return (0, "", "")   # network create/rm, ps, rm succeed
+
+        sb.run = fake_run
+        sb.gateway_of_host = lambda: ("https://api.z.ai/api/anthropic", "k")
+        sb.cli_version = lambda: "test-cli"   # otherwise calls an external binary
+        rc = sb.prepare("docker", sut, run_dir)
+        self.assertEqual(rc, 4)
+        meta = json.load(io.open(os.path.join(run_dir, "meta-sandbox.json"),
+                                 encoding="utf-8"))
+        self.assertIsNone(meta["sbx_net"])
+        work = meta["work"]
+        self.assertTrue(work and os.path.isabs(work))
+        self.assertFalse(os.path.exists(work), "work with the SUT copy must be removed")
+        self.assertFalse(os.path.exists(work + "-priv"),
+                         "priv with the key must be removed")
+
 
 class TestBuildBenchmarks(unittest.TestCase):
     """Acceptance log: sidecar + machine artifacts -> a table row; a guard filter."""

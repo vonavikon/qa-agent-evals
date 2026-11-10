@@ -191,6 +191,8 @@ def start_proxy(work):
     if code != 0:
         print("docker run proxy: " + err, file=sys.stderr)
         run(["docker", "network", "rm", net], timeout=30)
+        # priv with the key must not outlive a failed attempt (issue #1)
+        shutil.rmtree(priv, ignore_errors=True)
         return None
     # the second interface is the outbound one (only for the proxy, not for the SUT)
     run(["docker", "network", "connect", "bridge", proxy], timeout=30)
@@ -270,6 +272,12 @@ def prepare(level, sut_dir, run_dir):
         meta["sbx_net"] = net
         if not net:
             print("FAIL-CLOSED: сетевой прокси песочницы не поднялся - docker-уровень невозможен", file=sys.stderr)
+            # on proxy failure clean up both the work dir (SUT copy) and the
+            # priv dir with the key; write meta so the failure is visible (issue #1)
+            io.open(os.path.join(run_dir, "meta-sandbox.json"), "w", encoding="utf-8").write(
+                json.dumps(meta, ensure_ascii=False, indent=1))
+            stop_proxy(work)
+            shutil.rmtree(work, ignore_errors=True)
             return 4
         env_path = build_llm_env(work, net)
         meta["llm_env"] = env_path or "НЕ НАЙДЕН шлюз api.z.ai - контейнер без LLM"
