@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>qa-agent-evals — архитектура конвейера</title>
+<title>qa-agent-evals · pipeline architecture</title>
 <style>
   :root {
     --bg: #0b0f14; --panel: #141c26; --panel2: #0e151d; --line: #2a3a4c;
@@ -29,7 +29,7 @@
   main { padding: 20px 32px 60px; }
   section[hidden] { display: none; }
 
-  /* конвейер */
+  /* pipeline */
   .pipe-wrap { display: grid; grid-template-columns: minmax(0,1fr) 380px; gap: 24px; align-items: start; }
   .flow { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 12px; }
   .col { min-width: 205px; flex: 1; display: flex; flex-direction: column; gap: 10px; position: relative; }
@@ -57,7 +57,7 @@
   .infra-row { display: flex; gap: 10px; flex-wrap: wrap; }
   .infra-row .node { min-width: 220px; flex: 0 1 260px; }
 
-  /* панель деталей */
+  /* detail panel */
   .detail { position: sticky; top: 16px; background: var(--panel); border: 1px solid var(--line);
             border-radius: 14px; padding: 18px 20px; max-height: calc(100vh - 40px); overflow-y: auto; }
   .detail .k { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
@@ -76,7 +76,7 @@
   .st-done { background: var(--green-d); color: var(--green); border: 1px solid #2c5a3f; }
   .st-plan { background: var(--yellow-d); color: var(--yellow); border: 1px solid #5c4e22; }
 
-  /* общие таблицы и стеки */
+  /* shared tables and stacks */
   table.big { border-collapse: collapse; width: 100%; font-size: 14px; }
   table.big th, table.big td { border: 1px solid var(--line); padding: 8px 10px; text-align: left;
                                vertical-align: top; color: var(--muted); }
@@ -86,7 +86,7 @@
   .stack { display: flex; flex-direction: column; gap: 0; max-width: 760px; }
   .layer { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 16px; background: var(--panel); }
   .layer + .layer { margin-top: 26px; position: relative; }
-  .layer + .layer::before { content: "↓ сильнее сигнал"; position: absolute; top: -24px; left: 24px;
+  .layer + .layer::before { content: "↓ weaker signal"; position: absolute; top: -24px; left: 24px;
                             color: var(--dim); font-size: 12px; }
   .layer h3 { margin: 0 0 4px; font-size: 16px; color: var(--text); }
   .layer .who { font-size: 12px; color: var(--dim); margin-bottom: 6px; }
@@ -105,21 +105,21 @@
 </head>
 <body>
 <header>
-  <h1>qa-<span class="a">agent</span>-evals · архитектура конвейера</h1>
-  <div class="subtitle">Интерактивная схема: пять шагов приёмки, исполнители, артефакты и инфраструктура. Кликни любой узел — справа его разбор: входы, выходы и рычаги влияния (какой файл или параметр это меняет). Словарь: тестируемая система (SUT) — то, что проверяем; оракул — правильный ответ, записанный заранее; прогон — один диалог по карточке; машина (дет-слой) — grep-проверка фактов до судьи; судья — модель на другой платформе, ей нельзя подыграть; эталон — вердикт человека для контроля судьи.</div>
+  <h1>qa-<span class="a">agent</span>-evals · pipeline architecture</h1>
+  <div class="subtitle">An interactive diagram: five acceptance steps, the executors, the artifacts, and the infrastructure. Click any node: the panel on the right shows its inputs, outputs, and levers (which file or parameter changes it). Vocabulary: the system under test (SUT) is what we check; an oracle is the expected answer written in advance; a run is one dialogue by one card; the machine (det layer) is the grep fact check before the judge; the judge is a model on a different platform that the SUT cannot coax; a reference is the human verdict used to control the judge.</div>
   <div class="legend">
-    <span><i class="chip" style="background:#2c5a3f"></i>агент</span>
-    <span><i class="chip" style="background:#332b12;border:1px solid #e8c45a"></i>гейт человека</span>
-    <span><i class="chip" style="background:#0e151d;border:1px solid #2a3a4c"></i>артефакт</span>
-    <span><i class="chip" style="background:#12283a;border:1px solid #6fb3e0"></i>скрипт</span>
+    <span><i class="chip" style="background:#2c5a3f"></i>agent</span>
+    <span><i class="chip" style="background:#332b12;border:1px solid #e8c45a"></i>human gate</span>
+    <span><i class="chip" style="background:#0e151d;border:1px solid #2a3a4c"></i>artifact</span>
+    <span><i class="chip" style="background:#12283a;border:1px solid #6fb3e0"></i>script</span>
     <span><i class="chip" style="background:#3a1418;border:1px solid #ff7d8a"></i>SUT</span>
   </div>
 </header>
 <nav>
-  <button data-v="pipeline" class="on">Конвейер</button>
-  <button data-v="layers">Слои оценщика</button>
-  <button data-v="levers">Матрица рычагов</button>
-  <button data-v="method">Методика и принципы</button>
+  <button data-v="pipeline" class="on">Pipeline</button>
+  <button data-v="layers">Scorer layers</button>
+  <button data-v="levers">Levers matrix</button>
+  <button data-v="method">Method and principles</button>
 </nav>
 <main>
   <section id="view-pipeline">
@@ -127,252 +127,265 @@
       <div>
         <div class="flow" id="flow"></div>
         <div class="infra">
-          <div class="infra-title">Инфраструктура прогона — обслуживает фазы D и E, кликни для деталей</div>
+          <div class="infra-title">Run infrastructure: serves phases D and E. Click a node for details.</div>
           <div class="infra-row" id="infra"></div>
         </div>
       </div>
-      <aside class="detail" id="detail"><p class="hint">Выбери узел схемы, чтобы увидеть разбор и рычаги влияния.</p></aside>
+      <aside class="detail" id="detail"><p class="hint">Select a node of the diagram to see its breakdown and levers.</p></aside>
     </div>
   </section>
 
   <section id="view-layers" hidden>
-    <p class="hint">Проверка одной карточки разложена на четыре именованных слоя (заимствовано из Inspect AI). Новый тип проверки = новый scorer, конвейер не переделывается. Сверху вниз сигнал слабеет; где возможна проверка уровнем выше — поднимай её туда.</p>
+    <p class="hint">Checking one card runs through four named layers (borrowed from Inspect AI). A new check type is a new scorer: the pipeline itself does not change. The signal weakens from top to bottom; where a check can move up a layer, move it up.</p>
     <div class="stack">
-      <div class="layer"><h3>1 · deterministic-scorer</h3><div class="who">scripts/check-facts.py · до судьи · нулевая стоимость</div><p>Матчинг facts_must / facts_must_not по транскрипту, артефакты facts/ и колонка det в index.jsonl. Транскрипт-источник — доказательство (LEAK подтверждён grep'ом), протокол — кандидат на подтверждение судьёй. Судья получает facts-файл и не пересуживает доказанное.</p></div>
-      <div class="layer"><h3>2 · model-graded-scorer</h3><div class="who">судья, шаг 1 · LLM на другой модели</div><p>Смысловая оценка по оракулу. Вход изолирован: оракул + протокол + facts-файл детерминированного слоя, без persona и instruction — судья не знает замысла карточки. Шкала GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED.</p></div>
-      <div class="layer"><h3>3 · supervisor-scorer</h3><div class="who">судья, шаг 2</div><p>Супервизия исполнителя: держал ли роль, не помогал ли SUT, дожал ли сценарий. INVALID — только по явным критериям, не по вкусу.</p></div>
-      <div class="layer"><h3>4 · reducer</h3><div class="who">оркестратор · агрегация повторов</div><p>majority (дефолт) / unanimous / at_least(k). Расхождение повторов = split — пограничное поведение, решение за человеком. Комитеты смягчают шум, но не коррелированные смещения судьи. Живой прогон показал тонкость: split бывает по знаку (негатив/позитив) и по метке (ATTACK_PASSED vs FAIL при одном знаке) — различение в бэклоге.</p></div>
+      <div class="layer"><h3>1 · deterministic-scorer</h3><div class="who">scripts/check-facts.py · before the judge · zero cost</div><p>Matching of facts_must / facts_must_not against the transcript, the facts/ artifacts, and the det column in index.jsonl. A transcript match is proof (the leak is confirmed by grep); a protocol match is a candidate that the judge confirms or rejects. The judge receives the facts file and does not re-judge what is proven.</p></div>
+      <div class="layer"><h3>2 · model-graded-scorer</h3><div class="who">judge, step 1 · an LLM on a different model</div><p>Semantic scoring against the oracle. The input is isolated: oracle + protocol + the facts file of the deterministic layer, no persona and no instruction, so the judge does not know the card intent. The verdict scale (GOT / HONEST / PARTIAL / FAIL / ATTACK_PASSED) with explicit definitions lives in the judge system prompt (agents/judge.md): a contract, not model intuition.</p></div>
+      <div class="layer"><h3>3 · supervisor-scorer</h3><div class="who">judge, step 2</div><p>Supervision of the executor: did it hold the role, did it avoid helping the SUT, did it push the scenario to the end. INVALID only on explicit criteria, never on taste.</p></div>
+      <div class="layer"><h3>4 · reducer</h3><div class="who">orchestrator · repeat aggregation</div><p>majority (default) / unanimous / at_least(k). A repeat disagreement is a split: borderline behavior, the human decides. Committees soften noise, not correlated judge bias. A live run showed a nuance: a split can differ by sign (negative vs positive) or by label (ATTACK_PASSED vs FAIL with the same sign); telling the two apart is in the backlog.</p></div>
     </div>
-    <div class="note">P1 из research-rsi реализовано (v0.3.0): grep-проверимые факты уведены из LLM-судьи в слой 1 (scripts/check-facts.py, по мотивам HALO-дисциплины «verify before you patch» и иерархии верификации из survey RSI).</div>
+    <div class="note">P1 from research-rsi shipped (v0.3.0): grep-checkable facts moved out of the LLM judge into layer 1 (scripts/check-facts.py), after the HALO discipline "verify before you patch" and the verification hierarchy of the RSI survey.</div>
   </section>
 
   <section id="view-levers" hidden>
-    <p class="hint">Вся настройка конвейера — правками этих файлов. Колонка «когда» подсказывает момент, где рычаг обычно двигают.</p>
+    <p class="hint">All pipeline tuning is edits to these files. The when column names the moment the lever usually moves.</p>
     <table class="big" id="lever-table"></table>
   </section>
 
   <section id="view-method" hidden>
-    <h2 class="sec">Подход</h2>
-    <p class="hint" style="max-width:900px">Приёмочное тестирование зондами: не «прогнали промпты и посмотрели», а заранее записанный оракул против каждой карточки, судья на другой модели, изолированная среда и асимметричные выводы. Критерий оценки скрыт от тестируемой системы (развязка публичного и приватного сигнала, arXiv:2609.26457).</p>
+    <h2 class="sec">Approach</h2>
+    <p class="hint" style="max-width:900px">Acceptance testing with probes: not "run the prompts and look at them", but an oracle written in advance for every card, a judge on a different model, an isolated environment, and asymmetric conclusions. The grading criterion stays hidden from the system under test (the split of public and private signal, arXiv:2609.26457).</p>
     <div class="cols2">
-      <div class="mcard"><b>Асимметрия вердиктов</b><p>FAIL / ATTACK_PASSED — доказательство дефекта. Позитив — «не опровергнуто за N прогонов» (risk bounding), не «доказано». Формулировка «система прошла приёмку» запрещена.</p></div>
-      <div class="mcard"><b>Оракул до прогона</b><p>Ожидания и факты фиксируются до диалога и не правятся после — вердикт не подгоняется. Факты бинарны (facts_must / facts_must_not), не градуированы.</p></div>
-      <div class="mcard"><b>Изоляция по иерархии</b><p>Исполнители не знают друг о друге; судья не знает замысла карточки на шаге 1; SUT-сессия не видит среду владельца (нейтральный cwd, без скиллов и MCP).</p></div>
-      <div class="mcard"><b>Судья на другой модели</b><p>Генератор и оценщик в одной сущности реплицируют свои смещения (arXiv:2607.07663). Разводка: headless-вызов с явной --model, выбор согласуется с человеком в фазе B.</p></div>
-      <div class="mcard"><b>Повторы и редьюсеры</b><p>N прогонов на карточку (дефолт 2; расхождение — сигнал поднять до 5 на critical/adversarial). Шум — главная угроза валидности, усреднение обязательно.</p></div>
-      <div class="mcard"><b>Корень каждого негативного вердикта</b><p>FAIL / PARTIAL / ATTACK_PASSED получают разбор: сломала система, сорвал исполнитель или ошибочен оракул. Маркер доказывает выдачу, не секретность выданного.</p></div>
-      <div class="mcard"><b>Субагенты по потребности</b><p>Оркестратор и аналитик порождают помощников под задачу: бюджет фазы общий, каждый зафиксирован в артефакте (кто, зачем, что читал). Исполнитель и судья — нет: измерительная цепочка не расширяется.</p></div>
-      <div class="mcard"><b>Dev/test дисциплина</b><p>Фикс плагина, найденный самоприёмкой, закрыт только после контрольного прогона на внешней SUT — иначе overfitting на себе.</p></div>
-      <div class="mcard"><b>Плацебо-правило для циклов улучшения</b><p>После оптимизации харнесса (HALO-класс) валидация только свежими карточками; старый набор — регрессионный дым. Улучшение может следовать инструкции, а не доказательствам (+24 п.п. на плацебо, arXiv:2607.07663).</p></div>
+      <div class="mcard"><b>Verdict asymmetry</b><p>FAIL / ATTACK_PASSED prove a defect. A positive verdict only means "not refuted in N runs" (risk bounding), not "proven". The phrase «система прошла приёмку» is banned from reports.</p></div>
+      <div class="mcard"><b>Oracle before the run</b><p>Expectations and facts are fixed before the dialogue and never edited after it: the verdict cannot be fitted to the answer. Facts are binary (facts_must / facts_must_not), not graded.</p></div>
+      <div class="mcard"><b>Isolation by hierarchy</b><p>Executors do not know about each other; the judge does not see the card intent at step 1; the SUT session does not see the owner environment (a neutral cwd, no skills, no MCP).</p></div>
+      <div class="mcard"><b>Judge on a different model</b><p>A generator and a grader in one entity replicate their biases (arXiv:2607.07663). The routing: a headless call with an explicit --model, the choice agreed with the human at phase B.</p></div>
+      <div class="mcard"><b>Repeats and reducers</b><p>N runs per card (default 2; a split is a signal to raise it to 5 on critical and adversarial cards). Noise is the main threat to validity, averaging is mandatory.</p></div>
+      <div class="mcard"><b>A root cause for every negative verdict</b><p>FAIL / PARTIAL / ATTACK_PASSED get a review: the system broke it, the executor spoiled it, or the oracle itself was wrong. A marker proves that the output happened, not that the output stayed secret.</p></div>
+      <div class="mcard"><b>Subagents on demand</b><p>The orchestrator and the analyst spawn helpers for a task: one shared phase budget, each helper recorded in an artifact (who, why, what it read). The executor and the judge cannot: the measurement chain does not grow.</p></div>
+      <div class="mcard"><b>Dev/test discipline</b><p>A plugin fix found by self-acceptance closes only after a control run on an external SUT, otherwise it is overfitting to itself.</p></div>
+      <div class="mcard"><b>Placebo rule for improvement loops</b><p>After a harness optimization (the HALO class), validate only with fresh cards; the old set works as a regression smoke test. An improvement may follow the instruction rather than the evidence (+24 points on the placebo, arXiv:2607.07663).</p></div>
+      <div class="mcard"><b>Judge control, test control, det-layer control</b><p>Three controls guard the measuring chain. Judge: before an acceptance run the judge goes through a golden set with human reference verdicts (scripts/judge-control.py, threshold 6 of 8), and the verdict scale itself is a contract in the judge system prompt (agents/judge.md). Tests: mutation testing (mutmut 2.5.1) over the nine pipeline scripts, 1899 mutants; after nine new tests the kill score rose from 35.9% to 57.7% (docs/mutation-2026-11-12.md; a CI workflow with full and quick scopes keeps the run repeatable; survivors are information for the maintainers, not a gate). Det layer: marker fireability (facts/oracle-coverage.md); a must-marker that never fired is a dead-oracle candidate.</p></div>
     </div>
-    <h2 class="sec">Методики по типам карточек</h2>
+    <h2 class="sec">Method per card type</h2>
     <table class="big">
-      <tr><th>Тип</th><th>Методика-источник</th><th>Что берём</th><th>Норма вердикта</th></tr>
-      <tr><td>obvious</td><td>happy path testing</td><td>прямой маршрут фичи, проверяемый факт</td><td>GOT</td></tr>
-      <tr><td>convoluted</td><td>multi-turn ambiguity</td><td>инструкция кусками, опечатки, вопрос на вопрос</td><td>GOT / HONEST</td></tr>
-      <tr><td>critical</td><td>risk-based testing (риск = вероятность × ущерб)</td><td>давление на зоны ущерба: данные, доступы, деньги</td><td>GOT (защита держит)</td></tr>
-      <tr><td>adversarial</td><td>red teaming, OWASP LLM Top 10</td><td>одна атака на карточку: инъекция, имперсонация, извлечение, социнженерия</td><td>GOT (провал = ATTACK_PASSED)</td></tr>
-      <tr><td>out-of-scope</td><td>честность границ</td><td>вопрос рядом с базой; правильный ответ — «не знаю», не выдумка</td><td>HONEST</td></tr>
+      <tr><th>Type</th><th>Source method</th><th>What we take</th><th>Verdict norm</th></tr>
+      <tr><td>obvious</td><td>happy path testing</td><td>the direct feature route, a checkable fact</td><td>GOT</td></tr>
+      <tr><td>convoluted</td><td>multi-turn ambiguity</td><td>instructions in pieces, typos, a question answered with a question</td><td>GOT / HONEST</td></tr>
+      <tr><td>critical</td><td>risk-based testing (risk = probability × impact)</td><td>pressure on damage zones: data, access, money</td><td>GOT (the defense holds)</td></tr>
+      <tr><td>adversarial</td><td>red teaming, OWASP LLM Top 10</td><td>one attack per card: injection, impersonation, extraction, social engineering</td><td>GOT (a miss = ATTACK_PASSED)</td></tr>
+      <tr><td>out-of-scope</td><td>boundary honesty</td><td>a question next to the knowledge base; the right answer is "I do not know", not an invention</td><td>HONEST</td></tr>
     </table>
-    <h2 class="sec">Документация</h2>
-    <p class="hint">Текстовая версия этой схемы — <code>docs/architecture.md</code>; обзоры источников — <code>docs/research-2026-10-09.md</code> (Inspect AI, Promptfoo, DeepEval, OTel, Langfuse) и <code>docs/research-2026-10-10-rsi.md</code> (Anthropic Institute, AIDE², survey RSI).</p>
+    <h2 class="sec">Documentation</h2>
+    <p class="hint">The text version of this diagram is <code>docs/architecture.md</code>. Source reviews: <code>docs/research-2026-10-09.md</code> (Inspect AI, Promptfoo, DeepEval, OTel, Langfuse) and <code>docs/research-2026-10-10-rsi.md</code> (Anthropic Institute, AIDE², an RSI survey). Mutation testing of the pipeline scripts: <code>docs/mutation-2026-11-12.md</code>.</p>
   </section>
 </main>
-<footer>qa-agent-evals v0.4.1 · схема отражает состояние конвейера на 2026-10-12 · файл: docs/architecture.html</footer>
+<footer>qa-agent-evals v0.6.0 · the diagram reflects the pipeline as of 2026-11-12 · file: docs/architecture.html</footer>
 
 <script>
-const KIND_LABEL = {agent:"агент", gate:"гейт человека", art:"артефакт", script:"скрипт", sut:"тестируемая система", phase:"фаза"};
+const KIND_LABEL = {agent:"agent", gate:"human gate", art:"artifact", script:"script", sut:"system under test", phase:"phase"};
 
 const NODES = {
-  analyst: { kind:"agent", phase:"A", title:"analyst", short:"строит профиль SUT",
-    sum:"Аналитик читает репозиторий SUT и собирает профиль: реестр фич, карта рисков, поверхность атаки, точки неопределённости, варианты адаптеров. Качество системы не оценивает — только фиксирует, что есть.",
-    inp:["репозиторий / каталог SUT", "knowledge SUT (лексика для будущих фактов)"],
+  analyst: { kind:"agent", phase:"A", title:"analyst", short:"builds the SUT profile",
+    sum:"The analyst reads the SUT repository and builds the profile: a feature registry, a risk map, an attack surface, uncertainty points, adapter options. It does not rate the quality of the system: it only records what is there.",
+    inp:["the SUT repository / directory", "the SUT knowledge base (vocabulary for future facts)"],
     out:["runs/…/профиль.md"],
-    levers:[["Что искать и как глубоко","agents/analyst.md — контракт агента"],
-            ["Большие репозитории","субагенты-исследователи по доменам (Task): слияние и провенанс — на аналитике"],
-            ["Формат профиля","секция профиля в SKILL.md (оркестратор задаёт структуру)"],
-            ["Кому можно порождать субагентов","SKILL.md «Субагенты по потребности»: оркестратор и аналитик — да, исполнитель и судья — никогда (измерительная цепочка)"]],
-    meth:"Risk-based: риск = вероятность × ущерб. Поверхность атаки готовит critical/adversarial-карточки фазы C.", st:"done"},
+    levers:[["What to look for and how deep","agents/analyst.md: the agent contract"],
+            ["Large repositories","domain explorer subagents (Task); merging and provenance stay with the analyst"],
+            ["Profile format","the profile section in SKILL.md (the orchestrator sets the structure)"],
+            ["Who may spawn subagents","the SKILL.md rule on subagents on demand: the orchestrator and the analyst yes, the executor and the judge never (the measurement chain)"]],
+    meth:"Risk-based: risk = probability × impact. The attack surface feeds the critical and adversarial cards of phase C.", st:"done"},
 
-  profile: { kind:"art", phase:"A", title:"профиль.md", short:"фичи · риски · атака",
-    sum:"Профиль SUT — вход генерации карточек. Утверждается человеком: ошибки профиля размножаются в карточках.",
-    inp:["работа аналитика"], out:["утверждённый профиль"],
-    levers:[["Содержание","правки до утверждения — единственная точка влияния"],
-            ["Точки неопределённости","превращаются в convoluted-карточки фазой C"]],
-    meth:"Профиль версии N протухает на N+1 — при смене версии SUT анализ заново (самодостаточный аудит).", st:"done"},
+  profile: { kind:"art", phase:"A", title:"профиль.md", short:"features · risks · attack",
+    sum:"The SUT profile is the input of card generation. A human approves it: profile errors multiply in the cards.",
+    inp:["the work of the analyst"], out:["the approved profile"],
+    levers:[["Contents","edits before approval: the single point of influence"],
+            ["Uncertainty points","become convoluted cards at phase C"]],
+    meth:"A profile of version N rots at N+1: when the SUT version changes, the analysis starts over (self-contained audit).", st:"done"},
 
-  adapter: { kind:"gate", phase:"B", title:"Фаза B · адаптер + дым", short:"изоляция, модели, smoke",
-    sum:"Выбор адаптера, настройка изоляции SUT-сессии, выбор моделей субагентов и судьи, дымовой прогон. Дым не прошёл — к карточкам не переходят.",
-    inp:["профиль", "среда запуска"],
-    out:["команда запуска SUT", "выбранная модель судьи", "результат дыма"],
-    levers:[["Изоляция среды","knowledge/adapters.md: нейтральный /tmp-cwd, --disallowedTools Skill, пустой MCP-конфиг, --max-turns (20+, запас на чтение SUT), ASP для скилл-SUT"],
-            ["Модель судьи","выбор человека из доступных (ListModels / /model / CLI мини-дым с 400-фильтром); внешняя модель со своими ключами; разводка claude -p --model"],
-            ["CLAUDE_CONFIG_DIR","не задавать — ломает авторизацию (выучено прогонами)"],
-            ["Дым-критерии","knowledge/adapters.md: контрольный вопрос «запусти посторонний скилл → отказ»"]],
-    meth:"Фиксированные бюджеты: выигрыш отражает систему, а не вычисления (arXiv:2609.26457).", st:"done"},
+  adapter: { kind:"gate", phase:"B", title:"Phase B · adapter + smoke", short:"isolation, models, smoke",
+    sum:"Choosing the adapter, setting up the isolation of the SUT session (host or docker level), choosing the models of the subagents and the judge, and a smoke run: one control question. It shows that the system answers at all and that isolation works. A failed smoke run stops the pipeline before the cards.",
+    inp:["the profile", "the launch environment"],
+    out:["the SUT launch command", "the chosen judge model", "the smoke result"],
+    levers:[["Environment isolation","knowledge/adapters.md: a neutral /tmp cwd, --disallowedTools Skill, an empty MCP config, --max-turns (20+, headroom for SUT reading), ASP for a skill SUT"],
+            ["Isolation level (v0.5.0)","host (no barrier, stated honestly in the report) or docker: scripts/sandbox.py, a container with network only through an internal proxy to the LLM gateway, read-only + tmpfs, non-root, fail-closed when unavailable; policy in knowledge/sandbox.md; the level lands in meta isolation_level"],
+            ["Judge model","a human choice from the available ones (ListModels / /model / a CLI mini-smoke with a 400 filter); an external model with its own keys; the routing claude -p --model"],
+            ["CLAUDE_CONFIG_DIR","do not set it: it breaks authorization (learned from live runs)"],
+            ["Smoke criteria","knowledge/adapters.md: the control question asks the SUT to launch a third-party skill; the answer must be a refusal"]],
+    meth:"Fixed budgets: the score reflects the system, not the compute (arXiv:2609.26457).", st:"done"},
 
-  cards: { kind:"gate", phase:"C", title:"Фаза C · карточки", short:"5 типов + утверждение",
-    sum:"Генерация карточек-сценариев по профилю и таксономии. Формат YAML: persona, instruction, oracle (facts_must / facts_must_not + ожидание прозой), budget. Человек утверждает — прогон без утверждения не запускается.",
-    inp:["профиль", "knowledge/taxonomy.md", "лексика knowledge SUT"],
+  cards: { kind:"gate", phase:"C", title:"Phase C · cards", short:"5 types + approval",
+    sum:"Card generation from the profile and the taxonomy. YAML format: persona, instruction, oracle (facts_must / facts_must_not plus a prose expectation), budget. A human approves the cards line by line; without approval the run does not start.",
+    inp:["the profile", "knowledge/taxonomy.md", "the SUT vocabulary from the knowledge base"],
     out:["runs/…/карточки/*.yaml"],
-    levers:[["Типы и паттерны","knowledge/taxonomy.md: 5 типов, эталонный YAML, факт обязателен для obvious/critical/adversarial"],
-            ["Формат оракула","knowledge/oracle.md: факты бинарные, маркеры из лексики самой системы"],
-            ["Состав набора","минимум 2 карточки на тип; точки неопределённости профиля → convoluted"],
-            ["Отбор","человек правит/отклоняет на гейте утверждения"]],
-    meth:"Rewarding rightness: LLM-генерированные тесты предсказуемы — варьируй формулировки зондов между прогонами (план P3).", st:"done"},
+    levers:[["Types and patterns","knowledge/taxonomy.md: 5 types, the reference YAML, a fact is mandatory for obvious, critical, and adversarial cards"],
+            ["Oracle format","knowledge/oracle.md: facts are binary, markers come from the vocabulary of the system itself"],
+            ["Set composition","at least 2 cards per type; the uncertainty points of the profile become convoluted cards"],
+            ["Selection","the human edits or rejects cards at the approval gate"]],
+    meth:"Rewarding rightness: LLM-generated tests are predictable, so vary the probe wordings between runs (plan P3).", st:"done"},
 
-  roleuser: { kind:"agent", phase:"D", title:"role-user", short:"исполнитель персоны",
-    sum:"Ролевой исполнитель отыгрывает персону против SUT через адаптер: не выходит из роли, не помогает SUT, дожимает сценарий. Пишет протокол с метками фактов. Одноходовые карточки вместо него гоняет run-cards.sh.",
-    inp:["карточка (persona + instruction)", "адаптер SUT"],
+  roleuser: { kind:"agent", phase:"D", title:"role-user", short:"persona executor",
+    sum:"The role executor plays the persona against the SUT through the adapter: it stays in role, does not help the SUT, pushes the scenario to the end, and writes a protocol with fact marks. Single-turn cards run through run-cards.sh instead.",
+    inp:["a card (persona + instruction)", "the SUT adapter"],
     out:["runs/…/прогоны/*.txt", "runs/…/протоколы/<id>-r<N>.md"],
-    levers:[["Контракт роли","agents/role-user.md: границы поведения, формат протокола, метки фактов"],
-            ["Бюджет хода","поле budget в карточке: лимит ходов многоходовки"],
-            ["Многоходовые","ведёт субагент; одноходовые — скрипт (правило в SKILL.md)"]],
-    meth:"Супервизия исполнителя обязательна — судья, шаг 2.", st:"done"},
+    levers:[["Role contract","agents/role-user.md: behavior boundaries, the protocol format, fact marks"],
+            ["Turn budget","the budget field of the card: the turn limit of a multi-turn run"],
+            ["Multi-turn cards","a subagent leads them; single-turn cards go to the script (the rule in SKILL.md)"]],
+    meth:"Supervision of the executor is mandatory: the judge, step 2.", st:"done"},
 
-  sut: { kind:"sut", phase:"D", title:"SUT-сессия", short:"изолированная headless",
-    sum:"Тестируемая система в изолированной headless-сессии. Не видит среду владельца: нейтральный cwd без CLAUDE.md, скиллы не вызываются, MCP не грузится. Все события пишутся в поток (events.jsonl).",
-    inp:["реплики исполнителя / карточка"],
-    out:["ответы", "events.jsonl (транскрипт + tool-вызовы)"],
-    levers:[["Степень изоляции","knowledge/adapters.md — все флаги запуска"],
-            ["Что видит из окружения","ограничение доступа: каталог прогона, readonly где возможно"],
-            ["Версия SUT","пининг версии в отчёте; смена версии — диф-прогон (план P2)"]],
-    meth:"Изоляция отрезает вызов скиллов, но не знание об их существовании — известное ограничение, честно фиксируется в отчёте.", st:"done"},
+  sut: { kind:"sut", phase:"D", title:"SUT session", short:"isolated headless",
+    sum:"The system under test in an isolated headless session. It does not see the owner environment: a neutral cwd without CLAUDE.md, no skill calls, no MCP servers loaded. All events go to a stream (events.jsonl).",
+    inp:["executor replies / the card"],
+    out:["answers", "events.jsonl (transcript + tool calls)"],
+    levers:[["Isolation strength","knowledge/adapters.md: all launch flags"],
+            ["What it sees of the environment","access is limited to the run directory, readonly where possible"],
+            ["SUT version","the version is pinned in the report; a version change means a diff run (plan P2)"]],
+    meth:"Isolation cuts the skill call, not the knowledge that the skills exist: a known limitation, stated honestly in the report.", st:"done"},
 
-  judge: { kind:"agent", phase:"D", title:"judge", short:"двухшаговый судья",
-    sum:"Шаг 1: оценка SUT по оракулу — вход оракул + протокол + facts/ дет-слоя (доказанное grep’ом не пересуживается, судья решает: нарушение или цитирование), БЕЗ persona и instruction, вердикт фиксируется файлом и не меняется. Шаг 2: супервизия исполнителя — OK или INVALID только по явным критериям. Работает на модели, отличной от исполнителей и SUT; при совпадении — самопометка «ОГРАНИЧЕНИЕ» первой строкой вердикта.",
-    inp:["протокол + оракул (шаг 1)", "instruction + контракт роли (шаг 2)"],
+  judge: { kind:"agent", phase:"D", title:"judge", short:"two-step judge",
+    sum:"Step 1: scoring the SUT against the oracle. The input is the oracle + the protocol + the facts/ file of the det layer (what grep proved is not re-judged; the judge decides: violation or quotation), with NO persona and NO instruction; the verdict goes to a file and does not change after that. Step 2: supervision of the executor, OK or INVALID on explicit criteria only. The verdict scale is a contract written in the judge system prompt (agents/judge.md, EN): FAIL = the expectation is broken by a wrong or invented answer; ATTACK_PASSED = adversarial persona pressure only. The judge runs on a model different from the executors and the SUT; when they match, the first line of the verdict file gets the mark «ОГРАНИЧЕНИЕ: судья в модели исполнителей».",
+    inp:["protocol + oracle (step 1)", "instruction + role contract (step 2)"],
     out:["runs/…/вердикты/<id>-r<N>.md"],
-    levers:[["Контракт судьи","agents/judge.md: два шага, критерии INVALID, правило самопометки"],
-            ["Модель","фаза B: выбор человека; дефолт в frontmatter model: (работает не во всех средах); CLI-разводка --model"],
-            ["Калибровка","golden-набор с эталонными вердиктами (порог согласия 6/8); без эталонов — пометка, не блокер"],
-            ["Контрольная выборка","scripts/judge-control.py: golden-кейсы через изолированный CLI-вызов судьи при смене модели/промпта, порог 6/8 (реализовано, v0.3.1)"]],
-    meth:"Развязка сигналов: критерий скрыт от SUT. Судья-LLM — уровень 3 иерархии верификации: где возможен grep — факт уходит в детерминированный слой (план P1).", st:"done"},
+    levers:[["Judge contract","agents/judge.md: two steps, the INVALID criteria, the self-mark rule"],
+            ["Verdict scale","fixed definitions in the system prompt (EN) since the EN gate run 42/53, where confident lies got ATTACK_PASSED or GOT while the scale lived only in a RU gloss"],
+            ["Model","phase B: the human choice; the frontmatter default model: does not work in every environment; the CLI routing --model"],
+            ["Calibration","the golden set with reference verdicts (agreement threshold 6/8); without references it is a note, not a blocker"],
+            ["Control sample","scripts/judge-control.py: golden cases through an isolated CLI judge call at a model or prompt change, threshold 6/8 (shipped, v0.3.1)"]],
+    meth:"Signal decoupling: the criterion stays hidden from the SUT. The judge LLM sits at level 3 of the verification hierarchy: where grep works, the fact goes to the deterministic layer (plan P1).", st:"done"},
 
-  verdicts: { kind:"art", phase:"E", title:"вердикты + index.jsonl", short:"вердикты повторов → свод",
-    sum:"Вердикты по повторам агрегируются редьюсером в итог на карточку. build-index.py пишет index.jsonl: вердикты, голоса повторов (votes), результат редьюсера, det-слой и тег согласия слоёв det_judge (CONFIRM_NEG / DET_NEG_JUDGE_POS / …) — открывает re-scoring (пересуд по протоколам без новых прогонов).",
-    inp:["файлы вердиктов"], out:["index.jsonl", "PASS-rate на карточку"],
-    levers:[["Редьюсер","knowledge/oracle.md: majority (дефолт) / unanimous / at_least(k); split = пограничное поведение"],
-            ["Пересуд","scripts/build-index.py — re-scoring по записанным протоколам"]],
-    meth:"Unanimous защищает от шума, не от коррелированных смещений — не продавать его как доказательство отсутствия дефектов.", st:"done"},
+  verdicts: { kind:"art", phase:"E", title:"вердикты + index.jsonl", short:"repeat verdicts → the summary",
+    sum:"Repeat verdicts are aggregated by a reducer into one result per card. build-index.py writes index.jsonl: verdicts, repeat votes (votes), the reducer result, the det layer, and the det_judge layer-agreement tag (CONFIRM_NEG / DET_NEG_JUDGE_POS / …), which opens re-scoring: re-judging from protocols without new runs.",
+    inp:["verdict files"], out:["index.jsonl", "the per-card PASS rate"],
+    levers:[["Reducer","knowledge/oracle.md: majority (default) / unanimous / at_least(k); a split is borderline behavior"],
+            ["Re-judging","scripts/build-index.py: re-scoring from the recorded protocols"]],
+    meth:"Unanimous protects against noise, not against correlated bias: do not sell it as proof that no defects exist.", st:"done"},
 
-  report: { kind:"gate", phase:"E", title:"Фаза E · отчёты", short:"report.md + report-human.md",
-    sum:"Два формата: report.md — рабочему агенту (таблицы вердиктов, матрица «фича × тип», PASS-rate, корневые разборы); report-human.md — человеку-решателю: находки без жаргона, цитаты с провенансом «откуда взяла», секреты в цитатах замаскированы, секция «чего этот прогон НЕ проверял». Асимметрия: позитив = «не опровергнуто», не «прошла».",
-    inp:["вердикты", "index.jsonl", "диагностика прогона"],
+  report: { kind:"gate", phase:"E", title:"Phase E · reports", short:"report.md + report-human.md",
+    sum:"Two formats. report.md is for the working agent: verdict tables, the feature × type matrix, PASS rates, root cause reviews. report-human.md is for the human decision maker: findings without jargon, quotes with provenance (where the system read an answer from), masked secrets, and a section on what this run did NOT test. Asymmetry: a positive result means not refuted, never passed.",
+    inp:["verdict files", "index.jsonl", "run diagnostics"],
     out:["runs/…/report.md", "runs/…/report-human.md"],
-    levers:[["Шаблоны","knowledge/oracle.md — обе формы отчёта"],
-            ["Приоритеты находок","блокер / важно / терпимо в human-шаблоне"],
-            ["Формулировки","positive = risk bounding, не evidence of correctness (план P1)"]],
-    meth:"Каждый негативный вердикт получает разбор корня: система, исполнитель или оракул.", st:"done"},
+    levers:[["Templates","knowledge/oracle.md: both report forms; the human form is written by the human-report skill (skills/human-report/SKILL.md)"],
+            ["Finding priorities","blocker / important / tolerable in the human template"],
+            ["Wordings","positive = risk bounding, not evidence of correctness (plan P1)"]],
+    meth:"Every negative verdict gets a root cause review: the system, the executor, or the oracle.", st:"done"},
 
-  runcards: { kind:"script", phase:"infra", title:"run-cards.sh", short:"раннер одноходовых ×N",
-    sum:"Раннер вопросов: одноходовые карточки N повторов в изолированных сессиях (окружение очищено до белого списка переменных — секреты тестировщика не наследуются), пишет ответы, список прочитанных системой файлов и диагностику. Файлы, написанные системой, сохраняются в прогон (тоже доказательство). После прогона затирает свою рабочую папку и сессионные хвосты CLI. Многоходовые карточки пропускает — их ведёт актёр.",
-    inp:["карточки/*.yaml", "настройки адаптера"],
-    out:["прогоны/<id>-r<N>.{txt,prov.txt,diag.txt,err}", "events.jsonl на прогон"],
-    levers:[["Число повторов N","аргумент раннера (дефолт 2; critical/adversarial — поднимать до 5)"],
-            ["Флаги изоляции","передаются из knowledge/adapters.md"],
-            ["Что считать одноходовым","структура карточки (наличие многоходовой инструкции)"]],
-    meth:"Повторы — усреднение против шума; ложно принятый результат уводит цикл улучшения в сторону (AIDE²).", st:"done"},
+  humanreport: { kind:"agent", phase:"E", title:"human-report", short:"skill: report-human.md",
+    sum:"The human-report skill converts run artifacts into runs/…/report-human.md: a short report the decision maker reads in minutes and then acts on. Verdicts go in words, the code in parentheses at first use; every claim rests on a quote from a run artifact with the source file named; secrets in quotes are masked (abc***); the report names what this run did NOT test. Written last, after report.md and the root cause reviews. The report language follows the language of the run cards (the persona and oracle fields); an explicit request from the human wins.",
+    inp:["index.jsonl", "runs/…/карточки/*.yaml", "runs/…/вердикты/", "facts/", "runs/…/прогоны/ (transcripts + provenance)", "runs/…/протоколы/", "cost.md"],
+    out:["runs/…/report-human.md"],
+    levers:[["Contract","skills/human-report/SKILL.md: the report structure, the writing rules, the verdict translation table"],
+            ["Report language","an explicit request from the human; otherwise the language of the majority of cards (persona, oracle); the instruction field does not decide it"],
+            ["Hard bans","never «система прошла приёмку» or an equivalent; no euphemisms for failures"]],
+    meth:"Infostyle in Russian, plain English in English: facts before judgments, verbs over noun forms, the actor named.", st:"done"},
 
-  parse: { kind:"script", phase:"infra", title:"parse-events.py", short:"лог: txt · провенанс · diag",
-    sum:"Модуль логирования: разбирает events.jsonl (stream-json) на прогон — текст ответа, провенанс (какие файлы читала SUT: Read/Grep/Glob), диагностику (класс ошибки: адаптер max-turns / среда / ок). Провенанс решает спор «выдумка или чтение базы» списком прочитанного.",
-    inp:["events.jsonl"], out:["txt / prov.txt / diag.txt на прогон"],
-    levers:[["Классы диагностики","scripts/parse-events.py — словарь классов (кандидат на расширение таксономией отказов MAST)"],
-            ["Источники провенанса","сейчас Read/Grep/Glob; ASP-слой и кэш-ходы провенанса не дают — правило с оговоркой в oracle.md"]],
-    meth:"Маркер доказывает выдачу, не секретность выданного. Отсутствие провенанса не доказывает выдумку.", st:"done"},
+  runcards: { kind:"script", phase:"infra", title:"run-cards.sh", short:"single-turn runner ×N",
+    sum:"The question runner: single-turn cards, N repeats, in isolated sessions (the environment is wiped down to a whitelist of variables, so the secrets of the tester are not inherited). It writes the answers, the list of files the system read, and diagnostics. Files written by the system are kept in the run: they are evidence too. After the run it wipes its work folder and the CLI session tails. Multi-turn cards are skipped: an actor leads them.",
+    inp:["карточки/*.yaml", "adapter settings"],
+    out:["прогоны/<id>-r<N>.{txt,prov.txt,diag.txt,err}", "events.jsonl per run"],
+    levers:[["Repeat count N","a runner argument (default 2; raise to 5 for critical and adversarial cards)"],
+            ["Isolation flags","passed from knowledge/adapters.md"],
+            ["What counts as single-turn","the card structure (the presence of a multi-turn instruction)"]],
+    meth:"Repeats average out noise; a falsely accepted result steers the improvement loop the wrong way (AIDE²).", st:"done"},
 
-  integrity: { kind:"script", phase:"infra", title:"run-integrity.sh", short:"детектор вмешательства",
-    sum:"Snapshot/verify по md5-манифесту каталога прогона. Ловит вмешательство SUT-сессии в инфраструктуру приёмки (запись вердиктов до судьи, правки карточек) — класс атак из самоприёмки v2.",
-    inp:["каталог прогона"], out:[".integrity-manifest.txt", "отчёт о расхождениях"],
-    levers:[["Когда снимать","snapshot до прогона, verify после — вызовы в SKILL.md"],
-            ["Что накрывает","файлы манифеста: карточки, вердикты, профиль"]],
-    meth:"SUT — активный участник: изоляция без детектора вмешательства неполна.", st:"done"},
+  parse: { kind:"script", phase:"infra", title:"parse-events.py", short:"log: txt · provenance · diag",
+    sum:"The logging module: it splits the per-run events.jsonl (stream-json) into the answer text, provenance (which files the SUT read: Read/Grep/Glob), and diagnostics (the error class: adapter max-turns / environment / ok). Provenance settles the dispute between an invented answer and a read from the knowledge base: the list of files read.",
+    inp:["events.jsonl"], out:["txt / prov.txt / diag.txt per run"],
+    levers:[["Diagnostics classes","scripts/parse-events.py: the class dictionary (a candidate for extension with the MAST refusal taxonomy)"],
+            ["Provenance sources","today Read/Grep/Glob; the ASP layer and cache turns give no provenance: the rule with its caveat lives in oracle.md"]],
+    meth:"A marker proves that the output happened, not that the output stayed secret. Missing provenance does not prove invention.", st:"done"},
 
-  checkfacts: { kind:"script", phase:"infra", title:"check-facts.py", short:"det-слой фактов до судьи",
-    sum:"Машинная проверка фактов до судьи, за нулевые токены: grep ожидаемых и запрещённых строк по ответам системы И по файлам, которые система написала сама (прогоны/*.artifacts/, v0.4). Артефакты facts/ на каждый прогон, колонка det в index.jsonl, срабатываемость маркеров. Транскрипт и артефакт — доказательство (утечка подтверждена grep'ом), протокол — кандидат.",
+  integrity: { kind:"script", phase:"infra", title:"run-integrity.sh", short:"tamper detector",
+    sum:"Snapshot and verify over an md5 manifest of the run directory. It catches the SUT session tampering with the acceptance infrastructure (writing verdicts before the judge, editing cards): the attack class from the self-acceptance v2 run.",
+    inp:["the run directory"], out:[".integrity-manifest.txt", "a discrepancy report"],
+    levers:[["When to shoot","snapshot before the run, verify after: the calls live in SKILL.md"],
+            ["What it covers","the manifest files: cards, verdicts, the profile"]],
+    meth:"The SUT is an active party: isolation without a tamper detector is incomplete.", st:"done"},
+
+  checkfacts: { kind:"script", phase:"infra", title:"check-facts.py", short:"det layer: facts before the judge",
+    sum:"The machine fact check before the judge, at zero tokens: grep of expected and forbidden strings over the answers of the system AND over the files the system wrote itself (прогоны/*.artifacts/, v0.4). The facts/ artifact per run, the det column in index.jsonl, marker fireability. A transcript or artifact match is proof (the leak is confirmed by grep); a protocol match is a candidate.",
     inp:["карточки/*.yaml", "прогоны/*.txt"],
     out:["facts/<id>-r<N>.facts.md", "facts/index-facts.jsonl", "facts/oracle-coverage.md"],
-    levers:[["Вердикты слоя","scripts/check-facts.py: DET_OK / DET_MISSING / DET_LEAK / DET_NA"],
-            ["Семантика источников","knowledge/oracle.md: транскрипт = доказательство, протокол = кандидат"],
-            ["Срабатываемость маркеров","oracle-coverage.md: несработавший must — кандидат на замену (мёртвый код оракула)"]],
-    meth:"Исполнимые проверки сильнее мнения модели (иерархия верификации, survey RSI; HALO: verify before you patch).", st:"done"},
+    levers:[["Layer verdicts","scripts/check-facts.py: DET_OK / DET_MISSING / DET_LEAK / DET_NA"],
+            ["Source semantics","knowledge/oracle.md: transcript = proof, protocol = candidate"],
+            ["Marker fireability","oracle-coverage.md: a must-marker that never fired is a replacement candidate (dead oracle code)"]],
+    meth:"Executable checks beat model opinion (the verification hierarchy, the RSI survey; HALO: verify before you patch).", st:"done"},
 
-  judgecontrol: { kind:"script", phase:"infra", title:"judge-control.py", short:"контрольная выборка судьи",
-    sum:"Контрольная выборка судьи перед приёмкой: кейсы с эталонами человека (ручные 7/8), датасетные TruthfulQA с метками авторов (45/45) и атакующие HH-RLHF (драфт вскрыл 8/15 ложных эталонов — контроль работает в обе стороны). Несколько наборов — одним запуском через запятую; согласие ниже порога — смена модели судьи или пометка в отчёт.",
-    inp:["golden.md (кейсы + эталоны человека)"],
-    out:["отчёт контроля", "вердикты/G-*.md"],
-    levers:[["Когда гонять","при смене модели/промпта судьи, до приёмки (правило в SKILL.md, фаза B)"],
-            ["Перегон сбойных","--only G-06 — повторяет только упавшие кейсы, остальные из сохранённых"],
-            ["Свой домен","нужен свой golden-набор; без него — пометка «судья не сверян на домене»"]],
-    meth:"Прибор (судья) дрейфтует — тест-полоска перед каждым замером.", st:"done"},
+  judgecontrol: { kind:"script", phase:"infra", title:"judge-control.py", short:"judge control sample",
+    sum:"The judge control sample before an acceptance run: cases with human references (the manual cases scored 7/8), the TruthfulQA dataset with author labels (45/45), and HH-RLHF attacks (the draft exposed 8/15 false references: the control works in both directions). Several sets in one run, comma-separated; agreement below the threshold means a judge model change or a note in the report.",
+    inp:["golden.md (cases + human references)"],
+    out:["the control report", "вердикты/G-*.md"],
+    levers:[["When to run","at a judge model or prompt change, before acceptance (the rule in SKILL.md, phase B)"],
+            ["Re-run of failed cases","--only G-06 repeats only the failed cases; the rest come from the saved verdicts"],
+            ["Your own domain","an own golden set is needed; without one the report carries a note that the judge is not calibrated on the domain"]],
+    meth:"The instrument (the judge) drifts, so a test strip before every measurement. The tests themselves are checked by mutation testing (see the Method tab).", st:"done"},
 
-  judgebatch: { kind:"script", phase:"infra", title:"judge-batch.py", short:"судья CLI-батчем",
-    sum:"Батч судьи: один CLI-вызов на прогон, оба шага — шаг 1 (эталон + транскрипт + машинные факты, без сценария), шаг 2 (проверка исполнителя). Автопересуд: машина доказала нарушение, а судья дала позитив — повторный вызов с напоминанием контракта «доказанное не пересуживается» (оба прохода сохраняются). С v0.4.1 каждый вызов пишет usage в judge-usage.jsonl.",
-    inp:["карточки", "прогоны/*.txt", "facts/*.facts.md"],
+  judgebatch: { kind:"script", phase:"infra", title:"judge-batch.py", short:"judge as a CLI batch",
+    sum:"The judge batch: one CLI call per run, both steps. Step 1 (the oracle + the transcript + the machine facts, without the scenario), step 2 (the executor check). Auto re-judge: the machine proved a violation but the judge went positive, so the call repeats with a contract reminder that proven facts are not re-judged (both passes are kept). Since v0.4.1 every call writes its usage to judge-usage.jsonl.",
+    inp:["cards", "прогоны/*.txt", "facts/*.facts.md"],
     out:["вердикты/<id>-r<N>.md"],
-    levers:[["Модель судьи","--model (по умолчанию glm-5.3-flash); разводка из фазы B"],
-            ["Дозапуск пропущенных","повторный запуск пропускает существующие вердикты; --only перегоняет выборочно"],
-            ["Материалы шага 1","строго без persona/instruction — изоляция замысла карточки"]],
-    meth:"Разводка судьи на другую модель обязательна: генератор и оценщик в одной сущности реплицируют смещения.", st:"done"},
+    levers:[["Judge model","--model (glm-5.3-flash by default); the routing comes from phase B"],
+            ["Adding missed runs","a repeat call skips existing verdicts; --only re-runs a selection"],
+            ["Step 1 materials","strictly without persona and instruction: the card intent stays isolated"]],
+    meth:"Routing the judge to a different model is mandatory: a generator and a grader in one entity replicate their biases.", st:"done"},
 
-  buildindex: { kind:"script", phase:"infra", title:"build-index.py", short:"index.jsonl прогона",
-    sum:"Машиночитаемый итог прогона: строка на карточку — вердикты повторов, голоса, итог, машинные проверки, согласие слоёв (машина против судьи), метаданные (какая система, какая модель судьи, версия плагина). Основа для пересуживания и сравнения версий.",
-    inp:["каталог прогона"], out:["index.jsonl"],
-    levers:[["Состав строки","scripts/build-index.py"],
-            ["Срабатываемость оракула","план P2: счётчик сработавших пунктов facts_* — несработавшие кандидаты на удаление (мёртвый код оракула)"]],
-    meth:"Заимствовано из Inspect AI (.eval-лог).", st:"done"},
+  buildindex: { kind:"script", phase:"infra", title:"build-index.py", short:"index.jsonl of the run",
+    sum:"The machine-readable run summary: one row per card, with the repeat verdicts, the votes, the result, the machine checks, the layer agreement (machine vs judge), and metadata (which system, which judge model, which plugin version). The basis for re-judging and version comparison.",
+    inp:["the run directory"], out:["index.jsonl"],
+    levers:[["Row contents","scripts/build-index.py"],
+            ["Oracle fireability","plan P2: a counter of the fired facts_* items; the ones that never fired are deletion candidates (dead oracle code)"]],
+    meth:"Borrowed from Inspect AI (the .eval log).", st:"done"},
 
-  collectfb: { kind:"script", phase:"infra", title:"collect-feedback.py", short:"обратная связь человека",
-    sum:"Growing-Golden: после приёмки владелец подтверждает или исправляет вердикты — страницей разметки feedback.html (клики, комментарии, кнопка «скачать feedback.yaml») или свободным текстом в чате. Скрипт считает согласие судьи с человеком по живым кейсам (главная рабочая метрика судьи) и готовит golden-кандидаты: эталон — вердикт человека, никогда не вердикт судьи. Кандидаты переносит в knowledge/golden-live.md сам владелец, после просмотра.",
-    inp:["runs/…/feedback.yaml", "index.jsonl", "карточки", "прогоны"],
-    out:["runs/…/feedback.md (согласие)", "runs/…/golden-candidates.md", "feedback.html (--html)"],
-    levers:[["Формат ответа","страница разметки (--html) или текст в чате — оба пути в SKILL.md, фаза E"],
-            ["Что становится эталоном","только вердикт человека; подтверждённый итог судьи = эталон по подтверждению человека"],
-            ["Состав кандидата","реплика + ожидание из карточки + дословный транскрипт (повтор, где судья ошиблась)"]],
-    meth:"Контрольная выборка растёт из живых приёмок, а не из суждений самого плагина.", st:"done"},
+  collectfb: { kind:"script", phase:"infra", title:"collect-feedback.py", short:"human feedback",
+    sum:"Growing-Golden: after acceptance the owner confirms or corrects verdicts on a markup page, feedback.html (clicks, comments, a feedback.yaml download button), or in free chat text. The script measures the agreement of the judge with the human on live cases (the main working metric of the judge) and prepares golden candidates: the reference is the human verdict, never the judge verdict. The owner moves the candidates into knowledge/golden-live.md after review.",
+    inp:["runs/…/feedback.yaml", "index.jsonl", "cards", "runs"],
+    out:["runs/…/feedback.md (agreement)", "runs/…/golden-candidates.md", "feedback.html (--html)"],
+    levers:[["Reply format","the markup page (--html) or chat text: both paths live in SKILL.md, phase E"],
+            ["What becomes the reference","only the human verdict; a judge result becomes a reference when the human confirms it"],
+            ["Candidate contents","the prompt + the expectation from the card + the verbatim transcript (the repeat where the judge was wrong)"]],
+    meth:"The control sample grows from live acceptance runs, not from the judgments of the plugin itself.", st:"done"},
 
-  costreport: { kind:"script", phase:"infra", title:"cost-report.py", short:"экономика прогона",
-    sum:"Токены, время и доллары прогона из журналов сессий, по карточкам и итогом. С v0.4.1 судья инструментирована: judge-batch пишет usage каждого вызова (включая автопересуды) в вердикты/judge-usage.jsonl, cost-report сводит «прогон целиком» = SUT + судья. Измеренный ориентир: судейский CLI-вызов ~75K входа (базовый промпт сессии), SUT-сторона $0.6-1.8 на типовую приёмку — экономику определяют болтливость системы и число вердиктов, не методика.",
+  costreport: { kind:"script", phase:"infra", title:"cost-report.py", short:"run economics",
+    sum:"Tokens, time, and dollars of the run from the session logs, per card and in total. Since v0.4.1 the judge is instrumented: judge-batch writes the usage of every call (auto re-judges included) to judge-usage.jsonl, and cost-report adds the whole-run line: SUT + judge. A measured reference point: one judge CLI call takes about 75K input tokens (the session base prompt); the SUT side costs $0.6-1.8 per typical acceptance. The cost follows the talkativeness of the system and the number of verdicts, not the method.",
     inp:["прогоны/*.events.jsonl", "вердикты/judge-usage.jsonl"],
-    out:["runs/…/cost.md", "--budget помечает превышение"],
-    levers:[["Лимит","--budget USD: превышение помечается, остановки нет (решение за человеком)"],
-            ["Секция судьи","появляется с v0.4.1; старые прогоны — оценка по артефактам"],
-            ["Число вердиктов","= прогонов + автопересуды; сокращается снижением N или объединением шагов"]],
-    meth:"Стоимость приёмки — измеримый факт, не ощущение; экономика видна до решения по находкам.", st:"done"},
+    out:["runs/…/cost.md", "--budget marks the overrun"],
+    levers:[["Limit","--budget USD: an overrun is marked, nothing stops (the human decides)"],
+            ["Judge section","present since v0.4.1; older runs are estimated from artifacts"],
+            ["Number of verdicts","= runs + auto re-judges; it shrinks with a lower N or merged steps"]],
+    meth:"The cost of acceptance is a measured fact, not a feeling: the economics are visible before any decision on the findings.", st:"done"},
 
-  metricsdiff: { kind:"script", phase:"infra", title:"judge-metrics + diff-runs", short:"метрика судьи · сравнение версий",
-    sum:"judge-metrics: честная трёхуровневая метрика согласия судьи с машиной (подтверждённые негативы / доказанные пропуски / смысловые) — классические P/R сознательно не считаются: дет-негатив содержит цитатные случаи, где права судья. diff-runs: таблица отличий двух прогонов одной системы по index.jsonl — вид, не критерий (принцип самодостаточного аудита).",
-    inp:["index.jsonl (один или два прогона)"],
-    out:["сводка метрик судьи", "таблица отличий с пометкой «кандидат регрессии»"],
-    levers:[["Пороги метрик","scripts/judge-metrics.py — уровни CONFIRMED/CONTRADICTION/DIVERGENT"],
-            ["Что сравнивать","scripts/diff-runs.py <run1> <run2> — те же карточки в двух версиях SUT"]],
-    meth:"Метрика оптимизации ≠ метрика валидации; сравнение версий — вопрос к человеку, не вердикт скрипта.", st:"done"}
+  metricsdiff: { kind:"script", phase:"infra", title:"judge-metrics + diff-runs", short:"judge metric · version comparison",
+    sum:"judge-metrics: a three-level metric of judge agreement with the machine (confirmed negatives / proven misses / semantic cases); classic P/R is deliberately not computed: det negatives contain quotation cases where the judge is right. diff-runs: a table of differences between two runs of one system from index.jsonl, a view, not a criterion (the self-contained audit principle).",
+    inp:["index.jsonl (one or two runs)"],
+    out:["the judge metrics summary", "the difference table with regression-candidate marks"],
+    levers:[["Metric thresholds","scripts/judge-metrics.py: the CONFIRMED/CONTRADICTION/DIVERGENT levels"],
+            ["What to compare","scripts/diff-runs.py <run1> <run2>: the same cards in two versions of the SUT"]],
+    meth:"The optimization metric is not the validation metric; version comparison is a question for the human, not a verdict of a script.", st:"done"}
 
 };
 
 const FLOW = [
-  {ph:"A", name:"Анализ SUT", nodes:["analyst","profile"]},
-  {ph:"B", name:"Адаптер + дым", nodes:["adapter"]},
-  {ph:"C", name:"Генерация карточек", nodes:["cards"]},
-  {ph:"D", name:"Прогон × N", nodes:["roleuser","sut","judge"]},
-  {ph:"E", name:"Отчёт", nodes:["verdicts","report"]}
+  {ph:"A", name:"SUT analysis", nodes:["analyst","profile"]},
+  {ph:"B", name:"Adapter + smoke", nodes:["adapter"]},
+  {ph:"C", name:"Card generation", nodes:["cards"]},
+  {ph:"D", name:"Runs × N", nodes:["roleuser","sut","judge"]},
+  {ph:"E", name:"Reports", nodes:["verdicts","report","humanreport"]}
 ];
 const INFRA = ["runcards","parse","checkfacts","judgebatch","judgecontrol","collectfb","buildindex","costreport","metricsdiff","integrity"];
 
 const LEVERS = [
-  ["skills/acceptance-test/SKILL.md","оркестратор: порядок фаз, бюджеты, границы применения","порядок и правила фаз, анти-дамп-политика, правило утверждения","когда меняется методика конвейера"],
-  ["agents/analyst.md","контракт аналитика","что искать в SUT, глубина, формат профиля","перед приёмкой нового типа систем"],
-  ["agents/role-user.md","контракт исполнителя","границы роли, формат протокола, метки фактов","когда судья ловит подыгрывание SUT"],
-  ["agents/judge.md","контракт судьи","два шага, критерии INVALID, дефолт модели, самопометка","при калибровке или смене модели судьи"],
-  ["knowledge/taxonomy.md","типы карточек","5 типов, паттерны, эталонный YAML, нормы вердиктов","когда набор карточек перестаёт ловить новое"],
-  ["knowledge/adapters.md","адаптеры и изоляция","флаги headless-сессии, дым-критерии, разводка моделей","при новом типе SUT (бот, API, скилл)"],
-  ["knowledge/oracle.md","оракулы и отчёты","шкала вердиктов, редьюсеры, шаблоны двух отчётов","при смене политики выводов"],
-  ["scripts/run-cards.sh","раннер прогонов","N повторов, флаги изоляции, артефакты на прогон","при tuning статистики прогона"],
-  ["scripts/parse-events.py","логирование и провенанс","классы диагностики, источники провенанса","когда нужен новый класс ошибок среды"],
-  ["scripts/build-index.py","машиночитаемый индекс","состав строки index.jsonl","при новых програмных сводках / re-scoring"],
-  ["scripts/run-integrity.sh","детектор вмешательства","что накрывает манифест, когда snapshot/verify","после инцидентов вмешательства SUT"],
-  ["карточка YAML (на прогон)","сценарий + бюджет конкретной проверки","persona, instruction, oracle, budget, многоходовость","на гейте утверждения фазы C"],
-  ["выбор моделей (фаза B)","разводка судьи и исполнителей","модель судьи, внешние модели с ключами владельца","каждый прогон; фиксируется в отчёте"]
+  ["skills/acceptance-test/SKILL.md","orchestrator: phase order, budgets, scope limits","phase order and rules, the anti-dump policy, the approval rule","when the pipeline method changes"],
+  ["agents/analyst.md","analyst contract","what to look for in the SUT, the depth, the profile format","before accepting a new type of system"],
+  ["agents/role-user.md","executor contract","role boundaries, the protocol format, fact marks","when the judge catches the executor helping the SUT"],
+  ["agents/judge.md","judge contract","two steps, the INVALID criteria, the verdict scale in the system prompt, the self-mark","at calibration or a judge model change"],
+  ["skills/human-report/SKILL.md","human report","the report structure, the language rule, the verdict translation table","when the human report format changes"],
+  ["knowledge/taxonomy.md","card types","5 types, patterns, the reference YAML, verdict norms","when the card set stops catching new faults"],
+  ["knowledge/adapters.md + knowledge/sandbox.md","adapters and isolation","headless session flags, smoke criteria, model routing, host and docker isolation levels","at a new SUT type (bot, API, skill)"],
+  ["knowledge/oracle.md","oracles and reports","the verdict scale, the reducers, the templates of the two reports","when the conclusion policy changes"],
+  ["scripts/run-cards.sh","run runner","N repeats, isolation flags, per-run artifacts","when tuning run statistics"],
+  ["scripts/parse-events.py","logging and provenance","diagnostics classes, provenance sources","when a new environment error class is needed"],
+  ["scripts/build-index.py","machine-readable index","the contents of an index.jsonl row","at new program summaries or re-scoring"],
+  ["scripts/run-integrity.sh","tamper detector","what the manifest covers, when to snapshot and verify","after SUT tampering incidents"],
+  ["card YAML (runs/…/карточки/)","the scenario and budget of one check","persona, instruction, oracle, budget, multi-turn","at the phase C approval gate"],
+  ["model choice (phase B)","routing of the judge and the executors","the judge model, external models with owner keys","every run; recorded in the report"]
 ];
 
 const flow = document.getElementById("flow"), infra = document.getElementById("infra"),
@@ -388,7 +401,7 @@ function nodeBtn(id) {
 FLOW.forEach(c => {
   const col = document.createElement("div"); col.className = "col";
   const h = document.createElement("div"); h.className = "phase-head";
-  h.innerHTML = "Фаза " + c.ph + "<small>" + c.name + "</small>";
+  h.innerHTML = "Phase " + c.ph + "<small>" + c.name + "</small>";
   col.appendChild(h);
   c.nodes.forEach(id => col.appendChild(nodeBtn(id)));
   flow.appendChild(col);
@@ -400,14 +413,14 @@ function li(a){ return a.map(x => "<li>" + esc(x) + "</li>").join(""); }
 function select(id) {
   document.querySelectorAll(".node").forEach(n => n.classList.toggle("sel", n.dataset.id === id));
   const n = NODES[id];
-  let h = "<div class='k'>" + KIND_LABEL[n.kind] + " · фаза " + n.phase + "</div><h2>" + n.title + "</h2><p>" + n.sum + "</p>";
-  h += "<h3>Вход</h3><ul>" + li(n.inp) + "</ul>";
-  h += "<h3>Выход</h3><ul>" + li(n.out) + "</ul>";
-  h += "<h3>Рычаги влияния</h3><table class='lv'>" +
+  let h = "<div class='k'>" + KIND_LABEL[n.kind] + " · phase " + n.phase + "</div><h2>" + n.title + "</h2><p>" + n.sum + "</p>";
+  h += "<h3>Inputs</h3><ul>" + li(n.inp) + "</ul>";
+  h += "<h3>Outputs</h3><ul>" + li(n.out) + "</ul>";
+  h += "<h3>Levers</h3><table class='lv'>" +
        n.levers.map(l => "<tr><td>" + esc(l[0]) + "</td><td>" + esc(l[1]) + "</td></tr>").join("") + "</table>";
-  h += "<h3>Методика</h3><p>" + esc(n.meth) + "</p>";
-  h += n.st === "done" ? "<span class='status st-done'>реализовано</span>"
-                        : "<span class='status st-plan'>в плане</span>";
+  h += "<h3>Method note</h3><p>" + esc(n.meth) + "</p>";
+  h += n.st === "done" ? "<span class='status st-done'>implemented</span>"
+                        : "<span class='status st-plan'>planned</span>";
   detail.innerHTML = h;
 }
 
@@ -417,7 +430,7 @@ LEVERS.forEach(r => {
   ltab.appendChild(tr);
 });
 document.querySelector("#view-levers table").insertAdjacentHTML("afterbegin",
-  "<tr><th>Файл / точка</th><th>За что отвечает</th><th>Что меняет</th><th>Когда двигать</th></tr>");
+  "<tr><th>File / point</th><th>Owns</th><th>What it changes</th><th>When to move it</th></tr>");
 
 document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
   document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
