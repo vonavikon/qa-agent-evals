@@ -869,3 +869,369 @@ class TestBuildBenchmarks(unittest.TestCase):
         os.remove(os.path.join(self.run, "bench.yaml"))
         page = self.bb.build(self.td)
         self.assertIn("Без сайдкара bench.yaml в журнал не попали", page)
+
+
+GOLDEN3 = """# Golden
+
+## G-01 (эталон: GOT)
+
+Вопрос: q1
+Ожидание: e1
+Ответ SUT: a1
+
+## G-02 (эталон: FAIL)
+
+Вопрос: q2
+Ожидание: e2
+Ответ SUT: a2
+
+## G-03 (эталон: HONEST)
+
+Вопрос: q3
+Ожидание: e3
+Ответ SUT: a3
+"""
+
+
+class JudgeControlMain(unittest.TestCase):
+    """judge-control.py main(): согласие, отчёт, переиспользование вердиктов.
+
+    Убивает мутанты 435/437/449/452-461/472/481/486-491/493-513 (инверсия
+    согласия, счётчик, шапка и строки таблицы, rate, reuse с --only).
+    """
+    def run_main(self, td, golden, extra=()):
+        import contextlib
+        argv = sys.argv
+        sys.argv = ["judge-control.py", golden, os.path.join(td, "out"), *extra]
+        buf = io.StringIO()
+        real = judge_control.run_judge
+        judge_control.run_judge = lambda case, model, judge_md, timeout: {
+            "G-01": "Вердикт: GOT\nобоснование",
+            "G-02": "Вердикт: GOT\nобоснование",
+            "G-03": "Вердикт: HONEST\nобоснование"}[case["id"]]
+        try:
+            with contextlib.redirect_stdout(buf):
+                judge_control.main()
+        finally:
+            judge_control.run_judge = real
+            sys.argv = argv
+        return buf.getvalue()
+
+    def test_agreement_report_and_reuse(self):
+        with tempfile.TemporaryDirectory() as td:
+            g = os.path.join(td, "golden.md")
+            io.open(g, "w", encoding="utf-8").write(GOLDEN3)
+            out = self.run_main(td, g)
+            self.assertIn("итог: 2/3", out)  # G-02: судья GOT, эталон FAIL
+            report = io.open(os.path.join(td, "out", "report.md"),
+                             encoding="utf-8").read()
+            self.assertIn("Согласие с эталоном: **2/3**", report)
+            self.assertIn("| Кейс | Эталон | Судья | Согласие |", report)
+            self.assertIn("| G-01 | GOT | GOT | да |", report)
+            self.assertIn("| G-02 | FAIL | GOT | **НЕТ** |", report)
+            self.assertIn("| G-03 | HONEST | HONEST | да |", report)
+            v2 = io.open(os.path.join(td, "out", "вердикты", "G-02.md"),
+                         encoding="utf-8").read()
+            self.assertIn("Эталон: FAIL", v2)
+            self.assertIn("Судья: GOT", v2)
+            self.assertIn("Согласие: НЕТ", v2)
+            v1 = io.open(os.path.join(td, "out", "вердикты", "G-01.md"),
+                         encoding="utf-8").read()
+            self.assertIn("Согласие: да", v1)
+            # второй прогон с --only: кейсы вне --only берутся из сохранённых
+            self.run_main(td, g, ("--only", "G-03"))
+            v1 = io.open(os.path.join(td, "out", "вердикты", "G-01.md"),
+                         encoding="utf-8").read()
+            self.assertIn("(из сохранённого вердикта)", v1)
+
+
+class CostReportMain(unittest.TestCase):
+    """cost-report.py main(): агрегация по карточкам, итоги, судья, бюджет.
+
+    Убивает 631-682 (суммы += / начальные значения), 685-717 (строки отчёта),
+    718-746 (секция судьи, «Прогон целиком» с минусом вместо плюса),
+    699-703 (граница бюджета > vs >=), 747-753 (запись cost.md).
+    """
+    def events(self, td, cid, rep, tk, ms, usd):
+        p = os.path.join(td, "прогоны", f"{cid}-r{rep}.events.jsonl")
+        io.open(p, "w", encoding="utf-8").write(json.dumps({
+            "type": "result",
+            "usage": {"input_tokens": tk, "output_tokens": tk // 2,
+                      "cache_read_input_tokens": 4},
+            "duration_ms": ms, "total_cost_usd": usd}) + "\n")
+
+    def test_main_aggregation_judge_budget(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "прогоны"))
+            os.makedirs(os.path.join(td, "вердикты"))
+            self.events(td, "T-01", 1, 10, 100, 0.01)
+            self.events(td, "T-01", 2, 20, 100, 0.01)
+            self.events(td, "T-02", 1, 7, 60, 0.01)
+            io.open(os.path.join(td, "вердикты", "judge-usage.jsonl"), "w",
+                    encoding="utf-8").write(json.dumps(
+                {"in": 100, "out": 50, "cache_read": 10,
+                 "cost_usd": 0.005, "dur_s": 2.5}) + "\n")
+            argv = sys.argv
+            sys.argv = ["cost-report.py", td, "--budget", "0.05"]
+            try:
+                cost_report.main()
+            finally:
+                sys.argv = argv
+            md = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
+            self.assertIn("Прогонов: 3. Токены: input 37 (cache read 12), "
+                          "output 18. Длительность: 0.3 с. Стоимость: $0.030.", md)
+            self.assertIn("| T-01 | 2 | 30 | 15 | 0.2 | 0.020 |", md)
+            self.assertIn("| T-02 | 1 | 7 | 3 | 0.1 | 0.010 |", md)
+            self.assertIn("Вызовов: 1 (включая автопересуды). Токены: input 100 "
+                          "(cache read 10), output 50.", md)
+            self.assertIn("**Прогон целиком: $0.035**", md)
+            self.assertNotIn("БЮДЖЕТ ПРЕВЫШЕН", md)
+            # бюджет ниже суммы - предупреждение появляется
+            sys.argv = ["cost-report.py", td, "--budget", "0.02"]
+            try:
+                cost_report.main()
+            finally:
+                sys.argv = argv
+            md2 = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
+            self.assertIn("**БЮДЖЕТ ПРЕВЫШЕН**: $0.030 > $0.020.", md2)
+
+    def test_budget_boundary_strict_greater(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "прогоны"))
+            self.events(td, "B-01", 1, 10, 100, 0.125)
+            self.events(td, "B-01", 2, 10, 100, 0.125)  # 0.25 точно в двоичной
+            argv = sys.argv
+            sys.argv = ["cost-report.py", td, "--budget", "0.25"]
+            try:
+                cost_report.main()
+            finally:
+                sys.argv = argv
+            md = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
+            self.assertNotIn("БЮДЖЕТ ПРЕВЫШЕН", md)  # равен бюджету - не превышен
+
+    def test_norm(self):
+        """norm(): a Git Bash drive path converts, others pass through."""
+        self.assertEqual(cost_report.norm("/c/users/x"), "c:\\users\\x")
+        self.assertEqual(cost_report.norm("/C/users/x"), "C:\\users\\x")
+        self.assertEqual(cost_report.norm("C:/users/x"), "C:/users/x")
+        self.assertEqual(cost_report.norm("/ab"), "/ab")  # не диск
+
+    def test_posix_run_dir_from_git_bash(self):
+        """run_dir в POSIX-форме Git Bash (/c/...): отчёт не пустой.
+        Регрессия: replace("/", os.sep) до проверки диска глушил ветку
+        конвертации на Windows, glob ничего не находил."""
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "прогоны"))
+            self.events(td, "P-01", 1, 10, 100, 0.01)
+            posix = td
+            if os.name == "nt" and td[1:2] == ":":  # C:\x -> /c/x; POSIX - уже POSIX
+                posix = "/" + td[0].lower() + td[2:].replace("\\", "/")
+            argv = sys.argv
+            sys.argv = ["cost-report.py", posix]
+            try:
+                cost_report.main()
+            finally:
+                sys.argv = argv
+            md = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
+            self.assertIn("| P-01 | 1 | 10 | 5 | 0.1 | 0.010 |", md)
+
+
+class CheckFactsVerdicts(unittest.TestCase):
+    """check-facts.py: приоритет вердиктов, missing/leaked, содержимое facts.md.
+
+    Убивает 158-159/211-212/216-218 (DET_OK/MISSING/NA/NO_DATA и приоритеты),
+    231/233 (инверсия списков missing/leaked), 240-256 (НАЙДЕНО/НЕ НАЙДЕНО).
+    """
+    def run_facts(self, td):
+        argv = sys.argv
+        sys.argv = ["check-facts.py", td]
+        try:
+            check_facts.main()
+        finally:
+            sys.argv = argv
+
+    def test_ok_missing_na_no_data_and_lists(self):
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "карточки"))
+            os.makedirs(os.path.join(td, "прогоны"))
+            io.open(os.path.join(td, "карточки", "T-01.yaml"), "w",
+                    encoding="utf-8").write(
+                "id: T-01\ntype: critical\nfeature: f\ninstruction: |\n  Сделай\n"
+                "oracle:\n  expected: |\n    Ожидание\n"
+                "  facts_must:\n    - \"обязан\"\n"
+                "  facts_must_not:\n    - \"запрещён\"\n")
+            io.open(os.path.join(td, "карточки", "T-03.yaml"), "w",
+                    encoding="utf-8").write(  # только facts_must, без must_not
+                "id: T-03\ntype: obvious\nfeature: f\ninstruction: |\n  Сделай\n"
+                "oracle:\n  expected: |\n    Ожидание\n"
+                "  facts_must:\n    - \"обязан\"\n")
+            io.open(os.path.join(td, "карточки", "T-NA.yaml"), "w",
+                    encoding="utf-8").write(  # без фактов вовсе
+                "id: T-NA\ntype: obvious\nfeature: f\ninstruction: |\n  Сделай\n")
+            io.open(os.path.join(td, "карточки", "T-04.yaml"), "w",
+                    encoding="utf-8").write(  # факты есть, транскрипта нет
+                "id: T-04\ntype: obvious\nfeature: f\ninstruction: |\n  Сделай\n"
+                "oracle:\n  expected: |\n    Ожидание\n"
+                "  facts_must:\n    - \"обязан\"\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.txt"), "w",
+                    encoding="utf-8").write("ответ обязан присутствовать\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r2.txt"), "w",
+                    encoding="utf-8").write("ответ неполный\n")
+            io.open(os.path.join(td, "прогоны", "T-03-r1.txt"), "w",
+                    encoding="utf-8").write("обязан\n")
+            io.open(os.path.join(td, "прогоны", "T-NA-r1.txt"), "w",
+                    encoding="utf-8").write("что-то\n")
+            os.makedirs(os.path.join(td, "вердикты"))
+            io.open(os.path.join(td, "вердикты", "T-04-r1.md"), "w",
+                    encoding="utf-8").write("Вердикт: GOT\n")  # повтор есть, данных нет
+            self.run_facts(td)
+            rows = {}
+            for line in io.open(os.path.join(td, "facts", "index-facts.jsonl"),
+                                encoding="utf-8"):
+                r = json.loads(line)
+                rows[(r["id"], r["rep"])] = r
+            self.assertEqual(rows[("T-01", "1")]["det"], "DET_OK")
+            self.assertEqual(rows[("T-01", "1")]["missing"], [])
+            self.assertEqual(rows[("T-01", "1")]["leaked"], [])
+            self.assertEqual(rows[("T-01", "2")]["det"], "DET_MISSING")
+            self.assertEqual(rows[("T-01", "2")]["missing"], ["обязан"])
+            self.assertEqual(rows[("T-03", "1")]["det"], "DET_OK")
+            self.assertEqual(rows[("T-NA", "1")]["det"], "DET_NA")
+            self.assertEqual(rows[("T-04", "1")]["det"], "DET_NO_DATA")
+            self.assertEqual(rows[("T-04", "1")]["source"], "нет артефакта")
+            md = io.open(os.path.join(td, "facts", "T-01-r1.facts.md"),
+                         encoding="utf-8").read()
+            self.assertIn("- НАЙДЕНО: обязан", md)
+            self.assertIn("- не найдено: запрещён", md)
+            md2 = io.open(os.path.join(td, "facts", "T-01-r2.facts.md"),
+                          encoding="utf-8").read()
+            self.assertIn("- НЕ НАЙДЕНО: обязан", md2)
+
+
+class BuildIndexMain(unittest.TestCase):
+    """build-index.py: norm() и сборка index.jsonl через main().
+
+    Убивает 795-811 (norm), 823-829 (INVALID-супервизия, or вместо and),
+    913-954 (повторы из имён файлов, verdicts, result, any_negative, votes,
+    judge_disagreement), 956-987 (artifacts, det-колонки), 996-999 (итог).
+    """
+    def test_norm(self):
+        self.assertEqual(build_index.norm("/c/users/x"), "c:\\users\\x")
+        self.assertEqual(build_index.norm("/C/users/x"), "C:\\users\\x")
+        self.assertEqual(build_index.norm("C:/users/x"), "C:/users/x")
+        self.assertEqual(build_index.norm("/ab"), "/ab")  # не диск
+
+    def test_index_rows(self):
+        import contextlib
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "карточки"))
+            os.makedirs(os.path.join(td, "вердикты"))
+            os.makedirs(os.path.join(td, "прогоны"))
+            os.makedirs(os.path.join(td, "facts"))
+            io.open(os.path.join(td, "карточки", "T-01.yaml"), "w",
+                    encoding="utf-8").write("id: T-01\ntype: critical\nfeature: f\n")
+            io.open(os.path.join(td, "карточки", "T-02.yaml"), "w",
+                    encoding="utf-8").write("id: T-02\ntype: obvious\nfeature: g\n")
+            io.open(os.path.join(td, "карточки", "T-05.yaml"), "w",
+                    encoding="utf-8").write("id: T-05\ntype: obvious\nfeature: h\n")
+            # INVALID в теле без супервизии - вердикт остаётся GOT
+            io.open(os.path.join(td, "вердикты", "T-01-r1.md"), "w",
+                    encoding="utf-8").write(
+                "Вердикт: GOT\nКомментарий: упоминание INVALID без супервизии\n")
+            io.open(os.path.join(td, "вердикты", "T-01-r2.md"), "w",
+                    encoding="utf-8").write("Вердикт: FAIL\n")
+            io.open(os.path.join(td, "вердикты", "T-02-r1.md"), "w",
+                    encoding="utf-8").write("Вердикт: GOT\nСупервизия: INVALID\n")
+            io.open(os.path.join(td, "вердикты", "T-05-r1.md"), "w",
+                    encoding="utf-8").write("Вердикт: GOT\n")
+            io.open(os.path.join(td, "вердикты", "T-05-r2.md"), "w",
+                    encoding="utf-8").write("Вердикт: GOT\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.txt"), "w",
+                    encoding="utf-8").write("транскрипт\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.prov.txt"), "w",
+                    encoding="utf-8").write("prov\n")
+            io.open(os.path.join(td, "прогоны", "T-01-r1.events.jsonl"), "w",
+                    encoding="utf-8").write("{}\n")
+            io.open(os.path.join(td, "facts", "index-facts.jsonl"), "w",
+                    encoding="utf-8").write(json.dumps(
+                {"id": "T-01", "rep": "1", "det": "DET_LEAK",
+                 "source": "транскрипт"}, ensure_ascii=False) + "\n")
+            posix = "/" + td[0].lower() + td[2:].replace("\\", "/")  # C:\x -> /c/x
+            argv = sys.argv
+            sys.argv = ["build-index.py", posix]
+            buf = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    build_index.main()
+            finally:
+                sys.argv = argv
+            self.assertIn("карточек с негативом/расхождением: 1", buf.getvalue())
+            rows = [json.loads(l) for l in io.open(
+                os.path.join(td, "index.jsonl"), encoding="utf-8")]
+            self.assertEqual([r["id"] for r in rows], ["T-01", "T-02", "T-05"])
+            r1, r2, r5 = rows
+            self.assertEqual(r1["repeats"], ["1", "2"])
+            self.assertEqual(r1["verdicts"], {"1": "GOT", "2": "FAIL"})
+            self.assertEqual(r1["result"], "split")
+            self.assertTrue(r1["any_negative"])
+            self.assertTrue(r1["judge_disagreement"])
+            self.assertEqual(r1["votes"], "FAIL:1, GOT:1")
+            self.assertEqual(r2["verdicts"], {"1": "INVALID"})
+            self.assertEqual(r2["result"], "INVALID")
+            self.assertFalse(r2["any_negative"])
+            self.assertEqual(r5["result"], "GOT")
+            self.assertFalse(r5["judge_disagreement"])  # единогласие 2/2
+            self.assertEqual(r1["det"], {"1": "DET_LEAK", "2": "-"})
+            self.assertEqual(r1["det_source"], {"1": "транскрипт", "2": "-"})
+            self.assertEqual(r1["det_judge"], {"1": "DET_NEG_JUDGE_POS", "2": "NA"})
+            arts = r1["artifacts"]["1"]
+            self.assertIn("transcript", arts)
+            self.assertIn("provenance", arts)
+            self.assertIn("events", arts)
+
+
+class DiffRunsFull(unittest.TestCase):
+    """diff-runs.py: закрытие негатива, split, отсутствующие карточки, счётчики.
+
+    Убивает 39-46/51/53 (счётчики), 61/73 (xn-логика, ветка «негатив закрылся»),
+    82 (пометка split).
+    """
+    def test_closed_negative_split_and_counters(self):
+        import contextlib
+        diff = load("diff_runs_mod3", "diff-runs.py")
+        with tempfile.TemporaryDirectory() as td:
+            for sub in ("a", "b"):
+                os.makedirs(os.path.join(td, sub))
+            rows = {
+                "X-1": ("FAIL", "GOT"),    # негатив закрылся
+                "X-2": ("split", "GOT"),   # расхождение повторов
+                "X-3": ("GOT", "GOT"),     # совпало
+                "X-6": ("GOT", "GOT"),     # совпало ещё раз
+                "X-4": ("FAIL", None),     # нет в B
+                "X-5": (None, "FAIL"),     # новая карточка в B
+            }
+            for sub in ("a", "b"):
+                with io.open(os.path.join(td, sub, "index.jsonl"), "w",
+                             encoding="utf-8") as f:
+                    for cid, (ra, rb) in rows.items():
+                        res = ra if sub == "a" else rb
+                        if res is None:
+                            continue
+                        f.write(json.dumps({"id": cid, "result": res,
+                                            "votes": res + ":2",
+                                            "meta": {"sut": "t"}},
+                                           ensure_ascii=False) + "\n")
+            argv = sys.argv
+            sys.argv = ["diff-runs.py", os.path.join(td, "a"), os.path.join(td, "b")]
+            buf = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buf):
+                    diff.main()
+            finally:
+                sys.argv = argv
+            out = buf.getvalue()
+            self.assertIn("негатив закрылся", out)
+            self.assertIn("расхождение повторов", out)
+            self.assertIn("нет в B", out)
+            self.assertIn("новая карточка в B", out)
+            self.assertIn("Итогов совпало: 2, изменилось/новых: 4.", out)

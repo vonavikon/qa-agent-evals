@@ -60,14 +60,22 @@ def judge_stats(rd):
     return tot
 
 
+def norm(path):
+    """A Git Bash drive path (/c/...) -> a Windows drive path, like
+    build-index.py: the drive check runs BEFORE "/"->os.sep (after the
+    replace "/" no longer starts the path on Windows and the branch
+    never fires, the report comes out empty)."""
+    if len(path) >= 3 and path[0] == "/" and path[2] == "/" and path[1].isalpha():
+        return path[1] + ":\\" + path[3:].replace("/", "\\")
+    return path
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir")
     ap.add_argument("--budget", type=float, default=0, help="лимит USD на прогон")
     a = ap.parse_args()
-    rd = a.run_dir.replace("/", os.sep)
-    if len(rd) >= 3 and rd[0] == "/" and rd[2] == "/":
-        rd = rd[1] + ":\\" + rd[3:].replace("/", "\\")
+    rd = norm(a.run_dir).replace("/", os.sep)
 
     rows = []
     for evf in sorted(glob.glob(os.path.join(rd, "прогоны", "*.events.jsonl"))):
