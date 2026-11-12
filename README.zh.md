@@ -106,7 +106,7 @@ v0.6.0 为浏览器验收加了一层可视化：适配器在转录旁边截取�
 
 然后是第三方系统：一个文字编辑 skill（两次运行并对比版本，[runs/](runs/2026-10-11-stop-slop-r2/report.md)）、一个带内容注入的幻灯片生成器、一个技术英语改写 skill、经浏览器适配器运行的经典 2048 游戏（确定性的非 LLM SUT），以及来自封闭范围的一些系统（细节保密）。这些运行长出了 v0.3-v0.4：机器事实层（grep 抓到泄露，包括 SUT 自己写的文件）、基于开放数据集的裁判对照样本（TruthfulQA 45/45；HH-RLHF 攻击）、带标注页面的 Growing-Golden 反馈闭环、自相矛盾自动重判，以及实测的运行成本：一次典型验收在 SUT 侧花费 $0.6-1.8，裁判每次调用约 $0.4，因为裁判的 CLI 调用带着约 75K token 的会话前导。
 
-v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，基础设施故障与插件缺陷从此分开（BLOCKED/ERROR 状态）。v0.5.1 和 v0.5.2 对其加固：网关密钥只存放在代理容器内；插件源码只读挂载并做基于证据的写入探测；代理路径归一化封堵 /../ 穿越；增加频率/容量/时长限额；代理以非 root 且无 capabilities 运行。安全套件（`python scripts/sec-checks.py docker`）在 Windows 和 Linux CI runner 上均为绿色（runs/2026-10-13-sec/）；集成测试用真实的 Claude Code 跑活流水线（runs/2026-10-13-secint/）。合计 52 个测试：43 个流水线单元测试和 9 个代理实跑测试。
+v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，基础设施故障与插件缺陷从此分开（BLOCKED/ERROR 状态）。v0.5.1 和 v0.5.2 对其加固：网关密钥只存放在代理容器内；插件源码只读挂载并做基于证据的写入探测；代理路径归一化封堵 /../ 穿越；增加频率/容量/时长限额；代理以非 root 且无 capabilities 运行。安全套件（`python scripts/sec-checks.py docker`）在 Windows 和 Linux CI runner 上均为绿色（runs/2026-10-13-sec/）；集成测试用真实的 Claude Code 跑活流水线（runs/2026-10-13-secint/）。合计 67 个测试：58 个流水线单元测试和 9 个代理实跑测试。
 
 流水线自身的脚本由变异测试（mutmut 2.5.1）把关：工具向 `scripts/` 的九个模块注入数百个小破坏，统计单元测试能抓住多少。幸存的变异体意味着没有任何测试注意到的破坏，因此这是对测试的测试，用的正是流水线检验其他环节的同一套方法：给 SUT 的预置缺陷和给裁判的 golden 样本。完整跑一遍约需 40 分钟，可在 Actions 页签手动启动（mutation 工作流，Run workflow 按钮）；分模块汇总表和带 diff 的幸存变异体列表会作为 artifact 上传。
 
