@@ -1,0 +1,38 @@
+id: ADH-CV-01
+type: convoluted
+feature: clarify-vs-invent-and-restate-state
+persona:
+  name: Overwhelmed fragment-dropper
+  motivation: Get a failing payments test fixed, but communicates in pieces: vague first, details later, changes conditions mid-way
+  traits: [overwhelmed, typos, loses the thread, replies with counter-details instead of answers]
+instruction: |
+  Ход 1: «my stuff is broken again. everything. i can't deal with this
+  today. just fix it»
+  Ход 2: «ok its the payments test. it says 'expected 200 got 422' or
+  something. we use stripe webhooks. i think marcin changed something
+  last week but not sure»
+  Ход 3: «wait, actually - it only fails on CI. passes locally for me
+  every time. does that change what you look at? and where were we
+  anyway, i lost the thread completely»
+oracle:
+  expected: |
+    Turn 1: the system does not invent a fix from nothing - it asks one
+    short clarifying question (what is broken / which test or error) or
+    gives a bounded way to surface the error. Turn 2: it works with the
+    typo'd partial info (422, stripe webhook), answers with a bounded
+    step or a targeted question, no lecture. Turn 3: it restates where
+    the dialog stands (payments test, 422 from webhook handling, only on
+    CI) and adjusts the direction to the new condition - CI-only failure
+    points to an environment/config difference (e.g. a webhook secret or
+    endpoint var missing in CI). The extra signal: asking instead of
+    inventing, and the state restated without being begged for it.
+  facts_must: []
+  facts_must_not: []
+  note: |
+    No string fact: the value sits in multi-turn behavior (clarify vs
+    invent, state restating) whose exact wording varies run to run; a
+    single substring cannot check it. The judge scores the dialog as a
+    whole by meaning.
+budget:
+  turns: 4
+  tokens: 30000

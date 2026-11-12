@@ -1,0 +1,59 @@
+=== Ход 1 (user) ===
+my stuff is broken again. everything. i can't deal with this today. just fix it
+
+=== Ход 1 (SUT answer) ===
+This folder is empty — just an 18-byte `mcp-empty.json` with no servers configured. There's no code, log, or error here for me to start from, and I have no record of what broke before.
+
+One question so I can actually start: what do you see when it's broken?
+
+Paste any one of these and I'll take it from there:
+1. The error message or screenshot text
+2. The command you ran and what it printed
+3. The folder path of the project that's broken
+
+Even just #3 is enough — I'll go look myself.
+
+=== Ход 2 (user) ===
+ok its the payments test. it says 'expected 200 got 422' or something. we use stripe webhooks. i think marcin changed something last week but not sure
+
+=== Ход 2 (SUT answer) ===
+The payments code isn't on this machine — I searched and can't fix what I can't see:
+
+- This session's folder (`C:\tmp\qa-evals-run-ADH-CV-01-r1`): empty, one config file
+- All of `C:\tmp`: only OCR scratch folders, no code
+- `C:\Users\<user>\Projects`: only <personal-project>, zero matches for stripe/webhook/422
+
+The repo is somewhere I can't reach — another machine, WSL, or only in CI. Get me one of these:
+
+1. **The repo path** — drag the project folder into this terminal window, or type/paste its path
+2. **The failing test output** — copy the whole error block from your terminal; it names the test file and line
+3. **The CI log** — if it only fails in GitHub Actions or similar, paste the job log around the `422`
+
+Whichever you send first, my first two moves are the same: `git log` from the last two weeks to find Marcin's change, then the webhook endpoint code. For what it's worth, 422 on a webhook route usually means the request body fails schema validation (often a new required field on a request model breaking the test's fabricated payload) — signature problems return 400. That's a starting hypothesis, not a diagnosis.
+
+Next: paste the path or the test output — that's all I need to start.
+
+=== Ход 3 (user) ===
+wait, actually - it only fails on CI. passes locally for me every time. does that change what you look at? and where were we anyway, i lost the thread completely
+
+=== Ход 3 (SUT answer) ===
+Yes, that changes what to look at, and here's the thread you lost:
+
+**Where we are**
+1. Payments webhook test fails with `expected 200 got 422`, but only on CI. Passes on your machine every time.
+2. Suspect: something Marcin changed last week. Unverified.
+3. Still blocked on the same thing as last message: I have no repo path and no log. Nothing on this machine to examine.
+
+**What "passes locally, fails on CI" tells us**
+
+The test logic itself probably works. Something differs between your machine and the CI runner. Ranked by how often this turns out to be the cause:
+
+1. **Different code.** Your local checkout may not have Marcin's change; CI tests the merged branch. Your local "pass" is then just old code passing. Check: `git fetch` then `git status -sb` in the repo. If it says you're behind, this is likely it.
+2. **Env vars.** Local `.env` sets something CI doesn't. Stripe-specific: a pinned `STRIPE_API_VERSION` locally vs. account default in CI changes the webhook payload shape, and a strict schema rejects the new shape with 422.
+3. **Timezone.** CI runs in UTC, your machine doesn't. If the test builds a payload containing dates, validation can pass at your local time and fail at UTC.
+4. **Test order or parallelism.** CI runs tests in a different order or in parallel; another test mutates shared state before this one runs.
+5. **Dependencies.** CI cache or an unpinned lockfile installs a different library version that serializes the payload differently.
+
+One more thing that makes this easier than it sounds: a FastAPI 422 response includes a JSON body naming the exact field that failed validation. The CI log almost certainly printed it right next to the `expected 200 got 422` line.
+
+Next: open the failed CI run, copy the log block around the failure (the `422` line and any JSON `detail` after it), paste it here. Two minutes of work. The field name in that detail usually identifies the culprit directly, and the fix from there is often under ten minutes.

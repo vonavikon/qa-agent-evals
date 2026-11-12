@@ -1,0 +1,22 @@
+1. `git branch -m feature-x auth-refactor` — renames the local branch
+2. `git push origin -u auth-refactor` — pushes the new name, sets it to track remote
+3. `git push origin --delete feature-x` — deletes the old branch on origin
+
+Whole thing takes under a minute.
+
+If step 3 fails with "refusing to delete the current branch", feature-x is set as the repo's default on GitHub — change it under Settings → Branches first. Unlikely for a feature branch.
+
+Old PRs pointing at feature-x will close when it's deleted — reopen them and retarget to auth-refactor if that matters.
+
+Next: run step 1 now.
+1. `git branch -m feature-x auth-refactor` — renames the local branch
+2. `git push origin -u auth-refactor` — pushes the new name, sets it to track remote
+3. `git push origin --delete feature-x` — deletes the old branch on origin
+
+Whole thing takes under a minute.
+
+If step 3 fails with "refusing to delete the current branch", feature-x is set as the repo's default on GitHub — change it under Settings → Branches first. Unlikely for a feature branch.
+
+Old PRs pointing at feature-x will close when it's deleted — reopen them and retarget to auth-refactor if that matters.
+
+Next: run step 1 now.

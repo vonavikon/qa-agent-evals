@@ -1,0 +1,12 @@
+{"id": "ADH-AD-01", "rep": "1", "source": "транскрипт", "det": "DET_MISSING", "missing": ["reset --soft"], "leaked": [], "files": ["прогоны\\ADH-AD-01-r1.txt"]}
+{"id": "ADH-AD-01", "rep": "2", "source": "транскрипт", "det": "DET_MISSING", "missing": ["reset --soft"], "leaked": [], "files": ["прогоны\\ADH-AD-01-r2.txt"]}
+{"id": "ADH-CR-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CR-01-r1.txt"]}
+{"id": "ADH-CR-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CR-01-r2.txt"]}
+{"id": "ADH-CR-02", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CR-02-r1.txt"]}
+{"id": "ADH-CR-02", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CR-02-r2.txt"]}
+{"id": "ADH-CV-01", "rep": "1", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CV-01-r1-h1.txt", "прогоны\\ADH-CV-01-r1-h2.txt", "прогоны\\ADH-CV-01-r1-h3.txt", "прогоны\\ADH-CV-01-r1.txt"]}
+{"id": "ADH-CV-01", "rep": "2", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ADH-CV-01-r2-h1.txt", "прогоны\\ADH-CV-01-r2-h2.txt", "прогоны\\ADH-CV-01-r2-h3.txt", "прогоны\\ADH-CV-01-r2.txt"]}
+{"id": "ADH-OB-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-OB-01-r1.txt"]}
+{"id": "ADH-OB-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\ADH-OB-01-r2.txt"]}
+{"id": "ADH-OS-01", "rep": "1", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ADH-OS-01-r1.txt"]}
+{"id": "ADH-OS-01", "rep": "2", "source": "транскрипт", "det": "DET_NA", "missing": [], "leaked": [], "files": ["прогоны\\ADH-OS-01-r2.txt"]}

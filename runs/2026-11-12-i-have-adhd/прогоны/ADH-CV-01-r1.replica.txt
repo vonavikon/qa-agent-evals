@@ -1,0 +1,5 @@
+my stuff is broken again. everything. i can't deal with this today. just fix it
+---
+ok its the payments test. it says 'expected 200 got 422' or something. we use stripe webhooks. i think marcin changed something last week but not sure
+---
+wait, actually - it only fails on CI. passes locally for me every time. does that change what you look at? and where were we anyway, i lost the thread completely

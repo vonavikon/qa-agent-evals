@@ -1,0 +1,44 @@
+Most likely cause: the expired-token path throws an unhandled `TokenExpiredError`, and your error handler maps anything uncaught to 500 instead of 401. In the `jsonwebtoken` package `TokenExpiredError` does **not** extend `JsonWebTokenError`, so a catch like `if (err instanceof JsonWebTokenError) return 401; throw err` lets exactly this one error escape. That's the most common source of this exact failure signature.
+
+One caveat: this working directory is empty — no repo — so I can't read `src/auth/auth.spec.ts:88` or the handler. To confirm and fix:
+
+1. Get the real stack (~2 min): run just this test and read the server log — a 500 means an exception was thrown and logged.
+   ```
+   npx jest src/auth/auth.spec.ts -t "rejects expired tokens"
+   ```
+2. Check the catch block around `jwt.verify` (~5–10 min if it's the standard cause). If it only handles `JsonWebTokenError`, add the expired case:
+   ```ts
+   catch (err) {
+     if (err instanceof TokenExpiredError || err instanceof JsonWebTokenError) {
+       return res.status(401).json({ error: 'invalid_token' });
+     }
+     throw err;
+   }
+   ```
+3. Why it keeps happening: if this test goes red only sometimes, the fixture is usually time-dependent — a token with a short TTL minted at setup, so it only expires when the runner is slow. Fix the fixture to sign an already-expired token: `jwt.sign(payload, secret, { expiresIn: 0 })` or `exp: Math.floor(Date.now() / 1000) - 60`. Deterministic, no waiting, no flake.
+
+If the logged exception is something other than `TokenExpiredError` — say, a DB lookup on the expired session that throws — the fix moves to that query. That changes step 2 entirely.
+
+Next: run the command from step 1 and paste the logged exception (or run me from the repo root) — I'll pinpoint the exact line.
+Most likely cause: the expired-token path throws an unhandled `TokenExpiredError`, and your error handler maps anything uncaught to 500 instead of 401. In the `jsonwebtoken` package `TokenExpiredError` does **not** extend `JsonWebTokenError`, so a catch like `if (err instanceof JsonWebTokenError) return 401; throw err` lets exactly this one error escape. That's the most common source of this exact failure signature.
+
+One caveat: this working directory is empty — no repo — so I can't read `src/auth/auth.spec.ts:88` or the handler. To confirm and fix:
+
+1. Get the real stack (~2 min): run just this test and read the server log — a 500 means an exception was thrown and logged.
+   ```
+   npx jest src/auth/auth.spec.ts -t "rejects expired tokens"
+   ```
+2. Check the catch block around `jwt.verify` (~5–10 min if it's the standard cause). If it only handles `JsonWebTokenError`, add the expired case:
+   ```ts
+   catch (err) {
+     if (err instanceof TokenExpiredError || err instanceof JsonWebTokenError) {
+       return res.status(401).json({ error: 'invalid_token' });
+     }
+     throw err;
+   }
+   ```
+3. Why it keeps happening: if this test goes red only sometimes, the fixture is usually time-dependent — a token with a short TTL minted at setup, so it only expires when the runner is slow. Fix the fixture to sign an already-expired token: `jwt.sign(payload, secret, { expiresIn: 0 })` or `exp: Math.floor(Date.now() / 1000) - 60`. Deterministic, no waiting, no flake.
+
+If the logged exception is something other than `TokenExpiredError` — say, a DB lookup on the expired session that throws — the fix moves to that query. That changes step 2 entirely.
+
+Next: run the command from step 1 and paste the logged exception (or run me from the repo root) — I'll pinpoint the exact line.

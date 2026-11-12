@@ -1,0 +1,10 @@
+It's a quick one — closer to an afternoon than a week. GitHub is the easiest OAuth provider around, and since email login already works, you've got the hard parts (user model, sessions) done.
+
+What's actually involved: register an OAuth app on GitHub (5 min), then two routes — one redirects to GitHub, one handles the callback where you swap a code for a token and fetch the user's profile. With Passport it's mostly config; hand-rolled with `fetch` it's maybe 60 lines. Either way, a few hours including testing.
+
+The only real decision: what happens when someone signs in with GitHub using an email that already has an account. Link them automatically, or create a separate account? Most apps link automatically if the email is verified. That's a judgment call, not work — but it's the one spot worth 2 minutes of thought before you start.
+It's a quick one — closer to an afternoon than a week. GitHub is the easiest OAuth provider around, and since email login already works, you've got the hard parts (user model, sessions) done.
+
+What's actually involved: register an OAuth app on GitHub (5 min), then two routes — one redirects to GitHub, one handles the callback where you swap a code for a token and fetch the user's profile. With Passport it's mostly config; hand-rolled with `fetch` it's maybe 60 lines. Either way, a few hours including testing.
+
+The only real decision: what happens when someone signs in with GitHub using an email that already has an account. Link them automatically, or create a separate account? Most apps link automatically if the email is verified. That's a judgment call, not work — but it's the one spot worth 2 minutes of thought before you start.

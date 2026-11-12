@@ -1,0 +1,26 @@
+id: ADH-OB-01
+type: obvious
+feature: lead-action-numbered-steps
+persona:
+  name: Developer mid-task
+  motivation: Rename a pushed git branch without losing track of the steps
+  traits: [concrete task, states it clearly, asks for steps]
+instruction: |
+  I named my git branch wrong. It's called feature-x but it should be
+  auth-refactor, and it's already pushed to origin. How do I rename it
+  locally AND on the remote? Give me the steps, I lose track of long
+  instructions.
+oracle:
+  expected: |
+    The first line is an action the reader can do (the rename command),
+    the work is a numbered list of bounded steps (rename local, push the
+    new name, delete the old remote branch or set upstream), and the
+    answer ends without pleasantries. Equivalent wording is fine as long
+    as the commands are real and runnable.
+  facts_must:
+    - "branch -m"
+    - "push"
+  facts_must_not: []
+budget:
+  turns: 1
+  tokens: 5000

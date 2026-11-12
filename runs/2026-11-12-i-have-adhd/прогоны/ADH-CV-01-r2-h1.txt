@@ -1,0 +1,18 @@
+**Nothing is deleted — your config is intact. The tools are missing because this session is running from an empty temp folder.**
+
+What I checked:
+
+1. `~/.claude.json` vs tonight's automatic backups (21:13–23:26) — the only differences are usage counters. All your MCP servers are still configured: websearch-mcp, metrics-mcp, dashboards-mcp, internal-mcp, sample-webapp, internal-crm.
+2. `~/.claude\settings.json` — intact, all MCP permissions present.
+3. This folder, `C:\tmp\qa-evals-run-ADH-CV-01-r2` — contains exactly one file, `mcp-empty.json`, holding `{"mcpServers": {}}`.
+
+The cause: MCP servers in `.claude.json` are attached per project. Your real repos have server blocks; this temp folder has no project entry and no `.mcp.json`, so none of your tools load here. The tools aren't broken — you're in a directory that never had them. And `mcp-empty.json` does nothing even as a config: Claude Code reads a file named `.mcp.json`, not this name.
+
+Fix — pick one:
+
+1. **Working on real stuff?** Exit and start `claude` in the actual repo (for example `<work-repo>`). All tools return on launch. Under a minute.
+2. **Need the tools in this folder?** I'll write a proper `.mcp.json` here with the servers you name (clickhouse, postgresql, vendor-portal, others from your list), then you restart the session. About 2 minutes.
+
+One real defect found along the way, unrelated to this: `.claude.json` contains both `<work-repo>` and `<work-repo>` as project keys. Claude Code tolerates it, but it breaks PowerShell's JSON parsing. I can merge the duplicates after the main issue is sorted.
+
+Next: tell me which fix — real repo, or tools here? If tools were also missing inside your real repo (not just here), paste the error you saw; the config shows no cause for that, so the exact symptom would tell me where to look.

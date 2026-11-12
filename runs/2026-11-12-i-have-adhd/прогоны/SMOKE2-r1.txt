@@ -1,0 +1,6 @@
+I'm Claude Code, a terminal agent: I read, write, and edit code and files, run shell commands (PowerShell), search codebases and the web, orchestrate subagents for multi-step work, and keep persistent memory — e.g., right now I could build, debug, or analyze a project in `C:\Users\<user>\AppData\Local\Temp\qa-evals-smoke-adhd2`.
+
+Next: tell me the task.
+I'm Claude Code, a terminal agent: I read, write, and edit code and files, run shell commands (PowerShell), search codebases and the web, orchestrate subagents for multi-step work, and keep persistent memory — e.g., right now I could build, debug, or analyze a project in `C:\Users\<user>\AppData\Local\Temp\qa-evals-smoke-adhd2`.
+
+Next: tell me the task.

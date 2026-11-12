@@ -1,0 +1,38 @@
+1. Rename it locally (run this while on `feature-x`):
+   ```
+   git branch -m auth-refactor
+   ```
+   If you're on a different branch, use `git branch -m feature-x auth-refactor` instead.
+
+2. Push the new name and set it to track:
+   ```
+   git push origin -u auth-refactor
+   ```
+
+3. Delete the old branch on the remote:
+   ```
+   git push origin --delete feature-x
+   ```
+
+One warning: if there's an open pull request from `feature-x`, deleting the remote branch will close it. In that case rename the branch on GitHub instead (Branches page → pencil icon next to `feature-x`) — that updates the PR automatically — then run `git branch -m auth-refactor` locally and `git fetch --prune`.
+
+Takes about a minute. Next: run step 1 and paste any error you get.
+1. Rename it locally (run this while on `feature-x`):
+   ```
+   git branch -m auth-refactor
+   ```
+   If you're on a different branch, use `git branch -m feature-x auth-refactor` instead.
+
+2. Push the new name and set it to track:
+   ```
+   git push origin -u auth-refactor
+   ```
+
+3. Delete the old branch on the remote:
+   ```
+   git push origin --delete feature-x
+   ```
+
+One warning: if there's an open pull request from `feature-x`, deleting the remote branch will close it. In that case rename the branch on GitHub instead (Branches page → pencil icon next to `feature-x`) — that updates the PR automatically — then run `git branch -m auth-refactor` locally and `git fetch --prune`.
+
+Takes about a minute. Next: run step 1 and paste any error you get.

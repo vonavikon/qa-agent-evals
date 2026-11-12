@@ -1,0 +1,74 @@
+I can't see the code: this folder only contains `mcp-empty.json` — the repo isn't here. Either restart me from the repo root, or paste `src/auth/auth.spec.ts` (lines ~70–100) plus the file that verifies tokens, and I'll point at the exact line.
+
+What the failure means, and why it keeps happening:
+
+Expected 401, got 500. The token was rejected, but by an unhandled exception instead of your 401 path. That's a deterministic bug, not flakiness — every run of the suite will be red until the code changes. The most common shape (Node + jsonwebtoken):
+
+```js
+// verification middleware, no try/catch
+const payload = jwt.verify(token, SECRET) // throws TokenExpiredError on expired tokens
+```
+
+`jwt.verify` throws on expiry rather than returning null. If nothing catches it, the framework's generic error handler turns the throw into a 500. Same pattern applies in NestJS guards or custom verify functions: an exception escapes, the catch-all answers 500.
+
+5-minute check:
+
+1. Find the server-side stack trace for the 500 (test output or server console). Its top frame names the function whose throw escaped.
+2. Open that function — wherever `verify(...)` runs.
+3. Wrap it so any rejection maps to 401:
+
+```js
+try {
+  payload = jwt.verify(token, SECRET)
+} catch {
+  return res.status(401).json({ error: 'invalid_token' })
+}
+```
+
+A catch-all is correct here: expired and malformed tokens are both "unauthenticated", both 401.
+
+If the try/catch already exists, two other causes, 1 minute each:
+
+- The test signs its expired fixture with a different secret or algorithm than the app verifies with, so the error is `JsonWebTokenError`, and the handler only maps `TokenExpiredError`.
+- The error-handling middleware is registered after the routes, so it never fires.
+
+Estimate: 10–15 minutes if it's the missing try/catch, about 30 if it's middleware ordering.
+
+Next: paste the spec around line 88 and the verify code, and I'll mark the exact line to change.
+I can't see the code: this folder only contains `mcp-empty.json` — the repo isn't here. Either restart me from the repo root, or paste `src/auth/auth.spec.ts` (lines ~70–100) plus the file that verifies tokens, and I'll point at the exact line.
+
+What the failure means, and why it keeps happening:
+
+Expected 401, got 500. The token was rejected, but by an unhandled exception instead of your 401 path. That's a deterministic bug, not flakiness — every run of the suite will be red until the code changes. The most common shape (Node + jsonwebtoken):
+
+```js
+// verification middleware, no try/catch
+const payload = jwt.verify(token, SECRET) // throws TokenExpiredError on expired tokens
+```
+
+`jwt.verify` throws on expiry rather than returning null. If nothing catches it, the framework's generic error handler turns the throw into a 500. Same pattern applies in NestJS guards or custom verify functions: an exception escapes, the catch-all answers 500.
+
+5-minute check:
+
+1. Find the server-side stack trace for the 500 (test output or server console). Its top frame names the function whose throw escaped.
+2. Open that function — wherever `verify(...)` runs.
+3. Wrap it so any rejection maps to 401:
+
+```js
+try {
+  payload = jwt.verify(token, SECRET)
+} catch {
+  return res.status(401).json({ error: 'invalid_token' })
+}
+```
+
+A catch-all is correct here: expired and malformed tokens are both "unauthenticated", both 401.
+
+If the try/catch already exists, two other causes, 1 minute each:
+
+- The test signs its expired fixture with a different secret or algorithm than the app verifies with, so the error is `JsonWebTokenError`, and the handler only maps `TokenExpiredError`.
+- The error-handling middleware is registered after the routes, so it never fires.
+
+Estimate: 10–15 minutes if it's the missing try/catch, about 30 if it's middleware ordering.
+
+Next: paste the spec around line 88 and the verify code, and I'll mark the exact line to change.

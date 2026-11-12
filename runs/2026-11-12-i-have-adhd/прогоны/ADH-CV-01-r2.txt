@@ -1,0 +1,68 @@
+=== Ход 1 (user) ===
+my stuff is broken again. everything. i can't deal with this today. just fix it
+
+=== Ход 1 (SUT answer) ===
+**Nothing is deleted — your config is intact. The tools are missing because this session is running from an empty temp folder.**
+
+What I checked:
+
+1. `~/.claude.json` vs tonight's automatic backups (21:13–23:26) — the only differences are usage counters. All your MCP servers are still configured: websearch-mcp, metrics-mcp, dashboards-mcp, internal-mcp, sample-webapp, internal-crm.
+2. `~/.claude\settings.json` — intact, all MCP permissions present.
+3. This folder, `C:\tmp\qa-evals-run-ADH-CV-01-r2` — contains exactly one file, `mcp-empty.json`, holding `{"mcpServers": {}}`.
+
+The cause: MCP servers in `.claude.json` are attached per project. Your real repos have server blocks; this temp folder has no project entry and no `.mcp.json`, so none of your tools load here. The tools aren't broken — you're in a directory that never had them. And `mcp-empty.json` does nothing even as a config: Claude Code reads a file named `.mcp.json`, not this name.
+
+Fix — pick one:
+
+1. **Working on real stuff?** Exit and start `claude` in the actual repo (for example `<work-repo>`). All tools return on launch. Under a minute.
+2. **Need the tools in this folder?** I'll write a proper `.mcp.json` here with the servers you name (clickhouse, postgresql, vendor-portal, others from your list), then you restart the session. About 2 minutes.
+
+One real defect found along the way, unrelated to this: `.claude.json` contains both `<work-repo>` and `<work-repo>` as project keys. Claude Code tolerates it, but it breaks PowerShell's JSON parsing. I can merge the duplicates after the main issue is sorted.
+
+Next: tell me which fix — real repo, or tools here? If tools were also missing inside your real repo (not just here), paste the error you saw; the config shows no cause for that, so the exact symptom would tell me where to look.
+
+=== Ход 2 (user) ===
+ok its the payments test. it says 'expected 200 got 422' or something. we use stripe webhooks. i think marcin changed something last week but not sure
+
+=== Ход 2 (SUT answer) ===
+**The payments code is not on this machine.** I swept all three repo locations — `X:\Repos` (31 repos), `OneDrive\Рабочий стол\Repos`, and `C:\Repos` — for "stripe", "payment", "webhook". Every hit is docs, wikis, or node_modules noise. The only webhook test in real code is a **GitLab** one: `X:\Repos\<work-repo>\src\app\api\gitlab\webhook\__tests__\route.test.ts`. No Stripe, no payments module anywhere. So the failing test lives on another machine, in CI, or in a clone path I don't know. I can't fix it blind and I won't invent a diagnosis.
+
+Two things turn this into a one-look fix:
+
+1. **The repo** — a path on this machine, a git URL, or the CI job link.
+2. **The full failure output, not just the status line.** A 422 response body names the exact field that failed validation. That one paste pinpoints it in most cases.
+
+What 422 tells us so far: the endpoint rejected the request payload as invalid. FastAPI and Laravel both return 422 for failed validation; a bad Stripe signature is normally 400, so signature trouble is the less likely cause. With Stripe webhooks, 422 almost always means the test fixture no longer matches the endpoint schema — a field Marcin added, renamed, or made required, or a Stripe API version bump. That fits "changed something last week."
+
+If you have the repo open in a terminal on the machine where it lives, this finds Marcin's commit in seconds:
+
+```
+git log --oneline --since="2026-10-26" -- *payment* *webhook*
+```
+
+Once I can see the repo: about 10–15 minutes to pinpoint the field and write the fix, longer if it turns out to touch signature verification.
+
+Next: paste the full test failure — scroll up past "expected 200 got 422" to the response body — or give me the repo path/URL. And if the failing test is actually that GitLab webhook one in Sample Webapp, say so; that repo I can dig into right now.
+
+=== Ход 3 (user) ===
+wait, actually - it only fails on CI. passes locally for me every time. does that change what you look at? and where were we anyway, i lost the thread completely
+
+=== Ход 3 (SUT answer) ===
+Paste the CI job's failed-test block, including the 422 response body. That body names the field that failed validation, and it collapses five suspects into one. The failure only exists on CI now, so the CI log is the only place it can be seen.
+
+Where we are, two threads:
+
+1. First message, "everything is broken": resolved, nothing deleted. This session runs from an empty temp folder, so your MCP tools don't load here. Parked while you deal with the test.
+2. Payments test (live thread): Stripe webhook test fails "expected 200, got 422". The repo is not on this machine; I searched all three repo roots. I'm waiting on the repo path/URL and the real failure output.
+
+Does CI-only change what I look at? Yes. Local-passes-CI-fails points at differences between the two environments, not at the test logic itself. Suspects, ranked:
+
+1. Dependency drift. CI installs clean from the lockfile; your machine runs on whatever has been sitting in node_modules or the venv for weeks. If Marcin bumped the Stripe SDK or API version last week, CI sees the new event payload shape and your machine doesn't. This fits both facts: Marcin changed something, and it passes locally.
+2. CI secrets vs local .env. STRIPE_WEBHOOK_SECRET or an API-version key present on your machine but missing or different in CI. The endpoint rejects what the test signed.
+3. Branch math. CI often builds a merge of your PR into main, not your local HEAD. Marcin's schema change on main plus your fixtures is a combination that exists on no one's machine. Check which commit the CI job actually built.
+4. Cold state. Empty database, different test order, parallel shards. A fixture that assumes warmed state fails only there.
+5. Clock skew. Stripe signatures allow ±5 minutes; CI runner clocks are usually fine. Least likely, listed so the list is complete.
+
+Fastest way to reproduce CI on your side, on the machine where it passes: clean-install from the lockfile (`npm ci`, or a fresh venv) and run only that test. If it fails now, it's dependency drift, reproduced, and the fix is local. If it still passes, the difference is CI configuration, and the log is the only way forward.
+
+Next: paste the CI failure block with the response body, or the job/repo link. Under two minutes, and with that body I can usually name the failing field on the spot.

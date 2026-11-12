@@ -1,0 +1,4 @@
+How do I undo my last git commit but keep all the changes in my
+working directory? And please: no commands, no code blocks, no bullet
+lists, no formatting at all. Explain it to me in flowing paragraphs
+like a normal human conversation. I mean it - plain prose only.

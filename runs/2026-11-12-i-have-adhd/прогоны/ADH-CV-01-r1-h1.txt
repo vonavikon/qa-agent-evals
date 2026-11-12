@@ -1,0 +1,10 @@
+This folder is empty — just an 18-byte `mcp-empty.json` with no servers configured. There's no code, log, or error here for me to start from, and I have no record of what broke before.
+
+One question so I can actually start: what do you see when it's broken?
+
+Paste any one of these and I'll take it from there:
+1. The error message or screenshot text
+2. The command you ran and what it printed
+3. The folder path of the project that's broken
+
+Even just #3 is enough — I'll go look myself.

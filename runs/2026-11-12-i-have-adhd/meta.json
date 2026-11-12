@@ -1,0 +1,5 @@
+{
+  "sut": "i-have-adhd (ayghri) commit 1ecea1993b7fce257ffbd686c070948b5e07eda6, skill via --append-system-prompt-file, CLI adapter v0.1, host isolation",
+  "judge_model": "glm-5.3-flash",
+  "plugin_version": "0.6.0"
+}

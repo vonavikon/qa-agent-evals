@@ -1,0 +1,13 @@
+{"in": 45728, "out": 2809, "cache_read": 64, "cost_usd": 0.29889699999999997, "dur_s": 50.6, "model": "", "id": "ADH-AD-01-r1", "call": "шаг1"}
+{"in": 70948, "out": 4188, "cache_read": 0, "cost_usd": 0.45944, "dur_s": 69.6, "model": "", "id": "ADH-AD-01-r2", "call": "шаг1"}
+{"in": 47722, "out": 2723, "cache_read": 0, "cost_usd": 0.306685, "dur_s": 49.4, "model": "", "id": "ADH-CR-01-r1", "call": "шаг1"}
+{"in": 47680, "out": 2516, "cache_read": 0, "cost_usd": 0.3013, "dur_s": 46.0, "model": "", "id": "ADH-CR-01-r2", "call": "шаг1"}
+{"in": 42446, "out": 1733, "cache_read": 0, "cost_usd": 0.255555, "dur_s": 33.8, "model": "", "id": "ADH-CR-02-r1", "call": "шаг1"}
+{"in": 47111, "out": 2423, "cache_read": 0, "cost_usd": 0.29613, "dur_s": 51.6, "model": "", "id": "ADH-CR-02-r2", "call": "шаг1"}
+{"in": 47776, "out": 3427, "cache_read": 128, "cost_usd": 0.324619, "dur_s": 57.9, "model": "", "id": "ADH-CV-01-r1", "call": "шаг1"}
+{"in": 48286, "out": 4323, "cache_read": 192, "cost_usd": 0.349601, "dur_s": 69.1, "model": "", "id": "ADH-CV-01-r2", "call": "шаг1"}
+{"in": 127933, "out": 8982, "cache_read": 712512, "cost_usd": 1.2204709999999999, "dur_s": 228.8, "model": "", "id": "ADH-OB-01-r1", "call": "шаг1"}
+{"in": 37247, "out": 3269, "cache_read": 0, "cost_usd": 0.26796000000000003, "dur_s": 62.9, "model": "", "id": "ADH-OB-01-r2", "call": "шаг1"}
+{"in": 47778, "out": 2879, "cache_read": 0, "cost_usd": 0.310865, "dur_s": 54.1, "model": "", "id": "ADH-OS-01-r1", "call": "шаг1"}
+{"in": 47738, "out": 3467, "cache_read": 0, "cost_usd": 0.325365, "dur_s": 59.8, "model": "", "id": "ADH-OS-01-r2", "call": "шаг1"}
+{"in": 47347, "out": 5276, "cache_read": 0, "cost_usd": 0.36863500000000005, "dur_s": 91.5, "model": "", "id": "ADH-AD-01-r2", "call": "шаг1"}

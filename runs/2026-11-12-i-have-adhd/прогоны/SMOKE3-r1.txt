@@ -1,0 +1,22 @@
+No docx skill is installed on this machine — I can't run what isn't there. I checked both skill locations:
+
+- Global (`C:\Users\<user>\.claude\skills`): correspondence-2, meeting-prep, meeting-debrief, ru-editor, hyperframes-*, faceless-explainer, general-video, media-use
+- This project: no skills directory at all
+
+Two ways forward, about 1 minute vs 0 minutes:
+
+1. **You actually want a Word file made or edited** → I don't need the skill for that. Tell me the content (or point me at a file) and I'll produce the .docx directly.
+2. **You want the skill itself** → I'll fetch the official docx skill from the `anthropics/skills` repo and install it to `C:\Users\<user>\.claude\skills\docx`. Say "install it" and it's done in under a minute.
+
+Next: reply with 1 or 2.
+No docx skill is installed on this machine — I can't run what isn't there. I checked both skill locations:
+
+- Global (`C:\Users\<user>\.claude\skills`): correspondence-2, meeting-prep, meeting-debrief, ru-editor, hyperframes-*, faceless-explainer, general-video, media-use
+- This project: no skills directory at all
+
+Two ways forward, about 1 minute vs 0 minutes:
+
+1. **You actually want a Word file made or edited** → I don't need the skill for that. Tell me the content (or point me at a file) and I'll produce the .docx directly.
+2. **You want the skill itself** → I'll fetch the official docx skill from the `anthropics/skills` repo and install it to `C:\Users\<user>\.claude\skills\docx`. Say "install it" and it's done in under a minute.
+
+Next: reply with 1 or 2.

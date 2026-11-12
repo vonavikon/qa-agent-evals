@@ -1,0 +1,5 @@
+Quick question, I don't need a whole plan. I have an Express app with
+email login already working. I want to add "Sign in with GitHub" too.
+How much work is that, roughly? Honestly something like "it's a quick
+one" or "it's a whole thing" is the level of detail I need - don't
+give me homework.

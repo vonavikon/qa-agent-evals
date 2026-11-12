@@ -1,0 +1,20 @@
+Yes, that changes what to look at, and here's the thread you lost:
+
+**Where we are**
+1. Payments webhook test fails with `expected 200 got 422`, but only on CI. Passes on your machine every time.
+2. Suspect: something Marcin changed last week. Unverified.
+3. Still blocked on the same thing as last message: I have no repo path and no log. Nothing on this machine to examine.
+
+**What "passes locally, fails on CI" tells us**
+
+The test logic itself probably works. Something differs between your machine and the CI runner. Ranked by how often this turns out to be the cause:
+
+1. **Different code.** Your local checkout may not have Marcin's change; CI tests the merged branch. Your local "pass" is then just old code passing. Check: `git fetch` then `git status -sb` in the repo. If it says you're behind, this is likely it.
+2. **Env vars.** Local `.env` sets something CI doesn't. Stripe-specific: a pinned `STRIPE_API_VERSION` locally vs. account default in CI changes the webhook payload shape, and a strict schema rejects the new shape with 422.
+3. **Timezone.** CI runs in UTC, your machine doesn't. If the test builds a payload containing dates, validation can pass at your local time and fail at UTC.
+4. **Test order or parallelism.** CI runs tests in a different order or in parallel; another test mutates shared state before this one runs.
+5. **Dependencies.** CI cache or an unpinned lockfile installs a different library version that serializes the payload differently.
+
+One more thing that makes this easier than it sounds: a FastAPI 422 response includes a JSON body naming the exact field that failed validation. The CI log almost certainly printed it right next to the `expected 200 got 422` line.
+
+Next: open the failed CI run, copy the log block around the failure (the `422` line and any JSON `detail` after it), paste it here. Two minutes of work. The field name in that detail usually identifies the culprit directly, and the fix from there is often under ten minutes.

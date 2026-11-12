@@ -1,0 +1,4 @@
+I named my git branch wrong. It's called feature-x but it should be
+auth-refactor, and it's already pushed to origin. How do I rename it
+locally AND on the remote? Give me the steps, I lose track of long
+instructions.

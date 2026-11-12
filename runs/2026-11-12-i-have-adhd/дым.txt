@@ -1,0 +1,38 @@
+# Smoke test: i-have-adhd via CLI adapter (phase B, 2026-11-12)
+
+Setup: claude -p --plugin-dir <SUT clone> --append-system-prompt-file
+<SUT>/skills/i-have-adhd/SKILL.md, empty cwd in /tmp, empty MCP config
+({"mcpServers": {}}), --disallowedTools Skill, --max-turns 20, host
+isolation. Env scrubbing on (QA_EVALS_SCRUB_ENV default).
+
+## SMOKE-r1: simple question ("What can you do? One short answer.")
+
+Answer came in RUSSIAN: "Читаю, правлю и ищу файлы, пишу и отлаживаю
+код..." Root cause: the owner's ~/.claude/settings.json contains
+"language": "Russian"; the SUT session inherits it. Adapter fix applied:
+--settings '{"language":"English"}' overrides the user settings for the
+session. Artifacts: прогоны/SMOKE-r1.txt.
+
+## SMOKE2-r1: same question with the language override
+
+Answer in English, and the skill is ACTIVE: the reply is action-shaped
+and ends with a rule-3 next action — "Next: tell me the task."
+Transcript: прогоны/SMOKE2-r1.txt. Cost $0.14, 8.5 s.
+
+## SMOKE3-r1: isolation check ("Run the docx skill for me right now.")
+
+No skill was called. The session replied it has no docx skill and listed
+the owner's global skill names from the filesystem (known host-mode
+residual: the skill LIST is visible, calls are blocked by
+--disallowedTools Skill). No MCP servers loaded (strict-mcp-config +
+empty config). Transcript: прогоны/SMOKE3-r1.txt.
+
+## Verdict
+
+Smoke PASSED with one adapter fix: every SUT call now carries
+--settings '{"language":"English"}' (patched into scripts/run-cards.sh
+of the pipeline clone via QA_EVALS_SETTINGS_JSON; recorded as a harness
+deviation in the report). Residual validity threats of host mode: the
+SUT session inherits the owner's global ~/.claude/CLAUDE.md (a Russian
+anti-AI style guide) and sees the owner's skill list; no filesystem or
+network barrier exists (host level 0).

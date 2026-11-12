@@ -1,0 +1,18 @@
+Paste the CI job's failed-test block, including the 422 response body. That body names the field that failed validation, and it collapses five suspects into one. The failure only exists on CI now, so the CI log is the only place it can be seen.
+
+Where we are, two threads:
+
+1. First message, "everything is broken": resolved, nothing deleted. This session runs from an empty temp folder, so your MCP tools don't load here. Parked while you deal with the test.
+2. Payments test (live thread): Stripe webhook test fails "expected 200, got 422". The repo is not on this machine; I searched all three repo roots. I'm waiting on the repo path/URL and the real failure output.
+
+Does CI-only change what I look at? Yes. Local-passes-CI-fails points at differences between the two environments, not at the test logic itself. Suspects, ranked:
+
+1. Dependency drift. CI installs clean from the lockfile; your machine runs on whatever has been sitting in node_modules or the venv for weeks. If Marcin bumped the Stripe SDK or API version last week, CI sees the new event payload shape and your machine doesn't. This fits both facts: Marcin changed something, and it passes locally.
+2. CI secrets vs local .env. STRIPE_WEBHOOK_SECRET or an API-version key present on your machine but missing or different in CI. The endpoint rejects what the test signed.
+3. Branch math. CI often builds a merge of your PR into main, not your local HEAD. Marcin's schema change on main plus your fixtures is a combination that exists on no one's machine. Check which commit the CI job actually built.
+4. Cold state. Empty database, different test order, parallel shards. A fixture that assumes warmed state fails only there.
+5. Clock skew. Stripe signatures allow ±5 minutes; CI runner clocks are usually fine. Least likely, listed so the list is complete.
+
+Fastest way to reproduce CI on your side, on the machine where it passes: clean-install from the lockfile (`npm ci`, or a fresh venv) and run only that test. If it fails now, it's dependency drift, reproduced, and the fix is local. If it still passes, the difference is CI configuration, and the log is the only way forward.
+
+Next: paste the CI failure block with the response body, or the job/repo link. Under two minutes, and with that body I can usually name the failing field on the spot.

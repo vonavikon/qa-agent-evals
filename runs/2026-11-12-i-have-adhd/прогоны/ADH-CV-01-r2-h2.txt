@@ -1,0 +1,18 @@
+**The payments code is not on this machine.** I swept all three repo locations — `X:\Repos` (31 repos), `OneDrive\Рабочий стол\Repos`, and `C:\Repos` — for "stripe", "payment", "webhook". Every hit is docs, wikis, or node_modules noise. The only webhook test in real code is a **GitLab** one: `X:\Repos\<work-repo>\src\app\api\gitlab\webhook\__tests__\route.test.ts`. No Stripe, no payments module anywhere. So the failing test lives on another machine, in CI, or in a clone path I don't know. I can't fix it blind and I won't invent a diagnosis.
+
+Two things turn this into a one-look fix:
+
+1. **The repo** — a path on this machine, a git URL, or the CI job link.
+2. **The full failure output, not just the status line.** A 422 response body names the exact field that failed validation. That one paste pinpoints it in most cases.
+
+What 422 tells us so far: the endpoint rejected the request payload as invalid. FastAPI and Laravel both return 422 for failed validation; a bad Stripe signature is normally 400, so signature trouble is the less likely cause. With Stripe webhooks, 422 almost always means the test fixture no longer matches the endpoint schema — a field Marcin added, renamed, or made required, or a Stripe API version bump. That fits "changed something last week."
+
+If you have the repo open in a terminal on the machine where it lives, this finds Marcin's commit in seconds:
+
+```
+git log --oneline --since="2026-10-26" -- *payment* *webhook*
+```
+
+Once I can see the repo: about 10–15 minutes to pinpoint the field and write the fix, longer if it turns out to touch signature verification.
+
+Next: paste the full test failure — scroll up past "expected 200 got 422" to the response body — or give me the repo path/URL. And if the failing test is actually that GitLab webhook one in Sample Webapp, say so; that repo I can dig into right now.

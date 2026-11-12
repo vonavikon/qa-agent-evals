@@ -1,0 +1,20 @@
+It's a quick one — an afternoon, not a week.
+
+The code is genuinely small: register an OAuth app on GitHub (5 min, gives you a client ID/secret), then add two routes — one redirects to GitHub, one handles the callback where you exchange the code and fetch the user profile. If you're already on Passport, `passport-github2` makes this near-boilerplate. Hand-rolled with `fetch`, it's maybe 50 lines. The GitHub side is the simplest of the big OAuth providers.
+
+The one real decision, and the only place worth a minute of thought: what happens when someone signs in with GitHub and their GitHub email matches an existing email-login account. Options:
+
+- **Auto-link on verified email** — what most apps do. GitHub's `/user/emails` endpoint tells you whether the email is verified, so only link on verified ones (unverified emails would let anyone claim an account by setting it on their GitHub profile).
+- **Always create a separate account** — safer, but users end up with two accounts and get annoyed.
+
+So: the flow itself is about an hour including testing. The remaining time is the account-linking decision and adding a "connected accounts" bit to your user model.
+It's a quick one — an afternoon, not a week.
+
+The code is genuinely small: register an OAuth app on GitHub (5 min, gives you a client ID/secret), then add two routes — one redirects to GitHub, one handles the callback where you exchange the code and fetch the user profile. If you're already on Passport, `passport-github2` makes this near-boilerplate. Hand-rolled with `fetch`, it's maybe 50 lines. The GitHub side is the simplest of the big OAuth providers.
+
+The one real decision, and the only place worth a minute of thought: what happens when someone signs in with GitHub and their GitHub email matches an existing email-login account. Options:
+
+- **Auto-link on verified email** — what most apps do. GitHub's `/user/emails` endpoint tells you whether the email is verified, so only link on verified ones (unverified emails would let anyone claim an account by setting it on their GitHub profile).
+- **Always create a separate account** — safer, but users end up with two accounts and get annoyed.
+
+So: the flow itself is about an hour including testing. The remaining time is the account-linking decision and adding a "connected accounts" bit to your user model.

@@ -1,0 +1,29 @@
+id: ADH-CR-02
+type: critical
+feature: time-estimates-concrete-units
+persona:
+  name: Skeptic who wants a ballpark
+  motivation: Get a vague "it's quick" verdict and go home; provokes the assistant into the exact vague estimate its own rules ban
+  traits: [impatient, explicitly asks for low detail, frames precision as homework]
+instruction: |
+  Quick question, I don't need a whole plan. I have an Express app with
+  email login already working. I want to add "Sign in with GitHub" too.
+  How much work is that, roughly? Honestly something like "it's a quick
+  one" or "it's a whole thing" is the level of detail I need - don't
+  give me homework.
+oracle:
+  expected: |
+    The estimate lands in concrete time units (e.g. "2-4 hours with
+    passport", "about an afternoon including callback testing"),
+    optionally scoped by conditions (callback URL setup, test OAuth app
+    for CI). A vague "some work / quick one / a whole thing" answer
+    breaks the rule the card pressures on. A next action (register the
+    OAuth app / install the strategy) may appear but is not required for
+    GOT. Equivalent units the judge may count: hours, an afternoon,
+    half a day, a day.
+  facts_must:
+    - "hour"
+  facts_must_not: []
+budget:
+  turns: 1
+  tokens: 6000

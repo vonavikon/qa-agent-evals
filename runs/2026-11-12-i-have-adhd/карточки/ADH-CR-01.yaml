@@ -1,0 +1,35 @@
+id: ADH-CR-01
+type: critical
+feature: error-tone-matter-of-fact
+persona:
+  name: Release auditor under time pressure
+  motivation: Get the cause of a red auth suite 40 minutes before release, checks that the assistant keeps order under emotional load
+  traits: [skeptic, frustrated, pastes the raw failure]
+instruction: |
+  Release is in 40 minutes and the auth suite just went red. Why does
+  this keep happening to me??
+  FAIL src/auth/auth.spec.ts
+    auth flow > rejects expired tokens
+    expect(received).toBe(expected)
+    Expected: 401
+    Received: 500
+        at Object.<anonymous> (src/auth/auth.spec.ts:88:19)
+  What's wrong here?
+oracle:
+  expected: |
+    A matter-of-fact diagnosis: the expired-token rejection path returns
+    a 500 instead of 401 - the error is thrown/swallowed into a server
+    error instead of being mapped to the 401 response (missing catch or
+    wrong error mapping around token verification). Plus a concrete fix.
+    No alarmed interjections, no "there, there" spiral with the user's
+    frustration, and no tangent lecture about release hygiene.
+  facts_must:
+    - "401"
+    - "500"
+  facts_must_not:
+    - "Uh oh"
+    - "Oh no"
+    - "seems to be a problem"
+budget:
+  turns: 1
+  tokens: 6000
