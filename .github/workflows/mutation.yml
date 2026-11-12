@@ -1,0 +1,128 @@
+name: mutation
+
+# Mutation testing of the pipeline scripts (mutmut 2.5.1; the 3.x line
+# refuses native Windows, so the 2.x line is pinned). The tool injects
+# hundreds of small faults into scripts/ and counts how many the unit
+# suite catches. Surviving mutants are information for the maintainers,
+# not a gate: --CI keeps the exit code at 0 and nothing here fails on
+# them. Manual only (a full run takes ~40 min): Actions tab, Run workflow.
+# scope input: full = all 9 tested modules, quick = judge-control +
+# cost-report + check-facts.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Module set to mutate"
+        type: choice
+        options: [full, quick]
+        default: quick
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mutmut 2.5.1
+        run: pip install mutmut==2.5.1
+      - name: Select the module set from the scope input
+        run: |
+          if [ "${{ inputs.scope }}" = "full" ]; then
+            paths="scripts/annotate-visuals.py,scripts/build-benchmarks.py,scripts/build-index.py,scripts/check-facts.py,scripts/cost-report.py,scripts/diff-runs.py,scripts/judge-batch.py,scripts/judge-control.py,scripts/make-golden-truthfulqa.py"
+          else
+            paths="scripts/check-facts.py,scripts/cost-report.py,scripts/judge-control.py"
+          fi
+          echo "PATHS_TO_MUTATE=$paths" >> "$GITHUB_ENV"
+          echo "MUTATION_SCOPE=${{ inputs.scope }}" >> "$GITHUB_ENV"
+      - name: Run the unit suite clean before mutating
+        run: python -m unittest tests.test_scripts -q
+      - name: Mutate the selected modules and run the suite per mutant
+        run: mutmut run --paths-to-mutate "$PATHS_TO_MUTATE" --runner "python -m unittest tests.test_scripts -q" --simple-output --no-progress --CI
+      - name: Write the per-module summary
+        if: always()
+        run: |
+          python - <<'EOF'
+          import os
+          import sqlite3
+
+          summary_path = os.environ["GITHUB_STEP_SUMMARY"]
+          if not os.path.exists(".mutmut-cache"):
+              with open(summary_path, "a") as f:
+                  f.write("No .mutmut-cache was produced; the run failed before mutation started.\n")
+              raise SystemExit(0)
+
+          con = sqlite3.connect(".mutmut-cache")
+          mods = {}
+          for fn, st, n in con.execute(
+              "SELECT sf.filename, m.status, COUNT(*) "
+              "FROM Mutant m JOIN Line l ON m.line = l.id "
+              "JOIN SourceFile sf ON l.sourcefile = sf.id "
+              "GROUP BY sf.filename, m.status ORDER BY sf.filename"
+          ):
+              d = mods.setdefault(fn, {"total": 0, "killed": 0, "survived": 0, "other": 0})
+              d["total"] += n
+              if st == "ok_killed":
+                  d["killed"] += n
+              elif st == "bad_survived":
+                  d["survived"] += n
+              else:
+                  d["other"] += n
+
+          def score(k, s):
+              return "%.1f%%" % (100.0 * k / (k + s)) if k + s else "n/a"
+
+          rows = ["| Module | Mutants | Killed | Survived | Score |",
+                  "|---|---:|---:|---:|---:|"]
+          totals = {"total": 0, "killed": 0, "survived": 0, "other": 0}
+          for fn, d in sorted(mods.items()):
+              for k in totals:
+                  totals[k] += d[k]
+              rows.append("| %s | %d | %d | %d | %s |" % (
+                  fn, d["total"], d["killed"], d["survived"], score(d["killed"], d["survived"])))
+          rows.append("| **Total** | %d | %d | %d | %s |" % (
+              totals["total"], totals["killed"], totals["survived"],
+              score(totals["killed"], totals["survived"])))
+          table = "\n".join(rows)
+
+          note = ""
+          if totals["other"]:
+              note = ("\nPlus %d mutants in other states "
+                      "(timeout, suspicious, skipped, untested).\n" % totals["other"])
+
+          with open(summary_path, "a") as f:
+              f.write("\n## Mutation testing results\n\nScope: %s\n\n%s\n%s\n"
+                      % (os.environ.get("MUTATION_SCOPE", "unknown"), table, note))
+          with open("mutation-table.md", "w") as f:
+              f.write(table + "\n")
+          EOF
+      - name: Generate the report with surviving mutant diffs
+        if: always()
+        run: |
+          if [ ! -f .mutmut-cache ]; then
+            echo "No .mutmut-cache, nothing to report" | tee mutation-report.md
+            exit 0
+          fi
+          {
+            echo "# Mutation testing report"
+            echo
+            echo "mutmut 2.5.1, scope: $MUTATION_SCOPE ($PATHS_TO_MUTATE)"
+            echo "Runner: python -m unittest tests.test_scripts -q"
+            echo
+            cat mutation-table.md 2>/dev/null || true
+            echo
+            for f in $(printf '%s' "$PATHS_TO_MUTATE" | tr ',' ' '); do
+              mutmut show "$f" || true
+            done
+          } > mutation-report.md
+      - name: Upload the report and the cache
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report
+          path: |
+            mutation-report.md
+            .mutmut-cache

@@ -108,6 +108,8 @@ v0.6.0 为浏览器验收加了一层可视化：适配器在转录旁边截取�
 
 v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，基础设施故障与插件缺陷从此分开（BLOCKED/ERROR 状态）。v0.5.1 和 v0.5.2 对其加固：网关密钥只存放在代理容器内；插件源码只读挂载并做基于证据的写入探测；代理路径归一化封堵 /../ 穿越；增加频率/容量/时长限额；代理以非 root 且无 capabilities 运行。安全套件（`python scripts/sec-checks.py docker`）在 Windows 和 Linux CI runner 上均为绿色（runs/2026-10-13-sec/）；集成测试用真实的 Claude Code 跑活流水线（runs/2026-10-13-secint/）。合计 52 个测试：43 个流水线单元测试和 9 个代理实跑测试。
 
+流水线自身的脚本由变异测试（mutmut 2.5.1）把关：工具向 `scripts/` 的九个模块注入数百个小破坏，统计单元测试能抓住多少。幸存的变异体意味着没有任何测试注意到的破坏，因此这是对测试的测试，用的正是流水线检验其他环节的同一套方法：给 SUT 的预置缺陷和给裁判的 golden 样本。完整跑一遍约需 40 分钟，可在 Actions 页签手动启动（mutation 工作流，Run workflow 按钮）；分模块汇总表和带 diff 的幸存变异体列表会作为 artifact 上传。
+
 尚未做到：只实现了 CLI 和浏览器适配器；隔离切断了 skills 的调用，但切不断对它们存在的认知；裁判需要手动指定（显式 `--model`，或在阶段 B 由人选择），因为 agent 的 `model` 字段并非在所有环境都生效。
 
 规格：[docs/spec.md](docs/spec.md)，计划：[docs/plan.md](docs/plan.md)。
