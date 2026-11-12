@@ -15,7 +15,7 @@ a visual-reviewer subagent marks flaws with severity frames — the judge never
 sees that markup and verdicts do not change.
 
 Docs: `README.md` (EN, canonical) with RU/ZH/ES/FR translations (`README.ru.md`
-and siblings) · `docs/spec.md` · `docs/architecture.md` (+ interactive
+and siblings) · `docs/architecture.md` (+ interactive
 `docs/architecture.html`).
 
 ## Layout

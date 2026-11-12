@@ -86,13 +86,10 @@ scripts/sec-integration.py    集成测试：docker 沙箱内跑真实流水线
 scripts/Dockerfile.sandbox    隔离容器的镜像
 examples/evil-plugin          用于验证隔离的靶标插件
 tests/                        流水线的单元测试与实跑测试
-docs/spec.md                  规格说明
-docs/plan.md                  实现计划
 docs/architecture.md          工作原理：流水线、隔离、责任
 docs/research-2026-10-09.md   源框架综述
 docs/research-2026-10-10-rsi.md  自我提升（self-improvement）资料笔记
 docs/research-2026-10-11-kaggle-golden.md  用于 golden 用例的开放数据集
-docs/reviews/                 规格的外部评审与代码评审
 runs/                         自验收与第三方运行的产物（原始会话日志与敏感数据已剔除）
 ```
 
@@ -111,8 +108,6 @@ v0.5.0 加入执行隔离（host/docker），并用 evil-plugin 实跑验证，�
 流水线自身的脚本由变异测试（mutmut 2.5.1）把关：工具向 `scripts/` 的九个模块注入数百个小破坏，统计单元测试能抓住多少。幸存的变异体意味着没有任何测试注意到的破坏，因此这是对测试的测试，用的正是流水线检验其他环节的同一套方法：给 SUT 的预置缺陷和给裁判的 golden 样本。完整跑一遍约需 40 分钟，可在 Actions 页签手动启动（mutation 工作流，Run workflow 按钮）；分模块汇总表和带 diff 的幸存变异体列表会作为 artifact 上传。
 
 尚未做到：只实现了 CLI 和浏览器适配器；隔离切断了 skills 的调用，但切不断对它们存在的认知；裁判需要手动指定（显式 `--model`，或在阶段 B 由人选择），因为 agent 的 `model` 字段并非在所有环境都生效。
-
-规格：[docs/spec.md](docs/spec.md)，计划：[docs/plan.md](docs/plan.md)。
 
 ## 贡献者
 

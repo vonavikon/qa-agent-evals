@@ -86,13 +86,10 @@ scripts/sec-integration.py    test d'intégration : pipeline réel dans le bac �
 scripts/Dockerfile.sandbox    image du conteneur d'isolation
 examples/evil-plugin          plugin cible pour vérifier l'isolation
 tests/                        tests unitaires et réels du pipeline
-docs/spec.md                  spécification
-docs/plan.md                  plan d'implémentation
 docs/architecture.md          fonctionnement : pipeline, isolation, responsabilités
 docs/research-2026-10-09.md   revue des frameworks sources
 docs/research-2026-10-10-rsi.md  notes sur les sources d'auto-amélioration
 docs/research-2026-10-11-kaggle-golden.md  jeux de données ouverts pour les cas golden
-docs/reviews/                 revues externes de la spec et revues de code
 runs/                         artefacts des auto-acceptations et des courses tierces (logs bruts et données sensibles retirés)
 ```
 
@@ -111,8 +108,6 @@ v0.5.0 a ajouté l'isolation d'exécution (host/docker) avec preuves réelles co
 Les scripts du pipeline eux-mêmes sont vérifiés par du mutation testing (mutmut 2.5.1) : l'outil injecte des centaines de petites casses dans neuf modules de `scripts/` et compte combien les tests unitaires attrapent. Un mutant survivant est une casse qu'aucun test ne remarque, c'est donc tester les tests avec la même méthode que le pipeline applique ailleurs : défauts semés pour le SUT et jeu golden pour le juge. Une course complète prend environ 40 minutes et se lance à la main depuis l'onglet Actions (le workflow mutation, bouton Run workflow) ; le tableau par module et les mutants survivants avec leurs diffs sont téléversés comme artifacts.
 
 Ne fonctionne pas encore : seuls les adaptateurs CLI et navigateur sont implémentés ; l'isolation coupe l'invocation des skills mais pas la connaissance de leur existence ; le juge est câblé à la main (`--model` explicite ou choix du propriétaire à l'étape B), car le champ `model` de l'agent ne fonctionne pas dans tous les environnements.
-
-Spec : [docs/spec.md](docs/spec.md), plan : [docs/plan.md](docs/plan.md).
 
 ## Contributeurs
 

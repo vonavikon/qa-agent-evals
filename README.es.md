@@ -86,13 +86,10 @@ scripts/sec-integration.py    test de integración: pipeline vivo dentro del san
 scripts/Dockerfile.sandbox    imagen del contenedor de aislamiento
 examples/evil-plugin          plugin objetivo para verificar el aislamiento
 tests/                        tests unitarios y vivos del pipeline
-docs/spec.md                  especificación
-docs/plan.md                  plan de implementación
 docs/architecture.md          cómo funciona: pipeline, aislamiento, responsabilidad
 docs/research-2026-10-09.md   revisión de frameworks de origen
 docs/research-2026-10-10-rsi.md  notas sobre fuentes de self-improvement
 docs/research-2026-10-11-kaggle-golden.md  datasets abiertos para casos golden
-docs/reviews/                 revisiones externas de la spec y code reviews
 runs/                         artefactos de auto-aceptación y corridas de terceros (logs crudos y datos sensibles eliminados)
 ```
 
@@ -111,8 +108,6 @@ v0.5.0 añadió el aislamiento de ejecución (host/docker) con pruebas vivas con
 Los propios scripts del pipeline se comprueban con mutation testing (mutmut 2.5.1): la herramienta introduce cientos de fallos pequeños en nueve módulos de `scripts/` y cuenta cuáles detectan los tests unitarios. Un mutante superviviente es un fallo que ningún test nota, así que esto es testear los tests con el mismo método que el pipeline aplica al resto: defectos sembrados para el SUT y un conjunto golden para el juez. Una corrida completa tarda unos 40 minutos y se lanza a mano desde la pestaña Actions (el workflow mutation, botón Run workflow); la tabla por módulo y los mutantes supervivientes con sus diffs se suben como artifacts.
 
 Aún no funciona: solo están implementados los adaptadores CLI y de navegador; el aislamiento corta la invocación de skills pero no el conocimiento de su existencia; el juez se conecta a mano (`--model` explícito o elección del dueño en el paso B), porque el campo `model` del agente no funciona en todos los entornos.
-
-Spec: [docs/spec.md](docs/spec.md), plan: [docs/plan.md](docs/plan.md).
 
 ## Colaboradores
 
