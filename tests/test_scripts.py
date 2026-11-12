@@ -474,7 +474,7 @@ class JudgeBatchRescue(unittest.TestCase):
                                   "missing": []}, "GOT")
         self.assertIn("secret", add)
         self.assertIn("GOT", add)
-        self.assertIn("в пользу негатива", add)
+        self.assertIn("toward the negative", add)
 
     def test_rescue_flow_first_pass_positive(self):
         """GOT with DET_LEAK -> rerun, final file: the rescued verdict
@@ -519,7 +519,7 @@ class JudgeBatchRescue(unittest.TestCase):
             self.assertIn("автопересуд: GOT -> FAIL", text)
             v, _ = build_index.verdict_of(os.path.join(td, "вердикты", "T-01-r1.md"))
             self.assertEqual(v, "FAIL")
-            self.assertIn("АВТОПЕРЕСУД", calls[1])
+            self.assertIn("AUTO-REJUDGE", calls[1])
             # r2 without a contradiction - one call, a regular file
             text2 = io.open(os.path.join(td, "вердикты", "T-01-r2.md"),
                             encoding="utf-8").read()
