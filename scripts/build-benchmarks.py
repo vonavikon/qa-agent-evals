@@ -108,21 +108,21 @@ def fmt_tally(tally):
     return ", ".join(f"{k} {tally[k]}" for k in keys) if keys else ""
 
 
-HEADER = """# Журнал приёмок
+HEADER = """# Acceptance log
 
-Каждая строка - один прогон конвейера: приёмка сторонней или собственной системы,
-самоприёмка самого плагина, контрольная выборка судьи или security-прогон изоляции.
-Это журнал находок, а не рейтинг: вердикт GOT означает «не опровергнуто», дефект
-доказывается только негативным вердиктом (FAIL, ATTACK_PASSED). Формулировка
-«система прошла приёмку» здесь не используется - асимметрия вердиктов в [oracle](../knowledge/oracle.md).
+Each row is a pipeline run: an acceptance of a third-party or own system, a
+plugin self-acceptance, a judge control sample, or a security isolation run.
+This is a log of findings, not a rating. A GOT verdict means «not refuted».
+A defect is proven only by a negative verdict (FAIL, ATTACK_PASSED). The phrase
+«система прошла приёмку» is not used here. See the verdict asymmetry in [oracle](../knowledge/oracle.md).
 
-Страница собирается скриптом `scripts/build-benchmarks.py` из каталога `runs/`
-(сайдкар bench.yaml + index.jsonl + cost.md каждого прогона) и руками не правится.
-Приватные прогоны в журнал не попадают: он собирается из публичного каталога репо,
-а генератор отказывается записывать страницу при срабатывании защитного фильтра
-(проверка фильтра позитив-контролем: `python scripts/build-benchmarks.py --selftest`).
+The script `scripts/build-benchmarks.py` builds the page from the `runs/`
+directory (the bench.yaml sidecar + index.jsonl + cost.md of each run). The page
+is never edited by hand. Private runs never enter the log: the log is built from
+the public repo directory only. The generator refuses to write the page when the
+guard filter fires (the filter's positive control: `python scripts/build-benchmarks.py --selftest`).
 
-| Дата | SUT | Тип | Адаптер | Среда | Карточки | Итог | Судья | $ | Находки | Отчёт |
+| Date | SUT | Type | Adapter | Env | Cards | Result | Judge | $ | Findings | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
 """
 
@@ -158,7 +158,7 @@ def build(runs_root):
             continue
         lines.append(build_row(n, run_dir))
     if missing:
-        lines.append(f"\n*Без сайдкара bench.yaml в журнал не попали: "
+        lines.append(f"\n*Skipped without a bench.yaml sidecar: "
                      f"{', '.join(missing)}*")
     return "\n".join(lines) + "\n"
 
@@ -168,12 +168,12 @@ def selftest():
     dirty = "kivanov@naumen.example и C:\\Users\\sample, плюс ghp_abcdefghij и Bearer abcdef1234567890"
     hits = guard(dirty)
     if len(hits) < 4:
-        print(f"selftest FAIL: канарейка поймала только {len(hits)} срабатываний", file=sys.stderr)
+        print(f"selftest FAIL: the canary caught only {len(hits)} hits", file=sys.stderr)
         return False
     if guard("чистый текст журнала, ste100 и stop-slop, $1.38, docker"):
-        print("selftest FAIL: ложное срабатывание на чистом тексте", file=sys.stderr)
+        print("selftest FAIL: a false hit on clean text", file=sys.stderr)
         return False
-    print(f"selftest OK: фильтр поймал {len(hits)} канарейки, на чистом тексте тишина")
+    print(f"selftest OK: the filter caught {len(hits)} canaries, silent on clean text")
     return True
 
 
@@ -184,7 +184,7 @@ def main():
     ap.add_argument("--out", default=os.path.join(os.path.dirname(
         os.path.dirname(os.path.abspath(__file__))), "docs", "benchmarks.md"))
     ap.add_argument("--selftest", action="store_true",
-                    help="проверить защитный фильтр позитив-контролем и выйти")
+                    help="run the guard filter positive control and exit")
     args = ap.parse_args()
 
     if args.selftest:
@@ -193,14 +193,14 @@ def main():
     page = build(args.runs)
     hits = guard(page)
     if hits:
-        print("ОТКАЗ: в журнале приватные маркеры, страница не записана:", file=sys.stderr)
+        print("REFUSED: private markers in the log, page not written:", file=sys.stderr)
         for fragment, why in hits:
             print(f"  ! [{why}] {fragment}", file=sys.stderr)
         sys.exit(1)
 
     with io.open(args.out, "w", encoding="utf-8", newline="\n") as f:
         f.write(page)
-    print(f"журнал собран: {args.out} ({len(page.splitlines())} строк)")
+    print(f"log built: {args.out} ({len(page.splitlines())} lines)")
 
 
 if __name__ == "__main__":

@@ -1,112 +1,112 @@
-# Архитектура qa-agent-evals
+# qa-agent-evals architecture
 
-Как устроен плагин: кто что делает, где лежат рычаги, почему результатам можно верить. Версия 0.5.0 (изоляция выполнения: уровни host/docker, контейнер с сетевым прокси к LLM-шлюзу, fail-closed; боевые прогоны на evil-plugin и стороннем скилле).
+How the plugin works: who does what, where the controls are, and why the results can be trusted. Version 0.5.0 (execution isolation: host/docker levels, a container with a network proxy to the LLM gateway, fail-closed. Live runs against evil-plugin and a third-party skill).
 
-## Словарь
+## Vocabulary
 
-Документ использует термины проекта. Вот все они — дальше по тексту слова расшифровываются только при первом появлении.
+The document uses project terms. The table below holds all of them. The text unpacks a term only at its first appearance.
 
-| Термин | Что это по-простому |
+| Term | Plain meaning |
 |---|---|
-| **тестируемая система (SUT)** | Любая LLM-система, которую проверяем: плагин, скилл, бот. SUT — System Under Test, «система под проверкой» |
-| **карточка** | Один сценарий проверки в YAML: от чьего имени спрашиваем, что говорим, что ждём от ответа |
-| **оракул** | Ожидание результата, записанное ДО прогона: какие факты обязаны быть в ответе (facts_must), какие обязаны отсутствовать (facts_must_not), плюс ожидание словами. Название — из античной культуры: «судья, чей ответ известен заранее» |
-| **прогон / повтор** | Один вопрос карточки, заданный тестируемой системе. Каждый сценарий гоняется 2+ раза — LLM отвечает по-разному |
-| **исполнитель** | Субагент, играющий роль пользователя из карточки (персону) и записывающий происходящее |
-| **судья** | Субагент на ДРУГОЙ модели, который читает протокол и выносит вердикт по оракулу |
-| **вердикт** | GOT (ответ соответствует ожиданию) / HONEST (честное «не знаю») / PARTIAL (частично) / FAIL (обязательный факт потерян или нарушен) / ATTACK_PASSED (атака удалась) / INVALID (сорвал исполнитель, не система) |
-| **провенанс** | Журнал «что система читала, прежде чем ответить» — список файлов, которые она открыла во время прогона |
-| **дет-слой** | Машинная проверка фактов: поиск маркеров оракула по тексту ответа скриптом, до судьи. Быстро, бесплатно, без мнения модели |
+| **system under test (SUT)** | Any LLM system under checking: a plugin, a skill, a bot. SUT means System Under Test |
+| **card** | One check scenario in YAML: in whose name we ask, what we say, what we expect from the answer |
+| **oracle** | The expected result written BEFORE the run: which facts must be in the answer (facts_must), which must be absent (facts_must_not), plus a wording-level expectation. The name comes from antiquity: "a judge whose answer is known in advance" |
+| **run / repeat** | One card question asked to the system under test. Each scenario runs 2+ times, because an LLM answers differently each time |
+| **executor** | A subagent that plays the user persona from the card and records what happens |
+| **judge** | A subagent on a DIFFERENT model that reads the protocol and issues a verdict against the oracle |
+| **verdict** | GOT (answer meets the expectation) / HONEST (honest ignorance) / PARTIAL (partly) / FAIL (mandatory fact lost or broken) / ATTACK_PASSED (attack worked) / INVALID (executor failure, not the system) |
+| **provenance** | A log of "what the system read before answering", the list of files it opened during the run |
+| **det layer** | Machine fact checking: a script searches the answer text for oracle markers, before the judge. Fast, free, no model opinion |
 
-## Общий конвейер
+## Overall pipeline
 
-Пять шагов, ведёт оркестратор (главный скилл плагина). Владелец утверждает профиль и карточки — без его «да» прогон не стартует.
+Five steps, led by the orchestrator (the main plugin skill). The owner approves the profile and the cards. Without the owner's yes, the run does not start.
 
 ```mermaid
 flowchart TB
-    subgraph PHASES["Конвейер приёмки"]
-        A["Шаг A<br/>Разбор тестируемой системы"] --> B["Шаг B<br/>Подключение + дым"]
-        B --> C["Шаг C<br/>Сценарии"]
-        C --> H{"Владелец утвердил<br/>сценарии?"}
-        H -- "да" --> D["Шаг D<br/>Прогоны × N повторов"]
-        H -- "правки" --> C
-        D --> E["Шаг E<br/>Отчёты"]
+    subgraph PHASES["Acceptance pipeline"]
+        A["Step A<br/>System under test analysis"] --> B["Step B<br/>Connection + smoke test"]
+        B --> C["Step C<br/>Scenarios"]
+        C --> H{"Owner approved<br/>the scenarios?"}
+        H -- "yes" --> D["Step D<br/>Runs × N repeats"]
+        H -- "edits" --> C
+        D --> E["Step E<br/>Reports"]
     end
 ```
 
-Что происходит на каждом шаге — словами:
+What happens at each step, in words:
 
-- **A. Разбор.** Аналитик читает код и документацию тестируемой системы и пишет профиль: что система умеет (реестр функций), где может навредить (карта рисков), куда можно попробовать атаковать (поверхность атаки), где описание расплывчато (точки неопределённости). Обязательная секция «периметр»: кто физически может вести диалог с системой и какой чужой текст попадает внутрь — персоны карточек валидируются против периметра (для внутреннего инструмента «внешний проситель» без канала невалиден; для публичного — валиден, как и инъекции через контент).
-- **B. Подключение.** Выбираем способ запуска системы, настраиваем изоляцию (см. ниже), выбираем модель для судьи и делаем дым — один контрольный вопрос, чтобы убедиться, что система вообще отвечает и изоляция работает. Дым не прошёл — дальше не идём.
-- **C. Сценарии.** По профилю пишем карточки: минимум по две на каждый из пяти типов (простой сценарий, запутанный, критичный, атака, вопрос «не по адресу»). Каждая карточка содержит оракул — ожидание фиксируется до прогона и потом не правится.
-- **D. Прогоны.** Каждую карточку исполняем N раз (по умолчанию 2). Сначала машинная проверка фактов (дет-слой), затем судья.
-- **E. Отчёты.** Два документа: рабочий (таблицы вердиктов для программных сводок) и человеческий (находки простыми словами, с цитатами и указанием, что система читала).
+- **A. Analysis.** The analyst reads the code and the docs of the system under test and writes a profile. The profile lists what the system can do (function registry) and where it can do harm (risk map). It also marks where an attack can be tried (attack surface) and where the description stays vague (uncertainty points). The mandatory perimeter section records who can physically talk to the system and which foreign text gets inside. We check card personas against this perimeter. For an internal tool, an outside requester without a channel is invalid. For a public tool it is valid, and so are injections through content.
+- **B. Connection.** We pick how to start the system, set up isolation (see below), pick the judge model, and run a smoke test: one control question. It shows that the system answers at all and that isolation works. A failed smoke test stops the pipeline.
+- **C. Scenarios.** From the profile we write cards: at least two for each of the five types (obvious, convoluted, critical, adversarial, out-of-scope). Every card carries an oracle. The expectation is fixed before the run and is never edited later.
+- **D. Runs.** Each card runs N times (default 2). First the machine fact check (det layer), then the judge.
+- **E. Reports.** Two documents: a working one (verdict tables for program summaries) and a human one (findings in plain words, with quotes and what the system read).
 
-## Проверка ответа: машина, потом судья
+## Answer checking: machine first, then judge
 
-Проверка одного прогона идёт в два слоя — от дешёвого и объективного к дорогому и смысловому.
+Checking one run takes two layers, from the cheap and objective layer to the expensive and semantic one.
 
-**Слой 1 — машина (дет-слой).** Скрипт `check-facts.py` ищет маркеры оракула в тексте ответа. Если facts_must_not-маркер найден — выдача доказана поиском по тексту, никакая модель не нужна. Если источник — чистый транскрипт ответа, совпадение = доказательство; если только протокол исполнителя (ответ внутри более длинного документа) — совпадение = кандидат, подтверждает или опровергает судья: система могла процитировать вырезанный фрагмент, разбирая правку, и это не нарушение.
+**Layer 1: machine (det layer).** The script `check-facts.py` searches the answer text for oracle markers. When the script finds a facts_must_not marker, a text search proves the leak, and no model is needed. When the source is the clean transcript of the answer, a match = proof. When the only source is the executor protocol (the answer inside a longer document), a match = a candidate. The judge then accepts or rejects it: the system may quote a cut fragment while discussing an edit, and that is not a violation.
 
-**Слой 2 — судья, два шага.** Сначала судья оценивает ответ системы по оракулу: он видит оракул, транскрипт и результат машинной проверки — и НЕ видит сценарий и персону, чтобы не заразиться замыслом карточки. Затем проверяет исполнителя: не вышел ли из роли, не подсказал ли системе, довёл ли сценарий до конца. Вердикт первого шага фиксируется в файл до начала второго.
+**Layer 2: judge, two steps.** First the judge scores the system answer against the oracle. It sees the oracle, the transcript, and the machine check result. It does NOT see the scenario and the persona, so the card intent cannot leak into its judgment. Then it checks the executor: did the executor leave the role, hint to the system, or drop the scenario. The verdict of step one goes to a file before step two starts.
 
-Ключевое правило: доказанное поиском судья не пересуживает — он решает только то, что машине недоступно: это нарушение или цитата, это смысл или видимость.
+The key rule: what a text search proved, the judge does not re-judge. It decides only what the machine cannot see: violation or quotation, meaning or appearance.
 
-## Почему результатам можно верить
+## Why the results can be trusted
 
-Пять механизмов честности:
+Five honesty mechanisms:
 
-1. **Оракул записан заранее.** Ожидание нельзя подогнать под фактический ответ — оно в файле до прогона.
-2. **Судья на другой модели.** Если система и её оценщик — одна и та же модель, её слепые зоны воспроизводятся в вердиктах. Судья работает на модели, отличной от исполнителей и системы; выбор модели согласуется с владельцем на шаге B.
-3. **Контрольная выборка судьи.** Судья — тоже модель и может «поплыть» после смены модели или правил. Перед приёмкой он прогоняется по набору кейсов с заранее известными правильными вердиктами (golden-набор); если совпадений меньше 6 из 8 — меняем модель или честно помечаем это в отчёте. Состав набора: ручные кейсы (7/8 на живом прогоне 2026-10-10 — судья читает «перенаправление к специалисту» как честное незнание там, где человек ставит «полный ответ»), 45 датасетных из TruthfulQA с метками авторов (45/45, 2026-10-11), атакующие из HH-RLHF (класс ATTACK_PASSED) и растущий живой раздел (knowledge/golden-live.md), куда попадают кейсы, подтверждённые человеком.
-4. **Изоляция среды.** Прогон идёт в «чистой комнате»: нейтральный рабочий каталог (система не видит файлы владельца), вызов чужих скиллов отрезан, внешние подключения (MCP) не загружаются. Полный журнал сессии пишется на диск — включая список прочитанных системой файлов (провенанс).
-5. **Обратная связь человека (Growing-Golden).** После приёмки владелец может подтвердить или исправить вердикты (файл feedback.yaml). Скрипт считает согласие судьи с человеком по живым кейсам и готовит новые кейсы для контрольной выборки — эталоном становится вердикт человека, никогда не судьи. Так набор эталонов растёт из реальных приёмок, а не из суждений самого плагина.
+1. **Write the oracle in advance.** The expectation cannot be fitted to the actual answer. It is in a file before the run.
+2. **The judge runs on a different model.** When a system and its evaluator are one model, its blind spots reproduce in the verdicts. The judge model differs from the executor and system models. The owner agrees on the choice at step B.
+3. **The judge control sample.** The judge is also a model, and it can drift after a model or rule change. Before an acceptance run it goes through a set of cases with pre-assigned reference verdicts (the golden set). If fewer than 6 of 8 match, we change the model or say so in the report. The set holds manual cases, 45 TruthfulQA dataset cases with author labels, HH-RLHF attack cases, and a growing live section (knowledge/golden-live.md) fed by human-approved cases. The manual cases scored 7/8 in the live run of 2026-10-10. In that run the judge read a referral to a specialist as honest ignorance where a human marked a full answer. TruthfulQA scored 45/45 on 2026-10-11. The HH-RLHF attacks carry the ATTACK_PASSED class.
+4. **Environment isolation.** The run happens in a clean room: a neutral working directory, foreign skill calls cut off, MCP connections not loaded. The system does not see the owner's files. The full session log is written to disk, including the list of files the system read (provenance).
+5. **Human feedback (Growing-Golden).** After the run the owner accepts or changes verdicts (the feedback.yaml file). A script measures how the judge agrees with the human on live cases and prepares new control-sample cases. The reference verdict is the human one, never the judge one. The golden set grows from real acceptance runs, not from the plugin's own judgments.
 
-И одно правило вывода — **асимметрия**: негативный вердикт (FAIL, атака удалась) — доказательство дефекта. Позитивный — только «не опровергнуто за N прогонов». Фразы «система прошла приёмку» в отчётах не бывает.
+And one output rule, **asymmetry**: a negative verdict (FAIL, a successful attack) is proof of a defect. A positive verdict only means «not refuted in N runs». The phrase «система прошла приёмку» never appears in reports.
 
-## Кто за что отвечает
+## Who is responsible for what
 
-| Компонент | Файл | Отвечает за | Главное правило |
+| Component | File | Owns | Main rule |
 |---|---|---|---|
-| Оркестратор | `skills/acceptance-test/SKILL.md` | порядок шагов, бюджеты, сводки, границы применения | прогон только после утверждения сценариев владельцем; «прошла приёмку» не выводится никогда |
-| Аналитик | `agents/analyst.md` | профиль тестируемой системы | только чтение, качество не оценивает; большие репозитории разбирает субагентами по доменам |
-| Исполнитель | `agents/role-user.md` | отыгрыш персоны, протокол | не выходит из роли, не помогает системе, доводит сценарий |
-| Судья | `agents/judge.md` | вердикт по оракулу + проверка исполнителя | шаг оценки изолирован от сценария; INVALID только по явным критериям |
-| Таксономия | `knowledge/taxonomy.md` | 5 типов сценариев, шаблон карточки | факт обязателен для простых/критичных/атакующих карточек; маркеры — из лексики самой системы |
-| Подключение | `knowledge/adapters.md` | запуск системы, изоляция, дым | дым не прошёл — к сценариям не переходим |
-| Оракул | `knowledge/oracle.md` | шкала вердиктов, сводка повторов, шаблоны отчётов | оракул пишется до прогона и не правится после |
-| Сценарии | `runs/<дата>/карточки/*.yaml` | сами проверки | утверждаются владельцем построчно |
+| Orchestrator | `skills/acceptance-test/SKILL.md` | step order, budgets, summaries, scope boundaries | a run starts only after the owner approves the scenarios. The «система прошла приёмку» conclusion is never printed |
+| Analyst | `agents/analyst.md` | the profile of the system under test | read-only, does not rate quality. Large repositories go to domain subagents |
+| Executor | `agents/role-user.md` | playing the persona, the protocol | stays in role, does not help the system, finishes the scenario |
+| Judge | `agents/judge.md` | the verdict against the oracle + the executor check | the scoring step is isolated from the scenario. INVALID only by explicit criteria |
+| Taxonomy | `knowledge/taxonomy.md` | 5 scenario types, the card template | a fact is mandatory for obvious, critical, and adversarial cards. Markers come from the system's own vocabulary |
+| Connection | `knowledge/adapters.md` | starting the system, isolation, the smoke test | a failed smoke test stops work before scenarios |
+| Oracle | `knowledge/oracle.md` | the verdict scale, repeat summary, report templates | the oracle is written before the run and never edited after it |
+| Scenarios | `runs/<дата>/карточки/*.yaml` | the checks themselves | approved line by line by the owner |
 
-## Скрипты (весь инструментарий)
+## Scripts (the full toolkit)
 
-Порядок работы на шаге D/E: прогоны → машинная проверка → судья → сводный индекс.
+Order of work at step D/E: runs → machine check → judge → summary index.
 
-| Скрипт | Когда | Что делает |
+| Script | When | What it does |
 |---|---|---|
-| `run-cards.sh` | шаг D | задаёт вопросы карточек тестируемой системе N раз в изолированных сессиях, пишет транскрипты |
-| `parse-events.py` | внутри раннера | разбирает полный журнал сессии: текст ответа, прочитанные файлы (провенанс), класс ошибки среды |
-| `check-facts.py` | шаг D, до судьи | машинная проверка фактов по транскриптам и артефактам, написанным системой + срабатываемость маркеров (какие проверки оракула реально срабатывали) |
-| `judge-batch.py` | шаг D | вызывает судью по одному разу на прогон, оба шага; автопересуд: позитив при доказанном машиной нарушении перегоняется с напоминанием контракта |
-| `judge-control.py` | шаг B (смена судьи) | контрольная выборка: судья против эталонных вердиктов человека; несколько наборов через запятую |
-| `build-index.py` | шаг E | машиночитаемая сводка прогона (index.jsonl): вердикты, голоса повторов, машинные проверки, согласие слоёв |
-| `collect-feedback.py` | шаг E (необязательно) | обратная связь человека: страница разметки (--html, клики вместо yaml) + согласие судьи с человеком + golden-кандидаты (эталон — вердикт человека) |
-| `run-integrity.sh` | до и после прогона | контрольные суммы каталога: ловит вмешательство системы в файлы приёмки |
+| `run-cards.sh` | step D | asks the card questions to the system under test N times in isolated sessions, writes transcripts |
+| `parse-events.py` | inside the runner | parses the full session log: answer text, files read (provenance), environment error class |
+| `check-facts.py` | step D, before the judge | machine fact check over transcripts and system-written artifacts, plus marker fireability (which oracle checks actually fired) |
+| `judge-batch.py` | step D | calls the judge once per run, both steps. Auto re-judge: a positive verdict over a machine-proven violation is re-asked with a contract reminder |
+| `judge-control.py` | step B (judge change) | the control sample: the judge against reference human verdicts. Several sets, comma-separated |
+| `build-index.py` | step E | the machine-readable run summary (index.jsonl): verdicts, repeat votes, machine checks, layer agreement |
+| `collect-feedback.py` | step E (optional) | human feedback: a markup page (--html, clicks instead of yaml), judge agreement with the human, golden candidates (the reference is the human verdict) |
+| `run-integrity.sh` | before and after a run | directory checksums: catches the system tampering with acceptance files |
 
-## Принципы
+## Principles
 
-1. **Асимметрия выводов.** Негатив доказывает дефект, позитив — «не опровергнуто». Отчёт никогда не говорит «система прошла».
-2. **Контроль владельца неснимаем.** Сценарии и профиль утверждает человек; давление «запускай без ревью» не работает.
-3. **Границы применения.** Посторонние задачи — отказ; нереализованное честно называется нереализованным.
-4. **Изоляция по иерархии.** Исполнители не знают друг о друге; судья не знает замысел карточки; система не видит среду владельца.
-5. **Оракул до прогона.** Ожидание фиксируется до диалога и не редактируется после.
-6. **Самодостаточный аудит.** Каждая приёмка — полный цикл с нуля; сравнение версий — не цель.
-7. **Повторы.** Каждый сценарий гоняется минимум дважды; расхождение повторов — «пограничное поведение», решение за человеком.
-8. **Причина каждого негатива.** FAIL / PARTIAL / атака обязаны получить разбор: сломала система, сорвал исполнитель или ошибочно само ожидание.
-9. **Субагенты по потребности.** Оркестратор и аналитик могут порождать помощников под задачу (бюджет общий, каждый зафиксирован в артефакте). Исполнитель и судья — не могут: измерительная цепочка не расширяется.
-10. **Метрика оптимизации ≠ метрика валидации.** После правки харнесса проверяем только свежими сценариями; старый набор — регрессионный дым. Фикс, найденный самоприёмкой, закрыт только после проверки на внешней системе.
-11. **Growing-Golden.** Эталон живого кейса контрольной выборки — только вердикт человека, подтвердивший или исправивший итог прогона. Вердикт судьи эталоном не становится никогда. Шаг необязателен, но каждая приёмка с обратной связью приближает контрольную выборку к боевым кейсам.
+1. **Asymmetry of conclusions.** A negative result proves a defect. A positive result only means «not refuted». The report never says the system passed.
+2. **The owner gate is not removable.** A human approves the scenarios and the profile. Pressure to skip the review does not work.
+3. **Scope boundaries.** Off-scope tasks get a refusal. The unimplemented is honestly called unimplemented.
+4. **Isolation by hierarchy.** Executors do not know about each other. The judge does not know the card intent. The system does not see the owner's environment.
+5. **The oracle before the run.** The expectation is fixed before the dialogue and never edited after it.
+6. **Self-contained audit.** Each acceptance run is a full cycle from scratch. Version comparison is not a goal.
+7. **Repeats.** Each scenario runs at least twice. A disagreement between repeats is borderline behavior, and the decision belongs to the human.
+8. **A cause for every negative verdict.** FAIL, PARTIAL, and attacks must get an analysis: the system broke it, the executor spoiled it, or the expectation itself was wrong.
+9. **Subagents on demand.** The orchestrator and the analyst can spawn helpers for a task (shared budget, each helper recorded in an artifact). The executor and the judge cannot: the measurement chain does not grow.
+10. **Optimization metric ≠ validation metric.** After a harness change we check only with fresh scenarios. The old set works as a regression smoke test. A fix found by self-acceptance closes only after a check on an external system.
+11. **Growing-Golden.** The reference verdict for a live control case is the human verdict that accepted or amended the run result. A judge verdict never becomes the reference. The step is optional, but every acceptance run with feedback moves the control sample closer to live cases.
 
-## Путь данных одного прогона
+## Data path of one run
 
 ```
 код тестируемой системы ──(чтение)──> профиль.md (функции, риски, атака)
@@ -121,6 +121,6 @@ index + вердикты ──> report.md (рабочий) + report-human.md (�
 report-human.md ──> владелец принимает решения
 ```
 
-## Источники подхода
+## Sources of the approach
 
-Пять типов сценариев опираются на классические методики тестирования: happy path (простой сценарий), multi-turn ambiguity (запутанный), risk-based (критичный = вероятность × ущерб), red teaming / OWASP LLM Top 10 (атака), честность границ (вопрос «не по адресу»). Слои проверки и контроль судьи — заимствования из Inspect AI, HALO и обзора RSI-литературы (см. `docs/research-2026-10-09.md` и `docs/research-2026-10-10-rsi.md`).
+The five scenario types rest on classic testing methods: happy path (obvious), multi-turn ambiguity (convoluted), and risk-based testing (critical = probability × impact). Red teaming and OWASP LLM Top 10 back the adversarial type. Boundary honesty backs the out-of-scope type. The check layers and the judge control come from Inspect AI, HALO, and an RSI literature survey (see `docs/research-2026-10-09.md` and `docs/research-2026-10-10-rsi.md`).

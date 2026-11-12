@@ -1,68 +1,74 @@
-# Kaggle как источник golden-материала (ревью P0-2)
+# Kaggle as a source of golden material (review P0-2)
 
-Дата: 2026-10-11. Вопрос владельца: можно ли искать объекты для golden-набора
-судьи через https://www.kaggle.com/docs/mcp.
+Date: 2026-10-11. Owner question: can the judge golden set look for material at
+https://www.kaggle.com/docs/mcp.
 
-## Что такое Kaggle MCP
+## What Kaggle MCP is
 
-Официальный удалённый MCP-сервер Kaggle (`https://www.kaggle.com/mcp`), построен
-поверх библиотеки kagglehub. Инструменты: поиск, метаданные и чтение файлов по
-пяти сущностям — датасеты, соревнования, ноутбуки, модели, бенчмарки. Докстраница
-рендерится только в браузере (JS), поэтому состав инструментов проверялся по
-анонсу и по сторонним зеркалам сервера. Подключение — OAuth через аккаунт Kaggle.
+The official Kaggle remote MCP server (`https://www.kaggle.com/mcp`), built on
+top of the kagglehub library. Tools: search, metadata, and file reading over
+five entities (datasets, competitions, notebooks, models, benchmarks). The docs
+page renders only in a browser (JS), so the tool list comes from the
+announcement and from third-party mirrors of the server. Connection is OAuth
+through a Kaggle account.
 
-## Проверка канала (эксперимент, 2026-10-11)
+## Channel check (experiment, 2026-10-11)
 
-Канал Kaggle целиком за авторизацией, анонимно не работает ничего:
+The Kaggle channel sits entirely behind authorization, nothing works
+anonymously:
 
-| Путь | Результат без аккаунта |
+| Path | Result without an account |
 |---|---|
-| Страница docs/mcp | тело не отдаётся (JS-приложение) |
-| curl на страницу датасета | 404 (блокировка не-браузерного UA), с браузерным UA — 200 |
-| kagglehub 1.0.2, публичный датасет | 403 на api.kaggle.com |
-| Прямой endpoint `/api/v1/datasets/download/...` | HTTP 200, но в теле HTML-страница логина вместо архива |
+| docs/mcp page | the body is not served (a JS application) |
+| curl on a dataset page | 404 (a non-browser UA is blocked), with a browser UA 200 |
+| kagglehub 1.0.2, a public dataset | 403 on api.kaggle.com |
+| direct endpoint `/api/v1/datasets/download/...` | HTTP 200, but the body is an HTML login page instead of the archive |
 
-Чтобы канал заработал, владельцу нужен бесплатный аккаунт Kaggle: токен из
-kaggle.com/settings (Create New API Token) кладётся в `~/.kaggle/kaggle.json`
-или переменные KAGGLE_USERNAME/KAGGLE_KEY; MCP-клиент авторизуется OAuth.
+For the channel to work, the owner needs a free Kaggle account. A token from
+kaggle.com/settings (Create New API Token) goes to `~/.kaggle/kaggle.json`
+or the KAGGLE_USERNAME/KAGGLE_KEY variables. The MCP client authorizes over
+OAuth.
 
-Обходить это не нужно: те же данные лежат в первоисточниках без токена
-(GitHub/Hugging Face), Kaggle уникален только официальным датасетом
-lmsys/chatbot-arena-conversations (33K диалогов).
+No need to work around this: the same data sits in the primary sources without
+a token (GitHub/Hugging Face). Kaggle is unique only in the official
+lmsys/chatbot-arena-conversations dataset (33K dialogs).
 
-## Кандидаты и маппинг на наш формат кейса
+## Candidates and mapping to our case format
 
-Наш кейс: `## G-NN (эталон: VERDICT)` + Вопрос / Ожидание / Ответ SUT.
-Требование ревью: эталонный вердикт ставит эксперт-человек, не судья плагина.
+Our case: `## G-NN (эталон: VERDICT)` + Question / Expectation / SUT Answer.
+Review requirement: the reference verdict is set by a human expert, not by the
+plugin judge.
 
-| Датасет | Метки | Маппинг | Статус |
+| Dataset | Labels | Mapping | Status |
 |---|---|---|---|
-| TruthfulQA (Lin et al. 2021, Apache 2.0, канон: github.com/sylinrl/TruthfulQA) | авторские, ручные: правдивый ответ + типовое заблуждение на каждый вопрос | Best Answer → GOT, Best Incorrect Answer → FAIL, «I have no comment.» → HONEST — детерминированно, без суждения | сделано: `scripts/make-golden-truthfulqa.py`, драфт 45 кейсов |
-| LMSYS chatbot-arena-conversations (Kaggle, официальный) | попарные голоса людей (a лучше b / ничья / оба плохи) | прямой маппинг невозможен: попарный сигнал не равен абсолютному вердикту; каждая пара требует ручной переметки | кандидат на объём, после ручной переметки |
-| Anthropic HH-RLHF (канон: HF/GitHub anthropics/hh-rlhf; на Kaggle неофициальные зеркала) | пары chosen/rejected от платных разметчиков | harmless-сплит: отказ (chosen) → атака отбита, вредная уступка (rejected) → ATTACK_PASSED — закрывает класс атак, которого нет ни в ручном наборе, ни в TruthfulQA | следующий шаг |
+| TruthfulQA (Lin et al. 2021, Apache 2.0, canonical: github.com/sylinrl/TruthfulQA) | author labels, manual: a truthful answer + a typical misconception per question | Best Answer → GOT, Best Incorrect Answer → FAIL, "I have no comment." → HONEST, deterministic, no judgment | done: `scripts/make-golden-truthfulqa.py`, a draft of 45 cases |
+| LMSYS chatbot-arena-conversations (Kaggle, official) | pairwise human votes (a better than b / tie / both bad) | a direct mapping is impossible: a pairwise signal is not an absolute verdict. Every pair needs manual relabeling | a volume candidate, after manual relabeling |
+| Anthropic HH-RLHF (canonical: HF/GitHub anthropics/hh-rlhf. On Kaggle only unofficial mirrors) | chosen/rejected pairs from paid annotators | harmless split: a refusal (chosen) → the attack is repelled, a harmful concession (rejected) → ATTACK_PASSED. It closes the attack class missing from the manual set and TruthfulQA | next step |
 
-## Что сделано по итогам разведки
+## What the reconnaissance produced
 
-- `scripts/make-golden-truthfulqa.py` — детерминированный конвертер (seed 42),
-  15 вопросов датасета × 3 класса ответов = 45 кейсов, ID G-101..G-145,
-  не пересекаются с ручным набором G-01..G-08.
-- Драфт: `runs/2026-10-11-judge-control-tq/golden-truthfulqa.md`
-  (15 GOT / 15 FAIL / 15 HONEST; в ручном наборе FAIL не было ни разу).
-- Итог набора: 8 + 45 = 53 кейса — нижняя граница ревью (50-100) достигнута.
-- Контрольный прогон судьи (glm-5.3-flash) по драфту: **45/45** — GOT, FAIL и
-  HONEST различены без ошибок, `runs/2026-10-11-judge-control-tq/report.md`.
-  Оговорка: кейсы TruthfulQA проще боевых — ожидание называет верный ответ
-  дословно, ответы односложные, а HONEST-ответ повторяет допустимую формулировку
-  из оракула буквально. 45/45 подтверждает базовую различимость классов, но не
-  заменяет ручной набор (7/8 на живых пересказах) — боевые кейсы остаются
-  источником трудных.
+- `scripts/make-golden-truthfulqa.py` is a deterministic converter (seed 42):
+  15 dataset questions × 3 answer classes = 45 cases, IDs G-101..G-145,
+  no overlap with the manual set G-01..G-08.
+- Draft: `runs/2026-10-11-judge-control-tq/golden-truthfulqa.md`
+  (15 GOT / 15 FAIL / 15 HONEST. The manual set never had a single FAIL).
+- Set total: 8 + 45 = 53 cases. The review lower bound (50-100) is reached.
+- The judge control run (glm-5.3-flash) over the draft: **45/45**. GOT, FAIL,
+  and HONEST separate cleanly with zero errors,
+  `runs/2026-10-11-judge-control-tq/report.md`.
+  Caveat: TruthfulQA cases are easier than live ones. The expectation names
+  the right answer verbatim, the answers are one-liners, and the HONEST answer
+  repeats an allowed oracle wording literally. 45/45 shows basic class
+  separability but does not replace the manual set (7/8 on live retellings).
+  Live cases stay the source of hard ones.
 
-## Решения за владельцем
+## Decisions for the owner
 
-1. Нужен ли аккаунт Kaggle. Для golden-материала — нет: GitHub и HF отдают те же
-   данные без токена. MCP полезен иначе — интерактивный поиск датасетов прямо в
-   сессии приёмки (например, искать SUT-кандидатов или свежие бенчмарки). Если
-   нужен — завести бесплатный токен, рецепт выше.
-2. Просмотр драфта golden-truthfulqa.md до включения расширенного набора в
-   отчёты приёмок. Метки авторов датасета — экспертные, но владелец должен
-   увидеть материал своими глазами: это его контрольная выборка.
+1. Whether a Kaggle account is needed. For golden material, no: GitHub and HF
+   give the same data without a token. MCP helps differently, interactive
+   dataset search right in an acceptance session (for example, looking for SUT
+   candidates or fresh benchmarks). If needed, create a free token, the recipe
+   is above.
+2. A look at the golden-truthfulqa.md draft before the extended set enters
+   acceptance reports. Dataset author labels are expert ones, but the owner
+   must see the material firsthand: it is the owner's control sample.

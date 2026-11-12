@@ -1,18 +1,18 @@
-# Журнал приёмок
+# Acceptance log
 
-Каждая строка - один прогон конвейера: приёмка сторонней или собственной системы,
-самоприёмка самого плагина, контрольная выборка судьи или security-прогон изоляции.
-Это журнал находок, а не рейтинг: вердикт GOT означает «не опровергнуто», дефект
-доказывается только негативным вердиктом (FAIL, ATTACK_PASSED). Формулировка
-«система прошла приёмку» здесь не используется - асимметрия вердиктов в [oracle](../knowledge/oracle.md).
+Each row is a pipeline run: an acceptance of a third-party or own system, a
+plugin self-acceptance, a judge control sample, or a security isolation run.
+This is a log of findings, not a rating. A GOT verdict means «not refuted».
+A defect is proven only by a negative verdict (FAIL, ATTACK_PASSED). The phrase
+«система прошла приёмку» is not used here. See the verdict asymmetry in [oracle](../knowledge/oracle.md).
 
-Страница собирается скриптом `scripts/build-benchmarks.py` из каталога `runs/`
-(сайдкар bench.yaml + index.jsonl + cost.md каждого прогона) и руками не правится.
-Приватные прогоны в журнал не попадают: он собирается из публичного каталога репо,
-а генератор отказывается записывать страницу при срабатывании защитного фильтра
-(проверка фильтра позитив-контролем: `python scripts/build-benchmarks.py --selftest`).
+The script `scripts/build-benchmarks.py` builds the page from the `runs/`
+directory (the bench.yaml sidecar + index.jsonl + cost.md of each run). The page
+is never edited by hand. Private runs never enter the log: the log is built from
+the public repo directory only. The generator refuses to write the page when the
+guard filter fires (the filter's positive control: `python scripts/build-benchmarks.py --selftest`).
 
-| Дата | SUT | Тип | Адаптер | Среда | Карточки | Итог | Судья | $ | Находки | Отчёт |
+| Date | SUT | Type | Adapter | Env | Cards | Result | Judge | $ | Findings | Report |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 2026-10-13 | живой прогон полного конвейера с реальным Claude Code | security | полный конвейер | docker | - | - | - | - | сквозной прогон в изоляции с настоящим SUT-сеансом и судьёй; артефакты обезличены | - |
 | 2026-10-13 | интеграционный тест живого конвейера | security | полный конвейер | docker | - | - | - | - | prepare - прогон - транскрипт - судья - манифест - cleanup одной командой; PASS на Windows, честный SKIP в CI без ключа | [report](../runs/2026-10-13-secint/secint-report.md) |

@@ -868,7 +868,7 @@ class TestBuildBenchmarks(unittest.TestCase):
     def test_build_refuses_run_without_sidecar(self):
         os.remove(os.path.join(self.run, "bench.yaml"))
         page = self.bb.build(self.td)
-        self.assertIn("Без сайдкара bench.yaml в журнал не попали", page)
+        self.assertIn("Skipped without a bench.yaml sidecar", page)
 
 
 GOLDEN3 = """# Golden

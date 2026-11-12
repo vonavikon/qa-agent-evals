@@ -1,87 +1,87 @@
-# Research: recursive self-improvement и наш конвейер (2026-10-10)
+# Research: recursive self-improvement and our pipeline (2026-10-10)
 
-Три источника, изучены субагентами-аналитиками отдельно:
+Three sources, each studied by a separate analyst subagent:
 
-1. The Anthropic Institute, «When AI builds itself» (Marina Favaro, Jack Clark, октябрь 2026) — позиционный документ о рекурсивном самосовершенствовании.
-2. arXiv:2609.26457 — «Recursive self-improvement of AI research agents» (AIDE², Weco AI, 22.09.2026) — эмпирика: агент переписывает свой харнесс 8 дней, 0.703 → 0.778 на приватном отборе.
-3. arXiv:2607.07663 — survey «Recursive Self-Improvement in AI: From Bounded Self-Refinement to Autonomous Research Loops» (Chen, Wang, Qu; v2 06.09.2026, 44 стр., 1250 источников; репозиторий корпуса deepgrounding/recursive-self-improvement).
+1. The Anthropic Institute, "When AI builds itself" (Marina Favaro, Jack Clark, October 2026), a position paper on recursive self-improvement.
+2. arXiv:2609.26457, "Recursive self-improvement of AI research agents" (AIDE², Weco AI, 22.09.2026). Empirics: an agent rewrites its harness for 8 days, 0.703 → 0.778 on a private selection.
+3. arXiv:2607.07663, the survey "Recursive Self-Improvement in AI: From Bounded Self-Refinement to Autonomous Research Loops" (Chen, Wang, Qu, v2 06.09.2026, 44 pages, 1250 sources). Corpus repository: deepgrounding/recursive-self-improvement.
 
-Связь с предыдущим обзором (`research-2026-10-09.md`): HALO (context-labs) и AIDE² сидят в одном классе — эволюция харнесса по внешнему сигналу; survey даёт этому классу словарь и ограничения.
+Link to the previous review (`research-2026-10-09.md`): HALO (context-labs) and AIDE² sit in one class, harness evolution driven by an external signal. The survey gives this class a vocabulary and limits.
 
-## 1. Anthropic Institute — «When AI builds itself»
+## 1. Anthropic Institute: When AI builds itself
 
-**Что это.** Эссе о том, что рекурсивное самосовершенствование уже началось в зачаточной форме: >80% мерджимого в прод кода Anthropic пишет Claude (май 2026), инженеры мерджат в 8 раз больше строк в день, чем в 2024 (сами авторы дисконтируют: LOC меряет количество, не качество), скорость оптимизации кода выросла с ~3× до ~52× за год. На «поворотных моментах» исследовательских сессий модель выбирает шаг лучше человека в 64% случаев (год назад 51%). Половина документа — про политику: программа verifiable pause, аналогия с договором РСМР.
+**What it is.** An essay arguing that recursive self-improvement is already underway in embryo form. More than 80% of the code merged to production at Anthropic is written by Claude (May 2026). Engineers merge 8 times more lines per day than in 2024 (the authors discount this themselves: LOC measures quantity, not quality). Code optimization speed grew from ~3× to ~52× in a year. At "pivotal moments" of research sessions the model picks a better step than the human in 64% of cases (51% a year before). Half of the document is policy: a verifiable pause program, an analogy with the INF Treaty.
 
-**Методологические микро-приёмы, которые мы забираем:**
+**Methodological micro-techniques we take:**
 
-- **Контрольная выборка для судьи** (сноска 8): мерили выигрыш модели на 129 моментах, где человек отклонился от курса (64%), и параллельно на 127 моментах, где ход человека заведомо был силён — там модель выигрывает лишь ~20%. Это дешёвый детектор смещения судьи: фиксированный набор карточек с заведомо известными вердиктами, прогон при каждой смене модели судьи.
-- **Критерий «clearly succeeded»**: сессия засчитывается только при однозначном успехе, без трактовок в пользу. Отсюда — правило для судьи: FAIL только по явному нарушению оракула, «серые» случаи не тянут ни на FAIL, ни на GOT.
-- **Ретроспективная метрика полноты**: их ревьюер ретроспективно поймал бы ~треть багов прошлых инцидентов. Наш аналог — посев известных дефектов в SUT и замер доли пойманных: сейчас мы меряем точность, не полноту.
-- **Двойной критерий качества** («works» + «написано так, что другой инженер построит на этом») — вторая ось оракула для critical-карточек: не только «выдала факт», но «дала достаточно, чтобы продолжать».
-- **Закон Амдала как рамка**: ускорение одной части процесса смещает узкое место. Для отчёта — ось «на каком горизонте сценария SUT валится».
-- **Verifiability > detectability**: записанный заранее оракул — проверяемое обязательство; мнение судьи без оракула — лишь обнаружение. Готовая рамка для документации.
+- **A control sample for the judge** (footnote 8): they measured the model win rate on 129 moments where the human left the course (64%). In parallel, on 127 moments where the human move was known to be strong, the model wins only ~20%. This is a cheap detector of judge bias: a fixed card set with known verdicts, run at every judge model change.
+- **The "clearly succeeded" criterion**: a session counts only on an unambiguous success, with no interpretation in favor. Hence a judge rule: FAIL only on an explicit oracle violation, gray cases pull neither FAIL nor GOT.
+- **A retrospective recall metric**: their reviewer would retroactively have caught ~a third of the bugs of past incidents. Our analog: seed known defects into the SUT and measure the share caught. Today we measure precision, not recall.
+- **The double quality criterion** ("works" + "written so another engineer can build on it"). It is a second oracle axis for critical cards: not only "gave the fact" but "gave enough to continue".
+- **Amdahl's law as a frame**: speeding up one part of a process shifts the bottleneck. For reports, an axis "at which scenario horizon the SUT fails".
+- **Verifiability > detectability**: an oracle written in advance is a checkable obligation. A judge opinion without an oracle is only detection. A ready frame for the docs.
 
-**Конфликт с нами.** Их судья одношаговый, из семейства моделей Claude, с признанной в сносках предвзятостью — наш дизайн (два шага, другая модель) эти слабости закрывает. Их метрики throughput ортогональны нашим метрикам корректности. Для быстрых SUT их сценарий обнажает нашу дыру: оракул версии N протухает на N+1 — нужен пининг версии SUT в отчёте и диф-прогон при смене версии.
+**Conflict with us.** Their judge is single-step, from the Claude model family, with a bias admitted in footnotes. Our design (two steps, a different model) closes these weaknesses. Their throughput metrics are orthogonal to our correctness metrics. For fast SUTs their scenario exposes our gap: the version N oracle goes stale at N+1. We need SUT version pinning in the report and a diff run at a version change.
 
-## 2. AIDE² (arXiv:2609.26457) — самопереписывание харнесса
+## 2. AIDE² (arXiv:2609.26457): harness self-rewriting
 
-**Метод.** Двухуровневый цикл. Внутренний агент решает задачи, наблюдая публичный сигнал r_pub; внешний агент переписывает код внутреннего, и перепись принимается только при росте g — среднего балла на приватном held-out, усреднённого по нескольким прогонам. Ключевые решения дизайна: «сигнал внутреннего цикла развязан с сигналом отбора внешнего, чтобы предотвратить гейминг; фиксированные бюджеты гарантируют, что выигрыш отражает алгоритм, а не вычисления».
+**Method.** A two-level loop. The inner agent solves tasks, watching the public signal r_pub. The outer agent rewrites the inner agent's code, and a rewrite is accepted only when g grows. g is the mean score on a private held-out, averaged over several runs. Key design decisions: "the inner loop signal is decoupled from the selection signal of the outer loop, to prevent gaming. Fixed budgets guarantee that the gain reflects the algorithm, not the compute."
 
-**Результаты.** 8 дней автономной работы: 100 узлов траектории, 7 переписей принято, 92 отклонено; g: 0.703 → 0.778 против 0.749 у продакшен-агента, построенного людьми ~2 года. Наибольший выигрыш — на OOD-бенчмарке (WeatherBench 2: 0.262 → 0.793). Reward hacking на KernelBench эмерджентно упал: 55% → 32% по метрике, которую не оптимизировали. Строгость умеренная: одна траектория (case study), репликации дали 2 и 4 принятых переписи, абляций нет, публичного кода AIDE² нет.
+**Results.** 8 days of autonomous work: 100 trajectory nodes, 7 rewrites accepted, 92 rejected. g: 0.703 → 0.778 against 0.749 for a production agent built by humans over ~2 years. The largest gain came on an OOD benchmark (WeatherBench 2: 0.262 → 0.793). Reward hacking on KernelBench dropped emergently: 55% → 32% on a metric nobody optimized. Rigor is moderate: one trajectory (a case study), replications gave 2 and 4 accepted rewrites, no ablations, no public AIDE² code.
 
-**Что забираем:**
+**What we take:**
 
-- **Развязка публичного/приватного сигнала** — теоретическое имя для нашего приёма «оракул скрыт от SUT»: критерий оценки не виден тестируемой системе. Заодно обоснование против натаскивания SUT на повторных прогонах.
-- **Фиксированные бюджеты** — тот же аргумент, что наша изоляция: max-turns и бюджет карточки, чтобы различия SUT не конфаундились ресурсом.
-- **Усреднение g по прогонам** — наши редьюсеры, теперь с литературной опорой: шум — главная угроза валидности, ложно принятая перепись уводит поиск в сторону.
-- **Двухуровневый оракул reward hacking**: дешёвый прокси-тест (изолированный выигрыш > порога) + дорогой интеграционный (выживает ли выигрыш downstream) — шаблон для adversarial-карточек, где локальный успех SUT обязан не переживать перенос в контекст.
-- **Мёртвый код эволюционированного артефакта** (медианный штраф «никогда не менял исхода») — повод считать срабатываемость пунктов facts_must / facts_must_not: никогда не сработавший пункт оракула — кандидат на удаление.
-- **«Починил сломанную оценку вместо эксплуатации»** — родственно нашей диагностике: сначала проверь измеритель, потом вини SUT.
-- **Правило инкумбента** (принимать новую версию только при росте g на приватном отборе) — консервативное правило приёмки итераций SUT.
+- **Decoupling of public and private signal** is the theoretical name for our trick "the oracle is hidden from the SUT". The evaluation criterion stays invisible to the system under test. It also argues against coaching the SUT on repeated runs.
+- **Fixed budgets** are the same argument as our isolation: max-turns and the card budget, so SUT differences are not confounded by resources.
+- **Averaging g over runs** gives our reducers literature support: noise is the main threat to validity, a falsely accepted rewrite pulls the search aside.
+- **A two-level reward-hacking oracle**: a cheap proxy test (isolated gain > threshold) + an expensive integration one (does the gain survive downstream). The pair is a pattern for adversarial cards: a local SUT success must not survive the transfer into context.
+- **Dead code of the evolved artifact** (the median penalty "never changed the outcome") is a reason to count the fireability of facts_must / facts_must_not items. An oracle item that never fired is a deletion candidate.
+- **"Fixed the broken evaluation instead of exploiting it"** is close to our diagnostics: first test the measuring instrument, then blame the SUT.
+- **The incumbent rule** (accept a new version only when g grows on the private selection) is a conservative acceptance rule for SUT iterations.
 
-## 3. Survey (arXiv:2607.07663) — таксономия RSI
+## 3. Survey (arXiv:2607.07663): the RSI taxonomy
 
-**Что это.** Систематический обзор 1250 работ (2024–2026): 45% — улучшение поведения развёртывания, 30% — политики обучения, 15% — самооценка, 5% + 5% — исследовательская автоматизация и замкнутые петли. Ключевая рамка — иерархия верификации: формальные верификаторы > обратная связь от исполнения > выученные судьи > внутренние сигналы самооценки; каждый уровень — «сериализуемый артефакт с версией, который можно независимо проверять». Центральный тезис: «когда генератор и оценщик становятся одной сущностью, её предубеждения не устраняются, а реплицируются».
+**What it is.** A systematic review of 1250 papers (2024-2026): 45% deployment behavior improvement, 30% training policies, 15% self-evaluation, 5% + 5% research automation and closed loops. The key frame is a hierarchy of verification: formal verifiers > feedback from execution > learned judges > internal self-evaluation signals. Each level is "a versioned, serializable artifact that can be checked independently". The central thesis: "when the generator and the evaluator become one entity, its biases are not eliminated but replicated".
 
-**Контролируемый эксперимент фальсификации** (§3.3): Self-Rep-Agent «улучшился» на +24.4 п.п. после того, как окружение неявно закодировало желаемое поведение + плацебо-подсказка «пожалуйста, самоулучшись»; при сокрытии ключевой информации эффект падал до +0.4 п.п. Вывод: наблюдаемое улучшение следовало инструкции, а не доказательствам. Отсюда эпистемология, изоморфная нашей: «провал теста — исполняемый контрпример; прохождение не доказывает корректность, а лишь ограничивает риск», плюс «заявленный успех должен быть подкреплён минимумом независимых свидетельств».
+**The controlled falsification experiment** (§3.3): Self-Rep-Agent "improved" by +24.4 points after the environment implicitly encoded the desired behavior and added a placebo prompt "please, self-improve". With the key information hidden, the effect fell to +0.4 points. Conclusion: the observed improvement followed the instruction, not the evidence. Hence an epistemology isomorphic to ours: "a test failure is an executable counterexample. A pass does not prove correctness, it only bounds risk", plus "a claimed success must be backed by a minimum of independent evidence".
 
-**Что забираем:**
+**What we take:**
 
-- **Исполнимая проверка сильнее судьи.** Где факт проверяется матчингом по трейсу/артефакту — переносить его из судьи в детерминированный слой. Универсальный LLM-судья как единственный механизм — кандидат на пересмотр: наш judge — уровень 3, а не вершина.
-- **Двоичные вопросы оракула** (BinEval: «спрашивай, а не суди») — подтверждение, что facts_must/facts_must_not бинарны, а не градуированы.
-- **Комитеты смягчают, но не устраняют смещения** — unanimous-редьюсер защищает от шума, не от коррелированных смещений; не продавать unanimous как доказательство отсутствия дефектов.
-- **Rewarding rightness** (LLM-генерированные тесты слишком предсказуемы) — варьировать формулировки зондов между прогонами; и главное: **после оптимизации харнесса (HALO-класс) проверять только свежими зондами** — старые карточки годятся лишь как регрессионный дым.
-- **Перевод роняет производительность судей** — никакого машинного перевода карточек для мультиязычных SUT без ручной ревизии.
-- **MAST-каскады** (сбой одного компонента каскадируется) — словарь для нашей диагностики «среда vs SUT».
-- **Позиционирование**: наша пара «зондовые тесты + внешний судья» в их терминах — human-on-the-loop harness evolution с внешней фальсификацией улучшения; HALO без внешних зондов уязвим к плацебо-эффекту из §3.3.
-- **Парадокс Self-Teacher**: совместное итерирование оценщика и генератора нестабильно — не менять одновременно харнесс и карточки/судью; за один цикл — что-то одно.
+- **Executable checking beats a judge.** Where a fact can be matched against a trace or an artifact, move it from the judge to the deterministic layer. A universal LLM judge as the only mechanism is a revision candidate: our judge is level 3, not the top.
+- **Binary oracle questions** (BinEval: "ask, do not judge") are an argument that facts_must/facts_must_not stay binary, not graded.
+- **Committees soften but do not remove bias**: the unanimous reducer protects from noise, not from correlated bias. Do not sell unanimous as proof of absence of defects.
+- **Rewarding rightness** (LLM-generated tests are too predictable): vary probe wording across runs. And the main rule: after a harness optimization (HALO class), test only with fresh probes. Old cards work only as a regression smoke test.
+- **Translation drops judge performance**: no machine translation of cards for multilingual SUTs without manual revision.
+- **MAST cascades** (a failure of one component cascades) are a vocabulary for our diagnostics "environment vs SUT".
+- **Positioning**: our pair "probe tests + external judge" in their terms is human-on-the-loop harness evolution with external falsification of the improvement. HALO without external probes is vulnerable to the placebo effect from §3.3.
+- **The Self-Teacher paradox**: iterating the evaluator and the generator together is unstable. Do not change the harness and the cards or judge at once. One cycle changes one thing.
 
-## Сводный план переиспользования
+## Reuse plan
 
-**P1 — сейчас, дёшево (правки knowledge + судья):**
+**P1, now and cheap (edits to knowledge and the judge):**
 
-1. Плацебо-дисциплина для HALO-цикла: оптимизация харнесса валидируется только свежими карточками; старый набор — регрессионный дым (survey §3.3).
-2. Контрольная выборка судьи: расширить golden-калибровку фиксированным набором с заведомыми вердиктами (сильный/слабый исполнитель, чистый/дефектный SUT); мерить смещение при каждой смене модели судьи (Anthropic, сноска 8).
-3. Спуск фактов в детерминированный слой: пункты facts_must, проверяемые матчингом по трейсу/провенансу, убираются из LLM-судьи в grep-верификатор (survey, иерархия).
-4. Формулировки отчёта: позитивный вердикт = «risk bounding», не «evidence of correctness»; расхождение голосов судьи по повторам — отдельной колонкой поверх редьюсеров (survey + Anthropic).
-5. Dev/test правило: фикс плагина, найденный самоприёмкой, закрыт только после контрольного прогона на внешней SUT (AIDE² + HALO).
+1. Placebo discipline for the HALO loop: a harness optimization is tested only with fresh cards. The old set is a regression smoke test (survey §3.3).
+2. The judge control sample: extend the golden calibration with a fixed set of known verdicts (strong/weak executor, clean/defective SUT). Measure the bias at every judge model change (Anthropic, footnote 8).
+3. Lowering facts into the deterministic layer (survey, hierarchy): a facts_must item matchable by trace or provenance moves from the LLM judge to the grep verifier.
+4. Report wording: a positive verdict = "risk bounding", not "evidence of correctness". Judge vote divergence across repeats goes into a separate column over the reducers (survey + Anthropic).
+5. The dev/test rule: a plugin fix found by self-acceptance closes only after a control run on an external SUT (AIDE² + HALO).
 
-**P2 — следующая веха:**
+**P2, next milestone:**
 
-6. Двухуровневые adversarial-оракулы: прокси-порог + интеграционная проверка downstream-выживания (AIDE²).
-7. Счётчик срабатываемости пунктов оракула в build-index.py; несрабатывающие пункты — флаг в отчёт (AIDE², мёртвый код).
-8. Recall-метрика харнесса: посев известных дефектов в SUT-версию, доля пойманных (Anthropic, ретроспектива).
-9. Вторая ось critical-оракулов: «достаточность для продолжения другим агентом» (Anthropic, двойной критерий).
-10. Пининг версии SUT в отчёте + регрессионный диф-прогон карточек при смене версии (Anthropic, конфликт быстрых SUT).
+6. Two-level adversarial oracles: a proxy threshold + an integration check of downstream survival (AIDE²).
+7. An oracle-item fireability counter in build-index.py. Items that never fire raise a flag in the report (AIDE², dead code).
+8. A harness recall metric: seed known defects into an SUT version, measure the share caught (Anthropic, retrospective).
+9. A second axis of critical oracles: "enough for another agent to continue" (Anthropic, double criterion).
+10. SUT version pinning in the report + a regression card diff run at a version change (Anthropic, the fast-SUT conflict).
 
-**P3 — концептуальные:**
+**P3, conceptual:**
 
-11. Роль плагина в RSI-стеке: внешний приватный грейдер g(a) для оптимизаторов харнесса (HALO/AIDE²-класс) — наш отчёт с редьюсерами как кандидат на оценочную функцию внешнего цикла.
-12. Вариативность формулировок зондов между прогонами против «rewarding rightness».
-13. Правило одного изменения: не итерировать одновременно харнесс и измеритель (парадокс Self-Teacher).
+11. The plugin role in the RSI stack: an external private grader g(a) for harness optimizers (the HALO/AIDE² class). Our report with reducers is a candidate for the outer-loop evaluation function.
+12. Probe wording variation across runs against "rewarding rightness".
+13. The one-change rule: do not iterate the harness and the measuring instrument at the same time (the Self-Teacher paradox).
 
-## Источники
+## Sources
 
 - https://www.anthropic.com/institute/recursive-self-improvement
 - https://arxiv.org/abs/2609.26457 (HTML: https://arxiv.org/html/2609.26457)
-- https://arxiv.org/abs/2607.07663 (HTML: https://arxiv.org/html/2607.07663v2, корпус: https://github.com/deepgrounding/recursive-self-improvement)
+- https://arxiv.org/abs/2607.07663 (HTML: https://arxiv.org/html/2607.07663v2, corpus: https://github.com/deepgrounding/recursive-self-improvement)
