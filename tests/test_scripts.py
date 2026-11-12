@@ -1156,7 +1156,9 @@ class BuildIndexMain(unittest.TestCase):
                     encoding="utf-8").write(json.dumps(
                 {"id": "T-01", "rep": "1", "det": "DET_LEAK",
                  "source": "транскрипт"}, ensure_ascii=False) + "\n")
-            posix = "/" + td[0].lower() + td[2:].replace("\\", "/")  # C:\x -> /c/x
+            posix = td
+            if os.name == "nt" and td[1:2] == ":":  # C:\x -> /c/x; POSIX - уже POSIX
+                posix = "/" + td[0].lower() + td[2:].replace("\\", "/")
             argv = sys.argv
             sys.argv = ["build-index.py", posix]
             buf = io.StringIO()
