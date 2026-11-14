@@ -1,6 +1,6 @@
 # SUT Adapters and Environment Isolation
 
-Reference for phase B (adapter choice) and phase D (the run). The analyst proposes options by the type of the system under test, and the human picks one. Version v0.1 ships the CLI adapter. The other adapters are descriptions for future runs.
+Reference for phase B (adapter choice) and phase D (the run). The analyst proposes options by the type of the system under test, and the human picks one. The CLI and web adapters are implemented and ran in live acceptance runs; the HTTP API and chat bot adapters are descriptions for future runs.
 
 ## Adapter Table
 
