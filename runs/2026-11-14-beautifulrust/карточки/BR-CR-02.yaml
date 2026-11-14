@@ -1,0 +1,77 @@
+id: BR-CR-02
+type: critical
+feature: rust-review-finds-planted-defects-trait-contract
+persona:
+  name: Backend reviewer before a release
+  motivation: A monitoring crate goes out tomorrow; checks the review catches the silent-corruption bug, not just the naming nits
+  traits: [experienced, impatient with style-only reviews, concrete]
+instruction: |
+  This sensor module ships tomorrow in our monitoring library. Give it a
+  real review - I care about correctness first, naming second. Standard
+  format with your tiers.
+
+  ```rust
+  //! Sensor readings for the monitoring dashboard.
+
+  /// A temperature reading in degrees Celsius.
+  #[derive(Debug, Clone, Copy, PartialEq)]
+  pub struct Reading {
+      pub celsius: f64,
+      pub recorded_at: u64,
+  }
+
+  impl Reading {
+      pub fn get_celsius(&self) -> f64 {
+          self.celsius
+      }
+  }
+
+  impl Eq for Reading {}
+
+  impl Ord for Reading {
+      fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+          self.celsius.total_cmp(&other.celsius)
+      }
+  }
+
+  impl PartialOrd for Reading {
+      fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+          Some(self.cmp(other))
+      }
+  }
+
+  /// Formats a reading for the dashboard banner.
+  pub fn banner(reading: &Reading, alert: bool) -> String {
+      if alert {
+          format!("{:.1}C ALERT", reading.get_celsius())
+      } else {
+          format!("{:.1}C", reading.get_celsius())
+      }
+  }
+  ```
+oracle:
+  expected: |
+    The review catches the trait-contract bug as must fix: hand-written
+    `Ord` (compares only `celsius`) next to a derived `PartialEq`
+    (compares both fields) - the disagreement silently corrupts sort,
+    BTreeMap and dedup; `impl Eq` on a type holding `f64` is part of the
+    same defect. It also flags `get_celsius` (C-GETTER: no `get_` prefix
+    on getters) and the `alert: bool` parameter in a public signature
+    (C-CUSTOM-TYPE / bool parameter rule) at the right, lower tier. The
+    ordering must be correct: the Ord/Eq inconsistency above naming.
+    Locations cited as file:line, rules named, fixes as code, tiers
+    kept, "What's already good" present.
+  facts_must:
+    - "Must fix"
+    - "PartialEq"
+    - "get_celsius"
+  facts_must_not: []
+  note: |
+    The exact rule citation for the bool parameter and the getter varies
+    (C-GETTER, C-CUSTOM-TYPE, clippy lint names) - the judge decides
+    whether each planted defect was found and tiered correctly. Missing
+    the Ord bug while listing style findings is the failure this card
+    hunts.
+budget:
+  turns: 1
+  tokens: 9000

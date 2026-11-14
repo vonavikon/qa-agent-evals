@@ -1,0 +1,222 @@
+Cargo isn't available in this environment (the toolchain check was blocked), so this review is by reading — no `cargo fmt`/`clippy`/`test` runs to fold in. That matters less here than usual: the code is small and mechanically clean on inspection.
+
+# Rust review: `word_counts` (notes crate)
+
+A small library helper that counts ASCII-word frequencies into a `BTreeMap<&str, u32>` borrowed from the input. I reviewed it as **library code** (it exposes a `pub fn` from a crate); edition/MSRV couldn't be checked since no `Cargo.toml` was included, but nothing here is edition-sensitive. Overall this is clean, correct, and better-documented than most helpers — the one thing to settle **before you build on it** is case sensitivity, which the docs don't specify and which would be a breaking change to amend once callers depend on it. Line numbers below refer to your snippet.
+
+## Must fix
+
+### 1. Case sensitivity is unspecified — and changing it later is a breaking change (`src/lib.rs:5`)
+**Rule:** Public API semantics must be fully documented; behavior changes are breaking (Rust API Guidelines — Documentation; SemVer/`RFC 1105` semantics for crates).
+
+**Problem:** The doc pins the ASCII tokenization rule but says nothing about case, so `word_counts("Tea tea tea")` silently returns `tea: 2, Tea: 1`. For word frequency over prose, most readers expect case-folded counts; whichever behavior you keep, a consumer will assume the other one, and changing it after anyone calls this is a breaking change. Right now it's a one-line fix. Note the trade-off: case-insensitive counting forces owned keys, since lowercasing a `&str` requires allocating.
+
+**Fix:** Decide, document, and pin with a test. If case-sensitive (keeps your borrowed-key API):
+
+```rust
+/// Matching is case-sensitive: `"Tea"` and `"tea"` are counted separately.
+```
+
+```rust
+#[test]
+fn matching_is_case_sensitive() {
+    let counts = word_counts("Tea tea TEA");
+    assert_eq!(counts.len(), 3);
+}
+```
+
+If you want case-folded counting:
+
+```rust
+pub fn word_counts(text: &str) -> BTreeMap<String, u32> {
+    let mut counts = BTreeMap::new();
+    for word in text.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| !w.is_empty()) {
+        *counts.entry(word.to_ascii_lowercase()).or_insert(0) += 1;
+    }
+    counts
+}
+```
+
+(`to_ascii_lowercase` is correct and cheaper than `to_lowercase` because words are ASCII-only by construction.)
+
+## Should fix
+
+### 2. Tests don't cover the tokenization contract the docs promise (`src/lib.rs:27`)
+**Rule:** Every documented behavior should have a pinning test (rust-review checklist — documentation and tests).
+
+**Problem:** The doc explicitly promises that digits and punctuation split words, but neither test exercises a separator — they only cover space-separated words and empty input. A refactor that degraded into `split_whitespace` logic would pass the current suite while breaking the documented contract.
+
+**Fix:**
+
+```rust
+#[test]
+fn punctuation_and_digits_split_words() {
+    let counts = word_counts("tea, pot! tea99cup");
+    assert_eq!(counts.get("tea"), Some(&2));
+    assert_eq!(counts.get("pot"), Some(&1));
+    assert_eq!(counts.get("cup"), Some(&1));
+    assert_eq!(counts.get("tea99cup"), None);
+}
+```
+
+## Consider
+
+### 3. Add `#[must_use]` (`src/lib.rs:18`)
+**Rule:** `#[must_use]` on pure functions whose result is the only output (`clippy::must_use_candidate`).
+
+**Problem:** The function has no side effects, so calling it and discarding the result is always a bug; nothing warns today. (Pedantic clippy flags exactly this.)
+
+**Fix:**
+
+```rust
+#[must_use]
+pub fn word_counts(text: &str) -> BTreeMap<&str, u32> {
+```
+
+### 4. The `fold` is a loop in disguise (`src/lib.rs:21`)
+**Rule:** Prefer the plainer construct when a combinator adds noise (rust-review checklist — idiom: "match where a combinator is clearer, or the reverse").
+
+**Problem:** The `mut acc … acc` threading exists only to satisfy `fold`'s signature. The `for` loop is the canonical counting idiom in Rust and reads faster. Purely taste — what you have is correct and compact.
+
+**Fix:**
+
+```rust
+let mut counts = BTreeMap::new();
+for word in text.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| !w.is_empty()) {
+    *counts.entry(word).or_insert(0) += 1;
+}
+counts
+```
+
+### 5. Index into the map in the doctest (`src/lib.rs:16`)
+**Rule:** `BTreeMap` implements `Index<&Q>` — the idiomatic lookup in examples (std library docs).
+
+**Problem:** `.get(..) == Some(&2)` is ceremony a caller wouldn't write; indexing reads like intended usage and still fails the doctest if the key is absent.
+
+**Fix:**
+
+```rust
+/// assert_eq!(counts["tea"], 2);
+```
+
+## What's already good
+
+- `BTreeMap` with the deterministic-order guarantee written into the doc comment — this preempts the classic bug where `HashMap` iteration order leaks into output and tests.
+- Borrowed `&str` keys: zero per-word allocation, and the API is honest that the results view the input's lifetime.
+- Infallible and panic-free: the entry API plus the `!w.is_empty()` filter handle consecutive, leading, and trailing separators correctly — I traced `"tea, pot!"` and `",tea"` by hand and the behavior matches the docs.
+- Runnable doctest, and the documented tokenization rule (maximal ASCII-alphabetic runs) exactly matches what the code does.
+
+---
+
+One offer: your snippet has no `[lints]` table, so consider adding the BeautifulRust lint config (`lints/lints.toml` + `lints/clippy.toml`, https://github.com/morganlinton/BeautifulRust) to make clippy catch the mechanical issues automatically. Honest caveat: of this review's findings, only #3 is lint-catchable (`clippy::must_use_candidate`) — the rest are semantic decisions no lint can make for you. The config's real value is forward-looking: it guards the unwrap/panic-on-input and error-handling categories as this crate grows. If you can get a Rust toolchain in this environment later, `cargo clippy -- -W clippy::pedantic && cargo test` would also run the doctest, which is currently unverified.
+Cargo isn't available in this environment (the toolchain check was blocked), so this review is by reading — no `cargo fmt`/`clippy`/`test` runs to fold in. That matters less here than usual: the code is small and mechanically clean on inspection.
+
+# Rust review: `word_counts` (notes crate)
+
+A small library helper that counts ASCII-word frequencies into a `BTreeMap<&str, u32>` borrowed from the input. I reviewed it as **library code** (it exposes a `pub fn` from a crate); edition/MSRV couldn't be checked since no `Cargo.toml` was included, but nothing here is edition-sensitive. Overall this is clean, correct, and better-documented than most helpers — the one thing to settle **before you build on it** is case sensitivity, which the docs don't specify and which would be a breaking change to amend once callers depend on it. Line numbers below refer to your snippet.
+
+## Must fix
+
+### 1. Case sensitivity is unspecified — and changing it later is a breaking change (`src/lib.rs:5`)
+**Rule:** Public API semantics must be fully documented; behavior changes are breaking (Rust API Guidelines — Documentation; SemVer/`RFC 1105` semantics for crates).
+
+**Problem:** The doc pins the ASCII tokenization rule but says nothing about case, so `word_counts("Tea tea tea")` silently returns `tea: 2, Tea: 1`. For word frequency over prose, most readers expect case-folded counts; whichever behavior you keep, a consumer will assume the other one, and changing it after anyone calls this is a breaking change. Right now it's a one-line fix. Note the trade-off: case-insensitive counting forces owned keys, since lowercasing a `&str` requires allocating.
+
+**Fix:** Decide, document, and pin with a test. If case-sensitive (keeps your borrowed-key API):
+
+```rust
+/// Matching is case-sensitive: `"Tea"` and `"tea"` are counted separately.
+```
+
+```rust
+#[test]
+fn matching_is_case_sensitive() {
+    let counts = word_counts("Tea tea TEA");
+    assert_eq!(counts.len(), 3);
+}
+```
+
+If you want case-folded counting:
+
+```rust
+pub fn word_counts(text: &str) -> BTreeMap<String, u32> {
+    let mut counts = BTreeMap::new();
+    for word in text.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| !w.is_empty()) {
+        *counts.entry(word.to_ascii_lowercase()).or_insert(0) += 1;
+    }
+    counts
+}
+```
+
+(`to_ascii_lowercase` is correct and cheaper than `to_lowercase` because words are ASCII-only by construction.)
+
+## Should fix
+
+### 2. Tests don't cover the tokenization contract the docs promise (`src/lib.rs:27`)
+**Rule:** Every documented behavior should have a pinning test (rust-review checklist — documentation and tests).
+
+**Problem:** The doc explicitly promises that digits and punctuation split words, but neither test exercises a separator — they only cover space-separated words and empty input. A refactor that degraded into `split_whitespace` logic would pass the current suite while breaking the documented contract.
+
+**Fix:**
+
+```rust
+#[test]
+fn punctuation_and_digits_split_words() {
+    let counts = word_counts("tea, pot! tea99cup");
+    assert_eq!(counts.get("tea"), Some(&2));
+    assert_eq!(counts.get("pot"), Some(&1));
+    assert_eq!(counts.get("cup"), Some(&1));
+    assert_eq!(counts.get("tea99cup"), None);
+}
+```
+
+## Consider
+
+### 3. Add `#[must_use]` (`src/lib.rs:18`)
+**Rule:** `#[must_use]` on pure functions whose result is the only output (`clippy::must_use_candidate`).
+
+**Problem:** The function has no side effects, so calling it and discarding the result is always a bug; nothing warns today. (Pedantic clippy flags exactly this.)
+
+**Fix:**
+
+```rust
+#[must_use]
+pub fn word_counts(text: &str) -> BTreeMap<&str, u32> {
+```
+
+### 4. The `fold` is a loop in disguise (`src/lib.rs:21`)
+**Rule:** Prefer the plainer construct when a combinator adds noise (rust-review checklist — idiom: "match where a combinator is clearer, or the reverse").
+
+**Problem:** The `mut acc … acc` threading exists only to satisfy `fold`'s signature. The `for` loop is the canonical counting idiom in Rust and reads faster. Purely taste — what you have is correct and compact.
+
+**Fix:**
+
+```rust
+let mut counts = BTreeMap::new();
+for word in text.split(|c: char| !c.is_ascii_alphabetic()).filter(|w| !w.is_empty()) {
+    *counts.entry(word).or_insert(0) += 1;
+}
+counts
+```
+
+### 5. Index into the map in the doctest (`src/lib.rs:16`)
+**Rule:** `BTreeMap` implements `Index<&Q>` — the idiomatic lookup in examples (std library docs).
+
+**Problem:** `.get(..) == Some(&2)` is ceremony a caller wouldn't write; indexing reads like intended usage and still fails the doctest if the key is absent.
+
+**Fix:**
+
+```rust
+/// assert_eq!(counts["tea"], 2);
+```
+
+## What's already good
+
+- `BTreeMap` with the deterministic-order guarantee written into the doc comment — this preempts the classic bug where `HashMap` iteration order leaks into output and tests.
+- Borrowed `&str` keys: zero per-word allocation, and the API is honest that the results view the input's lifetime.
+- Infallible and panic-free: the entry API plus the `!w.is_empty()` filter handle consecutive, leading, and trailing separators correctly — I traced `"tea, pot!"` and `",tea"` by hand and the behavior matches the docs.
+- Runnable doctest, and the documented tokenization rule (maximal ASCII-alphabetic runs) exactly matches what the code does.
+
+---
+
+One offer: your snippet has no `[lints]` table, so consider adding the BeautifulRust lint config (`lints/lints.toml` + `lints/clippy.toml`, https://github.com/morganlinton/BeautifulRust) to make clippy catch the mechanical issues automatically. Honest caveat: of this review's findings, only #3 is lint-catchable (`clippy::must_use_candidate`) — the rest are semantic decisions no lint can make for you. The config's real value is forward-looking: it guards the unwrap/panic-on-input and error-handling categories as this crate grows. If you can get a Rust toolchain in this environment later, `cargo clippy -- -W clippy::pedantic && cargo test` would also run the doctest, which is currently unverified.

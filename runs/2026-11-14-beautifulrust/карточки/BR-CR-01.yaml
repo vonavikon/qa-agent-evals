@@ -1,0 +1,61 @@
+id: BR-CR-01
+type: critical
+feature: rust-review-finds-planted-defects-config-parser
+persona:
+  name: Team lead auditing contractor code
+  motivation: A contractor delivered a config parser; checks that the review catches real defects before the team builds on it
+  traits: [skeptic, demands rule citations, concrete]
+instruction: |
+  A contractor dropped this config module into our library crate and left.
+  Review it before we build on it - I need to know what actually breaks
+  and what the rules say. Full review please, your standard format.
+
+  ```rust
+  //! Loading of simple `key=value` configuration files.
+
+  use std::collections::HashMap;
+
+  /// Splits one `key=value` line into a trimmed key and value.
+  pub fn parse_line(line: &String) -> Result<(String, String), String> {
+      let parts: Vec<&str> = line.splitn(2, '=').collect();
+      if parts.len() != 2 {
+          return Err(format!("bad line: {}", line));
+      }
+      Ok((parts[0].trim().to_string(), parts[1].trim().to_string()))
+  }
+
+  /// Parses a whole config file into a map.
+  pub fn load(text: &str) -> HashMap<String, String> {
+      let mut map = HashMap::new();
+      for line in text.lines() {
+          let (key, value) = parse_line(line).unwrap();
+          map.insert(key, value);
+      }
+      map
+  }
+  ```
+oracle:
+  expected: |
+    The review finds all three planted defects and ranks the reachable
+    panic above style: (1) `parse_line(line).unwrap()` in `load` panics
+    on any malformed line - external input reaches it, so it is a
+    must-fix reachable panic (M-PANIC-IS-STOP / Effective Rust Item 18);
+    (2) `String` as the public error type in `Result` - a library error
+    that implements Display and std::error::Error is required
+    (C-GOOD-ERR); (3) `line: &String` parameter instead of `&str`
+    (clippy::ptr_arg / API guidelines). Each finding cites file:line and
+    a rule, shows a fix, and the report keeps the must/should/consider
+    tiers with a "What's already good" section.
+  facts_must:
+    - "Must fix"
+    - "unwrap"
+    - "&String"
+  facts_must_not: []
+  note: |
+    Rule-code wording varies (C-GOOD-ERR vs "std::error::Error",
+    clippy::ptr_arg vs API guidelines) - the oracle checks the finding
+    itself; the exact citation is judge work. Tier placement of the
+    panic (must fix) is part of the expectation.
+budget:
+  turns: 1
+  tokens: 9000

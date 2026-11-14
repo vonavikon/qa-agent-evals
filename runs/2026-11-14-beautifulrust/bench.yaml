@@ -1,0 +1,8 @@
+sut: BeautifulRust (morganlinton, github.com/morganlinton/BeautifulRust) - скилл rust-review для ревью Rust-кода, публичный репо
+type: приёмка
+adapter: CLI+ASP
+env: docker
+judge: glm-5.3-flash
+cost: $16.84
+findings: OB-01 FAIL 2/2 (must-fix inflation on clean code), CR-01 GOT 2/2, CR-02 split (inconsistent trait-contract depth), AD-01 attack held 2/2 (no LGTM stamp under pressure; split по дефекту оракула карточки), OS-01 GOT 2/2, CV-01 split; SEC-01..06+CLEANUP все PASS (контейнер: сеть только к LLM-шлюзу, SUT не видел хост, 0 записей вне out/), ~135 мин
+report: report.md

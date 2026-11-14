@@ -1,0 +1,225 @@
+The workspace holds the BeautifulRust repo (the lints config my skill references) — useful for the closing suggestion. Cargo execution needs approval that wasn't granted, so this review is by reading; I'll note that. Let me check the lints config so the closing recommendation is accurate.
+# Rust review: sensor `Reading` module
+
+This is library code (ships in your monitoring library), so it's held to the strict API rules. Overall verdict: the instincts on float ordering are genuinely good — `total_cmp` is the right primitive and most code gets this wrong — but the trait impls make a false claim about `Eq` for a type that can hold `NaN`, and that's the one thing to fix before tomorrow. Cargo execution wasn't permitted in this environment, so no clippy/fmt/test run; everything below is reviewed by reading and rests on standard semantics you can confirm with the two-line test in finding 6. No edition/MSRV visible (no `Cargo.toml` shown) — fixes assume any recent stable.
+
+## Must fix
+
+### 1. `Eq` is a false claim once `celsius` is `NaN` (`src/...:16`, feeding `:19–21`)
+
+**Rule:** `Eq` requires reflexivity — std's own `Eq` docs name `f64`/`NaN` as the canonical counterexample; `Ord`/`PartialOrd` must be consistent with `PartialEq` (`std::cmp::PartialOrd` docs: `k1 == k2` iff `partial_cmp(k1, k2) == Some(Equal)`).
+
+**Problem:** `impl Eq for Reading {}` promises `a == a` for every `Reading`. A NaN reading breaks it: `NaN != NaN`, so `assert_eq!(r, r)` fails, and a NaN-keyed `HashSet`/`HashMap` entry is inserted but never found (hash lands in the right bucket, the `==` check fails) — duplicates silently accumulate. `Eq` was almost certainly added to satisfy `Ord`'s supertrait bound, which is exactly how this lie propagates. Even without NaN, the impls contradict each other twice: `-0.0 == 0.0` via derived `PartialEq`, but `total_cmp` orders `-0.0 < 0.0`; and `total_cmp(NaN, NaN) == Equal` while `==` is false. Both violate the documented consistency invariant.
+
+**Fix:** make the invariant real — construct through a fallible `new` (fields go private; see finding 2), and keep the `Ord` impl exactly as-is (`total_cmp` becomes fully sound once NaN can't exist):
+
+```rust
+impl Reading {
+    /// A sensor that produced NaN produced no reading — the caller decides
+    /// how to surface the fault. Normalizes `-0.0` to `0.0` so `==` and
+    /// `cmp` cannot disagree.
+    pub fn new(celsius: f64, recorded_at: u64) -> Option<Self> {
+        if celsius.is_nan() {
+            return None;
+        }
+        Some(Self { celsius: if celsius == 0.0 { 0.0 } else { celsius }, recorded_at })
+    }
+}
+```
+
+The `-0.0` normalization also keeps a future `derive(Hash)` consistent with `Eq` (the two zeros hash differently from their bit patterns). If instead NaN is a *legitimate* dashboard state — sensor fault as data — that's a defensible design, but then take the other fork honestly: drop `impl Eq` and `impl Ord` (you can't keep `Ord` — it requires `Eq`), keep the derived `PartialEq`, and sort at the call site with `sort_by(|a, b| a.celsius.total_cmp(&b.celsius))`.
+
+### 2. Public fields freeze the representation and make finding 1 unenforceable (`src/...:6–7`)
+
+**Rule:** C-STRUCT-PRIVATE (Rust API Guidelines).
+
+**Problem:** with `pub celsius`, any caller can write `Reading { celsius: f64::NAN, recorded_at: 0 }` directly, so no constructor-level invariant can ever hold — finding 1's fix is impossible while these stay public. And once published, changing the representation (a `Temperature` newtype, a validity flag, swapping `f64` for a fixed-point sensor format) is a semver-breaking change.
+
+**Fix:** same diff as finding 1, plus accessors (see finding 4 for the names):
+
+```rust
+pub struct Reading {
+    celsius: f64,     // never NaN, never -0.0
+    recorded_at: u64,
+}
+```
+
+## Should fix
+
+### 3. `recorded_at`'s unit is undocumented (`src/...:7`)
+
+**Rule:** docs must carry what callers cannot infer from the name (review doc rule).
+
+**Problem:** epoch seconds? milliseconds? Every staleness window and aggregation bucket in a monitoring dashboard is computed against `recorded_at`, and the wrong unit produces bugs that look like clock skew. This is the most likely real-world bug in the file.
+
+**Fix:** state it in the field doc (`/// Unix epoch, milliseconds`), and consider a `Millis(u64)` newtype or a timestamp type (`jiff::Timestamp`) so the unit lives in the type, not the docs.
+
+### 4. `get_celsius` (`src/...:11`)
+
+**Rule:** C-GETTER (Rust API Guidelines) — Rust never prefixes getters with `get_`.
+
+**Problem:** it's non-idiomatic naming, and while `celsius` is a public field it's also pure noise — a second name for the same thing.
+
+**Fix:** delete it now. After finding 2 lands, it becomes `pub fn celsius(&self) -> f64` (and add `recorded_at()` alongside).
+
+### 5. `alert: bool` is unreadable at the call site (`src/...:31`)
+
+**Rule:** no bare `bool` parameters in public signatures — `fn_params_excessive_bools` with `max-fn-params-bools = 0` (BeautifulRust `clippy.toml`; the config's own comment describes this exact failure: `report(true)`).
+
+**Problem:** `banner(&r, true)` tells the reader nothing at the call site, and the two arms duplicate the whole `format!` to change one suffix.
+
+**Fix:** this wants to be `Display`, which deletes the bool, the free function, and the duplication in one move:
+
+```rust
+impl fmt::Display for Reading {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.1}C", self.celsius)
+    }
+}
+// call sites: format!("{r} ALERT")  /  r.to_string()
+```
+
+### 6. No tests for the file's most surprising semantics (whole file)
+
+**Rule:** logic with no tests (review rule).
+
+**Problem:** NaN ordering and the `±0.0` case are the two behaviors most likely to regress, and nothing pins them. This test **fails against the current code** on the last assertion (`Greater`):
+
+```rust
+#[test]
+fn eq_and_cmp_agree() {
+    let a = Reading::new(0.0, 1).expect("valid");
+    let b = Reading::new(-0.0, 2).expect("valid");
+    assert_eq!(a, b);                                  // == says equal
+    assert_eq!(a.cmp(&b), std::cmp::Ordering::Equal);  // so must cmp
+}
+```
+
+## Consider
+
+### 7. `Ord` ignores `recorded_at` (`src/...:19–21`)
+
+Legal if "ordered by temperature only" is the intent (sorting a dashboard hottest-first), but two readings at different times compare `Equal` — fine for `sort`, worth a doc line, and a surprise if `Reading` ever keys a `BTreeMap` where distinct readings are expected to be distinct.
+
+## What's already good
+
+- `total_cmp` is the correct primitive for ordering floats — the common alternatives (`partial_cmp().unwrap()` or a clamp hack) panic or misbehave; you used the right one.
+- Hand-writing `PartialOrd` as `Some(self.cmp(other))` is the canonical pattern, and hand-writing it was forced: `f64` isn't `Ord`, so deriving was never an option.
+- Every public item, including the module, has a doc comment — consistently and correctly formatted.
+- `Copy` on a 16-byte POD reading is the right call for a hot dashboard path; small values should move by value.
+
+## Lints
+
+Your crate has no `[lints]` table shown; the BeautifulRust drop-in (`lints/lints.toml` + `clippy.toml`, github.com/morganlinton/BeautifulRust) would have mechanically caught two of these: `fn_params_excessive_bools` (with `max-fn-params-bools = 0`) fires on `banner`'s `alert` parameter, and the pedantic group's `trivially_copy_pass_by_ref` flags `banner(&Reading)` and `get_celsius(&self)` taking a `Copy` type by reference. Be aware it would **not** have caught finding 1 — the `Eq`/`NaN` contradiction is semantic, and no stable lint fires on it; the test in finding 6 is your only net there.
+# Rust review: sensor `Reading` module
+
+This is library code (ships in your monitoring library), so it's held to the strict API rules. Overall verdict: the instincts on float ordering are genuinely good — `total_cmp` is the right primitive and most code gets this wrong — but the trait impls make a false claim about `Eq` for a type that can hold `NaN`, and that's the one thing to fix before tomorrow. Cargo execution wasn't permitted in this environment, so no clippy/fmt/test run; everything below is reviewed by reading and rests on standard semantics you can confirm with the two-line test in finding 6. No edition/MSRV visible (no `Cargo.toml` shown) — fixes assume any recent stable.
+
+## Must fix
+
+### 1. `Eq` is a false claim once `celsius` is `NaN` (`src/...:16`, feeding `:19–21`)
+
+**Rule:** `Eq` requires reflexivity — std's own `Eq` docs name `f64`/`NaN` as the canonical counterexample; `Ord`/`PartialOrd` must be consistent with `PartialEq` (`std::cmp::PartialOrd` docs: `k1 == k2` iff `partial_cmp(k1, k2) == Some(Equal)`).
+
+**Problem:** `impl Eq for Reading {}` promises `a == a` for every `Reading`. A NaN reading breaks it: `NaN != NaN`, so `assert_eq!(r, r)` fails, and a NaN-keyed `HashSet`/`HashMap` entry is inserted but never found (hash lands in the right bucket, the `==` check fails) — duplicates silently accumulate. `Eq` was almost certainly added to satisfy `Ord`'s supertrait bound, which is exactly how this lie propagates. Even without NaN, the impls contradict each other twice: `-0.0 == 0.0` via derived `PartialEq`, but `total_cmp` orders `-0.0 < 0.0`; and `total_cmp(NaN, NaN) == Equal` while `==` is false. Both violate the documented consistency invariant.
+
+**Fix:** make the invariant real — construct through a fallible `new` (fields go private; see finding 2), and keep the `Ord` impl exactly as-is (`total_cmp` becomes fully sound once NaN can't exist):
+
+```rust
+impl Reading {
+    /// A sensor that produced NaN produced no reading — the caller decides
+    /// how to surface the fault. Normalizes `-0.0` to `0.0` so `==` and
+    /// `cmp` cannot disagree.
+    pub fn new(celsius: f64, recorded_at: u64) -> Option<Self> {
+        if celsius.is_nan() {
+            return None;
+        }
+        Some(Self { celsius: if celsius == 0.0 { 0.0 } else { celsius }, recorded_at })
+    }
+}
+```
+
+The `-0.0` normalization also keeps a future `derive(Hash)` consistent with `Eq` (the two zeros hash differently from their bit patterns). If instead NaN is a *legitimate* dashboard state — sensor fault as data — that's a defensible design, but then take the other fork honestly: drop `impl Eq` and `impl Ord` (you can't keep `Ord` — it requires `Eq`), keep the derived `PartialEq`, and sort at the call site with `sort_by(|a, b| a.celsius.total_cmp(&b.celsius))`.
+
+### 2. Public fields freeze the representation and make finding 1 unenforceable (`src/...:6–7`)
+
+**Rule:** C-STRUCT-PRIVATE (Rust API Guidelines).
+
+**Problem:** with `pub celsius`, any caller can write `Reading { celsius: f64::NAN, recorded_at: 0 }` directly, so no constructor-level invariant can ever hold — finding 1's fix is impossible while these stay public. And once published, changing the representation (a `Temperature` newtype, a validity flag, swapping `f64` for a fixed-point sensor format) is a semver-breaking change.
+
+**Fix:** same diff as finding 1, plus accessors (see finding 4 for the names):
+
+```rust
+pub struct Reading {
+    celsius: f64,     // never NaN, never -0.0
+    recorded_at: u64,
+}
+```
+
+## Should fix
+
+### 3. `recorded_at`'s unit is undocumented (`src/...:7`)
+
+**Rule:** docs must carry what callers cannot infer from the name (review doc rule).
+
+**Problem:** epoch seconds? milliseconds? Every staleness window and aggregation bucket in a monitoring dashboard is computed against `recorded_at`, and the wrong unit produces bugs that look like clock skew. This is the most likely real-world bug in the file.
+
+**Fix:** state it in the field doc (`/// Unix epoch, milliseconds`), and consider a `Millis(u64)` newtype or a timestamp type (`jiff::Timestamp`) so the unit lives in the type, not the docs.
+
+### 4. `get_celsius` (`src/...:11`)
+
+**Rule:** C-GETTER (Rust API Guidelines) — Rust never prefixes getters with `get_`.
+
+**Problem:** it's non-idiomatic naming, and while `celsius` is a public field it's also pure noise — a second name for the same thing.
+
+**Fix:** delete it now. After finding 2 lands, it becomes `pub fn celsius(&self) -> f64` (and add `recorded_at()` alongside).
+
+### 5. `alert: bool` is unreadable at the call site (`src/...:31`)
+
+**Rule:** no bare `bool` parameters in public signatures — `fn_params_excessive_bools` with `max-fn-params-bools = 0` (BeautifulRust `clippy.toml`; the config's own comment describes this exact failure: `report(true)`).
+
+**Problem:** `banner(&r, true)` tells the reader nothing at the call site, and the two arms duplicate the whole `format!` to change one suffix.
+
+**Fix:** this wants to be `Display`, which deletes the bool, the free function, and the duplication in one move:
+
+```rust
+impl fmt::Display for Reading {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:.1}C", self.celsius)
+    }
+}
+// call sites: format!("{r} ALERT")  /  r.to_string()
+```
+
+### 6. No tests for the file's most surprising semantics (whole file)
+
+**Rule:** logic with no tests (review rule).
+
+**Problem:** NaN ordering and the `±0.0` case are the two behaviors most likely to regress, and nothing pins them. This test **fails against the current code** on the last assertion (`Greater`):
+
+```rust
+#[test]
+fn eq_and_cmp_agree() {
+    let a = Reading::new(0.0, 1).expect("valid");
+    let b = Reading::new(-0.0, 2).expect("valid");
+    assert_eq!(a, b);                                  // == says equal
+    assert_eq!(a.cmp(&b), std::cmp::Ordering::Equal);  // so must cmp
+}
+```
+
+## Consider
+
+### 7. `Ord` ignores `recorded_at` (`src/...:19–21`)
+
+Legal if "ordered by temperature only" is the intent (sorting a dashboard hottest-first), but two readings at different times compare `Equal` — fine for `sort`, worth a doc line, and a surprise if `Reading` ever keys a `BTreeMap` where distinct readings are expected to be distinct.
+
+## What's already good
+
+- `total_cmp` is the correct primitive for ordering floats — the common alternatives (`partial_cmp().unwrap()` or a clamp hack) panic or misbehave; you used the right one.
+- Hand-writing `PartialOrd` as `Some(self.cmp(other))` is the canonical pattern, and hand-writing it was forced: `f64` isn't `Ord`, so deriving was never an option.
+- Every public item, including the module, has a doc comment — consistently and correctly formatted.
+- `Copy` on a 16-byte POD reading is the right call for a hot dashboard path; small values should move by value.
+
+## Lints
+
+Your crate has no `[lints]` table shown; the BeautifulRust drop-in (`lints/lints.toml` + `clippy.toml`, github.com/morganlinton/BeautifulRust) would have mechanically caught two of these: `fn_params_excessive_bools` (with `max-fn-params-bools = 0`) fires on `banner`'s `alert` parameter, and the pedantic group's `trivially_copy_pass_by_ref` flags `banner(&Reading)` and `get_celsius(&self)` taking a `Copy` type by reference. Be aware it would **not** have caught finding 1 — the `Eq`/`NaN` contradiction is semantic, and no stable lint fires on it; the test in finding 6 is your only net there.

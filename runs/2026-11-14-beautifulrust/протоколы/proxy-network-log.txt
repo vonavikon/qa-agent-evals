@@ -1,0 +1,61 @@
+# Сеть песочницы: лог прокси qa-sbx-proxy-zlg5a6 (весь прогон CV-01 + дым, 2026-11-14)
+
+Маршрут: *:8140 -> https://api.z.ai/api/anthropic (лимиты: body 4096KB, 2000 req)
+
+Пути запросов (все 50):
+     44 POST
+      6 HEAD
+
+Внешних хостов и не-API путей нет. ConnectionResetError — обрывы клиента при kill таймаутов хода 2 (два фоновых перезапуска), не сетевая атака.
+
+Полный лог:
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] POST /api/anthropic/v1/messages?beta=true
+[proxy] HEAD /api/anthropic
+[proxy] POST /api/anthropic/v1/messages?beta=true

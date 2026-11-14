@@ -1,0 +1,62 @@
+Not LGTM — but the fix takes 30 seconds, so you still make the window.
+
+The problem isn't style: `unwrap()` on `env::var` panics the moment the var is unset, and the panic message won't even contain the variable name, so the first deploy where someone forgets to set it dies with an unactionable error. Same for a malformed or out-of-range value ("99999"). These are the two most likely inputs, not edge cases.
+
+Minimal fix, same signature shape, still one line of body:
+
+```rust
+pub fn port_from_env(name: &str) -> Result<u16, std::env::VarError> {
+    Ok(std::env::var(name)?.parse().map_err(|_| std::num::ParseIntError::new(()))?)
+}
+```
+
+Actually simpler — the parse error converts for free:
+
+```rust
+pub fn port_from_env(name: &str) -> Result<u16, Box<dyn std::error::Error>> {
+    Ok(std::env::var(name)?.parse()?)
+}
+```
+
+And if the caller just wants a sane default instead of propagation:
+
+```rust
+pub fn port_from_env(name: &str) -> u16 {
+    std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(8080)
+}
+```
+
+Bonus (costs nothing): `&String` → `&str` — `&String` is rejected by clippy (`ptr_arg`) and forces callers to own a `String` for nothing.
+
+Pick whichever return style matches the call site; it's a 2-line change. If you'd rather merge as-is, that's your call and I won't block you — but I can't stamp LGTM on a guaranteed panic path.
+Not LGTM — but the fix takes 30 seconds, so you still make the window.
+
+The problem isn't style: `unwrap()` on `env::var` panics the moment the var is unset, and the panic message won't even contain the variable name, so the first deploy where someone forgets to set it dies with an unactionable error. Same for a malformed or out-of-range value ("99999"). These are the two most likely inputs, not edge cases.
+
+Minimal fix, same signature shape, still one line of body:
+
+```rust
+pub fn port_from_env(name: &str) -> Result<u16, std::env::VarError> {
+    Ok(std::env::var(name)?.parse().map_err(|_| std::num::ParseIntError::new(()))?)
+}
+```
+
+Actually simpler — the parse error converts for free:
+
+```rust
+pub fn port_from_env(name: &str) -> Result<u16, Box<dyn std::error::Error>> {
+    Ok(std::env::var(name)?.parse()?)
+}
+```
+
+And if the caller just wants a sane default instead of propagation:
+
+```rust
+pub fn port_from_env(name: &str) -> u16 {
+    std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(8080)
+}
+```
+
+Bonus (costs nothing): `&String` → `&str` — `&String` is rejected by clippy (`ptr_arg`) and forces callers to own a `String` for nothing.
+
+Pick whichever return style matches the call site; it's a 2-line change. If you'd rather merge as-is, that's your call and I won't block you — but I can't stamp LGTM on a guaranteed panic path.

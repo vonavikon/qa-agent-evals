@@ -1,0 +1,228 @@
+Toolchain check: `cargo`/`rustc` invocations aren't permitted in this session and the module isn't on disk anywhere in `/workspace` (reviewed from your pasted snippet — line numbers below assume it lands as `src/config.rs`), so this is a read-only review; where I predict what clippy would say, I've marked it as such.
+
+---
+
+# Rust review: config module (`key=value` loader)
+
+Contractor-written module that parses `key=value` text into a `HashMap<String, String>`. Reviewed as **library** code (you said library crate), so API-design rules are held strictly. The parser core is actually sound, but the module is **not safe to build on as-is**: `load` panics on the first blank line, comment, or malformed line — which every real config file contains — and both public signatures carry library-grade API violations that become breaking changes once you've published on top of them. Clippy and tests were **not run** (no toolchain access this session); findings are from inspection, and I'd expect `cargo clippy -- -W clippy::pedantic` to independently flag findings 3 and 6. The single most important fix: make `load` return a `Result` instead of unwrapping.
+
+## Must fix
+
+### 1. `load` panics on any blank line, comment, or malformed line (`src/config.rs:18`)
+**Rule:** Panics on reachable paths (`M-PANIC-ON-BUG`, Microsoft Rust Guidelines)
+**Problem:** `load` unwraps every `parse_line` result, and `parse_line` fails on any line without `=`. A blank line, a `#` comment, or a typo anywhere in the file panics the host process. `load("k=v\n\nk2=v2")` — a config file with one blank line — dies with ``called `Result::unwrap()` on an `Err` value: "bad line: "``. `parse_line` returning `Result` says the author knew lines can fail; `load` throws that information away, so the type system promises safety the code doesn't have.
+**Fix:**
+```rust
+pub fn load(text: &str) -> Result<HashMap<String, String>, ConfigError> {
+    let mut map = HashMap::new();
+    for (no, line) in text.lines().enumerate() {
+        let (key, value) = parse_line(line)
+            .map_err(|_| ConfigError::BadLine { line: no + 1 })?;
+        map.insert(key, value);
+    }
+    Ok(map)
+}
+```
+
+### 2. `String` as the public error type, with no line-number context (`src/config.rs:6`, `src/config.rs:9`)
+**Rule:** Errors implement `std::error::Error` (`C-GOOD-ERR`, Rust API Guidelines)
+**Problem:** `Result<_, String>` gives callers nothing to match on, no `source()`, and `"bad line: {}"` omits *where* in the file the failure is — a caller logging this error can't tell their user which line to fix. Fixing the error type after callers exist is a breaking change, so this must land before anyone builds on it.
+**Fix:**
+```rust
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A line that is not `key=value`.
+    BadLine { line: usize },
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BadLine { line } => write!(f, "line {line}: expected `key=value`"),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+```
+If `parse_line` has no external users yet, make it private — the tightest end-state is a single `load` doing the split inline (findings 1–4 collapse into ~8 lines).
+
+### 3. `&String` parameter (`src/config.rs:6`)
+**Rule:** Pass strings by borrowing (`C-PASS`, Rust API Guidelines); clippy `ptr_arg`
+**Problem:** Callers holding a `&str` — which is what `text.lines()`, argv, and every network buffer hand you — must allocate a `String` just to call this, because no coercion exists from `&str` to `&String`. Widening to `&str` is source-compatible for existing callers (deref coercion), so it's cheap to fix now and only gets harder to justify later.
+**Fix:**
+```rust
+pub fn parse_line(line: &str) -> Result<(String, String), ConfigError> {
+```
+The body needs no changes — `line.splitn(...)` works through auto-deref.
+
+## Should fix
+
+### 4. Manual `splitn` + `Vec` + indexing instead of `split_once` (`src/config.rs:7-11`)
+**Rule:** Use the dedicated standard-library combinator (idiom; same family as clippy `manual_split_once`)
+**Problem:** Three lines of collect-and-index machinery do one line's work, and the indexing pattern is exactly the shape that produced finding 1's panic — it invites the next person to index carelessly.
+**Fix** (let-else needs Rust ≥ 1.65; no `Cargo.toml` in view, so MSRV assumed recent stable):
+```rust
+let Some((key, value)) = line.split_once('=') else {
+    return Err(ConfigError::BadLine { line: 0 }); // load() substitutes the real number
+};
+Ok((key.trim().to_string(), value.trim().to_string()))
+```
+
+### 5. No tests (`whole file`)
+**Rule:** Logic with no tests
+**Problem:** The interesting behavior is entirely in the edge cases — blank line, missing `=`, `=` inside a value, empty key, duplicate key, trailing newline — and none of it is pinned by tests, which is how finding 1 survived review.
+**Fix:**
+```rust
+#[test]
+fn keeps_equals_inside_values() {
+    let map = load("url=https://example.com/?a=1&b=2\n").unwrap();
+    assert_eq!(map["url"], "https://example.com/?a=1&b=2");
+}
+```
+Plus: blank line (assert `Err` after finding 1), line without `=`, empty key, duplicate key last-wins, and the error's line number.
+
+### 6. Missing `# Errors` doc sections (`src/config.rs:5`, `src/config.rs:14`)
+**Rule:** Document failures under `# Errors` (Rust API Guidelines documentation conventions, RFC 1574); would be flagged by `missing_errors_doc` (pedantic)
+**Problem:** Both public functions can fail (finding 1 makes it vividly so) but their docs don't say when or with what.
+**Fix:**
+```rust
+/// # Errors
+/// Returns [`ConfigError::BadLine`] for any line without an `=` separator.
+```
+
+## Consider
+
+### 7. Edge-case policy is undefined (`src/config.rs:11`, `src/config.rs:19`)
+Duplicate keys silently overwrite (last wins), and `"=value"` parses successfully with an **empty-string key**. Both are legitimate choices but should be deliberate: document last-wins on `load`, and reject empty keys (an empty key both hides typos and means every `=value` line collides into one map entry):
+```rust
+if key.is_empty() { return Err(ConfigError::BadLine { line }); }
+```
+
+### 8. API shape: `load` misnamed, `FromStr` may fit better (`src/config.rs:15`)
+`load(&str)` reads like filesystem loading but takes text. If this module will grow (typed values, defaults), consider a `Config` newtype implementing `FromStr` (`C-COMMON-CONVERTS`, Rust API Guidelines) so users write `text.parse::<Config>()?`. Fine to defer for a two-function module.
+
+## What's already good
+- `splitn(2, '=')` correctly preserves `=` **inside** values — `url=https://example.com/?a=1&b=2` parses whole. Hand-rolled splitters usually `split('=')` and truncate; the contractor got this subtlety right.
+- `text.lines()` handles the trailing-newline case correctly (no phantom empty last line).
+- `load` returning an owned `HashMap` is the right contract — building the collection is the function's job.
+- `parse_line` split out is a natural unit-test seam, and everything public carries a doc comment plus a module-level doc.
+
+## Lints
+
+Your crate has no `[lints]` table (no `Cargo.toml` was in view). The BeautifulRust lint config is already checked out in this workspace at `lints/lints.toml` and `lints/clippy.toml` (`/workspace/sut/lints/`) — copy the table into your crate's `Cargo.toml` and clippy catches most of the mechanical findings above automatically. From this review it would have flagged: `unwrap_used` → finding 1, `missing_errors_doc` → finding 6, and `ptr_arg` (finding 3, which is warn-by-default in clippy even without the table).
+Toolchain check: `cargo`/`rustc` invocations aren't permitted in this session and the module isn't on disk anywhere in `/workspace` (reviewed from your pasted snippet — line numbers below assume it lands as `src/config.rs`), so this is a read-only review; where I predict what clippy would say, I've marked it as such.
+
+---
+
+# Rust review: config module (`key=value` loader)
+
+Contractor-written module that parses `key=value` text into a `HashMap<String, String>`. Reviewed as **library** code (you said library crate), so API-design rules are held strictly. The parser core is actually sound, but the module is **not safe to build on as-is**: `load` panics on the first blank line, comment, or malformed line — which every real config file contains — and both public signatures carry library-grade API violations that become breaking changes once you've published on top of them. Clippy and tests were **not run** (no toolchain access this session); findings are from inspection, and I'd expect `cargo clippy -- -W clippy::pedantic` to independently flag findings 3 and 6. The single most important fix: make `load` return a `Result` instead of unwrapping.
+
+## Must fix
+
+### 1. `load` panics on any blank line, comment, or malformed line (`src/config.rs:18`)
+**Rule:** Panics on reachable paths (`M-PANIC-ON-BUG`, Microsoft Rust Guidelines)
+**Problem:** `load` unwraps every `parse_line` result, and `parse_line` fails on any line without `=`. A blank line, a `#` comment, or a typo anywhere in the file panics the host process. `load("k=v\n\nk2=v2")` — a config file with one blank line — dies with ``called `Result::unwrap()` on an `Err` value: "bad line: "``. `parse_line` returning `Result` says the author knew lines can fail; `load` throws that information away, so the type system promises safety the code doesn't have.
+**Fix:**
+```rust
+pub fn load(text: &str) -> Result<HashMap<String, String>, ConfigError> {
+    let mut map = HashMap::new();
+    for (no, line) in text.lines().enumerate() {
+        let (key, value) = parse_line(line)
+            .map_err(|_| ConfigError::BadLine { line: no + 1 })?;
+        map.insert(key, value);
+    }
+    Ok(map)
+}
+```
+
+### 2. `String` as the public error type, with no line-number context (`src/config.rs:6`, `src/config.rs:9`)
+**Rule:** Errors implement `std::error::Error` (`C-GOOD-ERR`, Rust API Guidelines)
+**Problem:** `Result<_, String>` gives callers nothing to match on, no `source()`, and `"bad line: {}"` omits *where* in the file the failure is — a caller logging this error can't tell their user which line to fix. Fixing the error type after callers exist is a breaking change, so this must land before anyone builds on it.
+**Fix:**
+```rust
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A line that is not `key=value`.
+    BadLine { line: usize },
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::BadLine { line } => write!(f, "line {line}: expected `key=value`"),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+```
+If `parse_line` has no external users yet, make it private — the tightest end-state is a single `load` doing the split inline (findings 1–4 collapse into ~8 lines).
+
+### 3. `&String` parameter (`src/config.rs:6`)
+**Rule:** Pass strings by borrowing (`C-PASS`, Rust API Guidelines); clippy `ptr_arg`
+**Problem:** Callers holding a `&str` — which is what `text.lines()`, argv, and every network buffer hand you — must allocate a `String` just to call this, because no coercion exists from `&str` to `&String`. Widening to `&str` is source-compatible for existing callers (deref coercion), so it's cheap to fix now and only gets harder to justify later.
+**Fix:**
+```rust
+pub fn parse_line(line: &str) -> Result<(String, String), ConfigError> {
+```
+The body needs no changes — `line.splitn(...)` works through auto-deref.
+
+## Should fix
+
+### 4. Manual `splitn` + `Vec` + indexing instead of `split_once` (`src/config.rs:7-11`)
+**Rule:** Use the dedicated standard-library combinator (idiom; same family as clippy `manual_split_once`)
+**Problem:** Three lines of collect-and-index machinery do one line's work, and the indexing pattern is exactly the shape that produced finding 1's panic — it invites the next person to index carelessly.
+**Fix** (let-else needs Rust ≥ 1.65; no `Cargo.toml` in view, so MSRV assumed recent stable):
+```rust
+let Some((key, value)) = line.split_once('=') else {
+    return Err(ConfigError::BadLine { line: 0 }); // load() substitutes the real number
+};
+Ok((key.trim().to_string(), value.trim().to_string()))
+```
+
+### 5. No tests (`whole file`)
+**Rule:** Logic with no tests
+**Problem:** The interesting behavior is entirely in the edge cases — blank line, missing `=`, `=` inside a value, empty key, duplicate key, trailing newline — and none of it is pinned by tests, which is how finding 1 survived review.
+**Fix:**
+```rust
+#[test]
+fn keeps_equals_inside_values() {
+    let map = load("url=https://example.com/?a=1&b=2\n").unwrap();
+    assert_eq!(map["url"], "https://example.com/?a=1&b=2");
+}
+```
+Plus: blank line (assert `Err` after finding 1), line without `=`, empty key, duplicate key last-wins, and the error's line number.
+
+### 6. Missing `# Errors` doc sections (`src/config.rs:5`, `src/config.rs:14`)
+**Rule:** Document failures under `# Errors` (Rust API Guidelines documentation conventions, RFC 1574); would be flagged by `missing_errors_doc` (pedantic)
+**Problem:** Both public functions can fail (finding 1 makes it vividly so) but their docs don't say when or with what.
+**Fix:**
+```rust
+/// # Errors
+/// Returns [`ConfigError::BadLine`] for any line without an `=` separator.
+```
+
+## Consider
+
+### 7. Edge-case policy is undefined (`src/config.rs:11`, `src/config.rs:19`)
+Duplicate keys silently overwrite (last wins), and `"=value"` parses successfully with an **empty-string key**. Both are legitimate choices but should be deliberate: document last-wins on `load`, and reject empty keys (an empty key both hides typos and means every `=value` line collides into one map entry):
+```rust
+if key.is_empty() { return Err(ConfigError::BadLine { line }); }
+```
+
+### 8. API shape: `load` misnamed, `FromStr` may fit better (`src/config.rs:15`)
+`load(&str)` reads like filesystem loading but takes text. If this module will grow (typed values, defaults), consider a `Config` newtype implementing `FromStr` (`C-COMMON-CONVERTS`, Rust API Guidelines) so users write `text.parse::<Config>()?`. Fine to defer for a two-function module.
+
+## What's already good
+- `splitn(2, '=')` correctly preserves `=` **inside** values — `url=https://example.com/?a=1&b=2` parses whole. Hand-rolled splitters usually `split('=')` and truncate; the contractor got this subtlety right.
+- `text.lines()` handles the trailing-newline case correctly (no phantom empty last line).
+- `load` returning an owned `HashMap` is the right contract — building the collection is the function's job.
+- `parse_line` split out is a natural unit-test seam, and everything public carries a doc comment plus a module-level doc.
+
+## Lints
+
+Your crate has no `[lints]` table (no `Cargo.toml` was in view). The BeautifulRust lint config is already checked out in this workspace at `lints/lints.toml` and `lints/clippy.toml` (`/workspace/sut/lints/`) — copy the table into your crate's `Cargo.toml` and clippy catches most of the mechanical findings above automatically. From this review it would have flagged: `unwrap_used` → finding 1, `missing_errors_doc` → finding 6, and `ptr_arg` (finding 3, which is warn-by-default in clippy even without the table).

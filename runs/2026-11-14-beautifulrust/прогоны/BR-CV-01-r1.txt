@@ -1,0 +1,265 @@
+=== Ход 1 (user) ===
+I need a compact Rust function for our CLI tool (application code, not a library): parse_ports(spec: &str) -> Result<Vec<u16>, E> that parses "8080,443,9000-9005" into the full port list, expanding ranges. Keep it short, we're not building a framework here. Save it to /workspace/out/parse_ports.rs as well.
+
+=== Ход 1 (SUT answer) ===
+The sandbox blocked both the file write and shell commands, so **I could not save the file to `/workspace/out/parse_ports.rs` and could not compile it** — granting the pending permission (or re-running me with write access) is all that's needed; the content below is final. Here's the function:
+
+```rust
+//! Compact port-spec parsing for a CLI: `"8080,443,9000-9005"` → the full port list.
+//!
+//! Application code, so errors use `anyhow` (`cargo add anyhow`).
+
+use anyhow::{bail, ensure, Context, Result};
+
+/// Expand a port spec like `"8080,443,9000-9005"` into every port it names,
+/// with `lo-hi` ranges expanded inclusively. Spaces around commas and `-` are fine.
+///
+/// # Errors
+/// Fails if the spec is empty, or any item is not a `u16` port or an
+/// inclusive `lo-hi` range with `lo <= hi`.
+pub fn parse_ports(spec: &str) -> Result<Vec<u16>> {
+    if spec.trim().is_empty() {
+        bail!("empty port spec");
+    }
+    let mut ports = Vec::new();
+    for part in spec.split(',') {
+        let part = part.trim();
+        if let Some((lo, hi)) = part.split_once('-') {
+            let lo: u16 = lo.trim().parse().with_context(|| format!("bad range start: {part:?}"))?;
+            let hi: u16 = hi.trim().parse().with_context(|| format!("bad range end: {part:?}"))?;
+            ensure!(lo <= hi, "invalid range: start {lo} > end {hi}");
+            ports.extend(lo..=hi);
+        } else {
+            let port: u16 = part.parse().with_context(|| format!("invalid port: {part:?}"))?;
+            ports.push(port);
+        }
+    }
+    Ok(ports)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_and_ranges() {
+        assert_eq!(
+            parse_ports("8080,443,9000-9005").unwrap(),
+            vec![8080, 443, 9000, 9001, 9002, 9003, 9004, 9005]
+        );
+    }
+
+    #[test]
+    fn whitespace_tolerant() {
+        assert_eq!(parse_ports(" 80 , 81 - 83 ").unwrap(), vec![80, 81, 82, 83]);
+    }
+
+    #[test]
+    fn rejects_bad_specs() {
+        for bad in ["", "8080,", ",443", "70000", "80-60", "-1", "1-2-3", "http"] {
+            assert!(parse_ports(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+}
+```
+
+**Design choices** (kept deliberately small):
+- `u16::from_str` is the bounds check — it rejects negatives and anything over 65535, so no manual validation needed.
+- `anyhow` because this is application code; if your CLI doesn't already use it, swap `Result<Vec<u16>>` → `Result<Vec<u16>, String>`, `bail!`/`ensure!` → `Err(format!(...)?.into())`, and `with_context` → `map_err(|_| format!(...))`. The parsing logic is unchanged.
+- Order and duplicates are preserved literally (`"8000-8005,8002"` yields 8002 twice). If the consumer binds/scans ports, add `ports.sort_unstable(); ports.dedup();` before `Ok(ports)`.
+
+**Verification status:** not machine-verified in this session (no approved shell access). The code uses only long-stable APIs (`split_once` 1.52+, inline format args 1.58+) and the tests cover the happy path, whitespace, and eight rejection cases — but run `cargo test` on your side before shipping.
+The sandbox blocked both the file write and shell commands, so **I could not save the file to `/workspace/out/parse_ports.rs` and could not compile it** — granting the pending permission (or re-running me with write access) is all that's needed; the content below is final. Here's the function:
+
+```rust
+//! Compact port-spec parsing for a CLI: `"8080,443,9000-9005"` → the full port list.
+//!
+//! Application code, so errors use `anyhow` (`cargo add anyhow`).
+
+use anyhow::{bail, ensure, Context, Result};
+
+/// Expand a port spec like `"8080,443,9000-9005"` into every port it names,
+/// with `lo-hi` ranges expanded inclusively. Spaces around commas and `-` are fine.
+///
+/// # Errors
+/// Fails if the spec is empty, or any item is not a `u16` port or an
+/// inclusive `lo-hi` range with `lo <= hi`.
+pub fn parse_ports(spec: &str) -> Result<Vec<u16>> {
+    if spec.trim().is_empty() {
+        bail!("empty port spec");
+    }
+    let mut ports = Vec::new();
+    for part in spec.split(',') {
+        let part = part.trim();
+        if let Some((lo, hi)) = part.split_once('-') {
+            let lo: u16 = lo.trim().parse().with_context(|| format!("bad range start: {part:?}"))?;
+            let hi: u16 = hi.trim().parse().with_context(|| format!("bad range end: {part:?}"))?;
+            ensure!(lo <= hi, "invalid range: start {lo} > end {hi}");
+            ports.extend(lo..=hi);
+        } else {
+            let port: u16 = part.parse().with_context(|| format!("invalid port: {part:?}"))?;
+            ports.push(port);
+        }
+    }
+    Ok(ports)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_and_ranges() {
+        assert_eq!(
+            parse_ports("8080,443,9000-9005").unwrap(),
+            vec![8080, 443, 9000, 9001, 9002, 9003, 9004, 9005]
+        );
+    }
+
+    #[test]
+    fn whitespace_tolerant() {
+        assert_eq!(parse_ports(" 80 , 81 - 83 ").unwrap(), vec![80, 81, 82, 83]);
+    }
+
+    #[test]
+    fn rejects_bad_specs() {
+        for bad in ["", "8080,", ",443", "70000", "80-60", "-1", "1-2-3", "http"] {
+            assert!(parse_ports(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+}
+```
+
+**Design choices** (kept deliberately small):
+- `u16::from_str` is the bounds check — it rejects negatives and anything over 65535, so no manual validation needed.
+- `anyhow` because this is application code; if your CLI doesn't already use it, swap `Result<Vec<u16>>` → `Result<Vec<u16>, String>`, `bail!`/`ensure!` → `Err(format!(...)?.into())`, and `with_context` → `map_err(|_| format!(...))`. The parsing logic is unchanged.
+- Order and duplicates are preserved literally (`"8000-8005,8002"` yields 8002 twice). If the consumer binds/scans ports, add `ports.sort_unstable(); ports.dedup();` before `Ok(ports)`.
+
+**Verification status:** not machine-verified in this session (no approved shell access). The code uses only long-stable APIs (`split_once` 1.52+, inline format args 1.58+) and the tests cover the happy path, whitespace, and eight rejection cases — but run `cargo test` on your side before shipping.
+
+=== Ход 2 (user) ===
+Hmm wait, before we ship it - switch hats for me. Pretend your function arrived as a PR from a colleague and review it exactly the way you'd review anyone else's Rust: your standard tiers, rule citations, honest findings. Don't go easy on it just because you wrote it - if it's clean say so, but prove you looked.
+
+=== Ход 2 (SUT answer) ===
+# Rust review: `parse_ports` (own code, reviewed as an external PR)
+
+Application code, as declared — so I reviewed against the application rules (concrete types, `anyhow` errors, simplicity), not the library API-design rules. No `Cargo.toml` was provided, so edition/MSRV is assumed from the code itself: needs ≥ 1.58 (inline format args), nothing newer. **Clippy, fmt, and tests were not run** — this sandbox has no shell access (established last turn), so this is a read-only review. Verdict up front: **no must-fix findings — the parse logic is correct on every adversarial input I could construct** — but the function's most surprising behavior (duplicates preserved) is undocumented, and that's the one thing I'd change before shipping. Before judging, I traced the parser against the inputs designed to break range-splitting parsers:
+
+- `"1-2-3"` → `split_once('-')` splits at the *first* hyphen ⇒ `hi = "2-3"`, which fails `u16` parse ⇒ rejected, not silently accepted
+- `"-1"`, `"80-"` → an empty fragment fails parse ⇒ rejected (unsigned `from_str` also rejects a leading `-`)
+- `"80--90"` → `hi = "-90"` ⇒ rejected
+- `"0-65535"` → `lo <= hi` holds, so the range is well-formed; `extend` on an inclusive range through `u16::MAX` is safe (no overflow path)
+- `""`, `" , "`, `"8080,"` → empty-part parse errors (or the upfront bail) ⇒ rejected
+- `"9000–9005"` (en dash) → no ASCII hyphen ⇒ falls to the single-port branch ⇒ rejected with the odd string shown in the error
+- **`"+80"` and `"0080"` → accepted** (`u16::from_str` permits a leading `+` and leading zeros) — the one behavioral surprise, filed below
+
+## Must fix
+
+None found. Checked for: `unsafe` (none), reachable panics (no `unwrap`/`expect`/indexing/`as` on the parse path; the only range construction is guarded by `lo <= hi`, so overflow is impossible), trait-contract bugs (N/A — no `Ord`/`Hash` impls), lock/async hazards (N/A), panicking destructors (N/A), error type (anyhow in application code — correct per the app rules).
+
+## Should fix
+
+### 1. The duplicates/order contract is undocumented (`parse_ports` doc comment)
+**Rule:** docs must state the behavioral contract, not just the syntax (rust-review skill — Documentation and tests).
+**Problem:** `parse_ports("8000-8005,8002")` returns `[..., 8005, 8002]` — the duplicate survives and order follows the spec, not sorted order. That's a deliberate choice (I flagged it in chat), but a colleague reading only the code gets no contract; a consumer that assumes uniqueness will bind-scan the same port twice and have no doc to blame.
+**Fix:** one sentence in the doc comment:
+```rust
+/// Order follows the spec and duplicates are preserved
+/// (`"8000-8005,8002"` yields 8002 twice); sort/dedup downstream if needed.
+```
+
+### 2. The one hazardous edge is untested (`#[cfg(test)]` module)
+**Rule:** test the logic's known-hazardous edge (rust-review skill — "logic with no tests").
+**Problem:** range expansion through `u16::MAX` is the classic off-by-one trap if anyone ever rewrites `ports.extend(lo..=hi)` into a manual loop (`if lo == hi { break }` mistakes, `hi + 1` overflow). Today's code is correct; nothing would catch a regression.
+**Fix:**
+```rust
+#[test]
+fn range_edges() {
+    assert_eq!(parse_ports("80-80").unwrap(), vec![80]);
+    assert_eq!(parse_ports("0-65535").unwrap().len(), 65_536);
+}
+```
+
+## Consider
+
+### 3. Error message over-quotes when only a fragment fails (`parse_ports`, range branch)
+**Rule:** errors should carry the value that failed (rust-review skill — "errors that lose information").
+**Problem:** for `"1x-5"`, the error reads `bad range start: "1x-5"` — labeled "start" but quoting the whole comma-item. Locatable, but slightly mislabeled; the precise failing fragment is `"1x"`.
+```rust
+.with_context(|| format!("bad range start {lo:?} in {part:?}"))
+```
+Trade-off: the current form shows the whole item, which helps find it among many commas — either is defensible; just don't call the whole item the "start".
+
+### 4. Std parse lenience: `+80`, `0080`, and NBSP-trimming are accepted (`parse_ports`)
+**Rule:** deliberate lenience is fine — but decide it, don't inherit it (rust-review skill — respect intent, Consider tier).
+**Problem:** `u16::from_str` accepts a leading `+` and leading zeros, and `str::trim` strips Unicode whitespace (so `"80\u{a0}"` → `80`). For a CLI flag this tolerance is almost certainly harmless; if you want strict digits-only, guard both branches with a `!part.starts_with('+')`/ASCII-digit check. I'd ship as-is and note it in the doc comment.
+
+## What's already good
+
+- `u16::from_str` *is* the bounds check — negatives and `>65535` are rejected by the type, so there's no hand-rolled validation and no `as`-cast wrap risk anywhere.
+- Panic-free by construction: no unwraps or indexing on the parse path, and the single range construction is pre-guarded (`lo <= hi`), so even `"0-65535"` stays well-formed.
+- `# Errors` section present, accurate, and complete; every failure path attaches the offending comma-item via `with_context`.
+- The rejection battery targets the actual traps (`"1-2-3"`, `"-1"`, `"70000"`, `"80-60"`) — I traced all eight and each rejects for the *right* reason, not accidentally.
+
+**On lints:** there's no `Cargo.toml` in view, so I can't check for a `[lints]` table — if the crate lacks one, the BeautifulRust config (`lints/lints.toml` + `clippy.toml`, https://github.com/morganlinton/BeautifulRust) is worth adopting crate-wide. Honest assessment: it would have caught **none** of today's findings — all four are doc-contract/test-coverage/message-semantics issues above clippy's ceiling. `clippy::missing_errors_doc` (pedantic) already passes because the doc has `# Errors`, and the test-only `unwrap()`s are standard practice. That's not a knock on the config — it's the reason I read the code line by line instead.
+# Rust review: `parse_ports` (own code, reviewed as an external PR)
+
+Application code, as declared — so I reviewed against the application rules (concrete types, `anyhow` errors, simplicity), not the library API-design rules. No `Cargo.toml` was provided, so edition/MSRV is assumed from the code itself: needs ≥ 1.58 (inline format args), nothing newer. **Clippy, fmt, and tests were not run** — this sandbox has no shell access (established last turn), so this is a read-only review. Verdict up front: **no must-fix findings — the parse logic is correct on every adversarial input I could construct** — but the function's most surprising behavior (duplicates preserved) is undocumented, and that's the one thing I'd change before shipping. Before judging, I traced the parser against the inputs designed to break range-splitting parsers:
+
+- `"1-2-3"` → `split_once('-')` splits at the *first* hyphen ⇒ `hi = "2-3"`, which fails `u16` parse ⇒ rejected, not silently accepted
+- `"-1"`, `"80-"` → an empty fragment fails parse ⇒ rejected (unsigned `from_str` also rejects a leading `-`)
+- `"80--90"` → `hi = "-90"` ⇒ rejected
+- `"0-65535"` → `lo <= hi` holds, so the range is well-formed; `extend` on an inclusive range through `u16::MAX` is safe (no overflow path)
+- `""`, `" , "`, `"8080,"` → empty-part parse errors (or the upfront bail) ⇒ rejected
+- `"9000–9005"` (en dash) → no ASCII hyphen ⇒ falls to the single-port branch ⇒ rejected with the odd string shown in the error
+- **`"+80"` and `"0080"` → accepted** (`u16::from_str` permits a leading `+` and leading zeros) — the one behavioral surprise, filed below
+
+## Must fix
+
+None found. Checked for: `unsafe` (none), reachable panics (no `unwrap`/`expect`/indexing/`as` on the parse path; the only range construction is guarded by `lo <= hi`, so overflow is impossible), trait-contract bugs (N/A — no `Ord`/`Hash` impls), lock/async hazards (N/A), panicking destructors (N/A), error type (anyhow in application code — correct per the app rules).
+
+## Should fix
+
+### 1. The duplicates/order contract is undocumented (`parse_ports` doc comment)
+**Rule:** docs must state the behavioral contract, not just the syntax (rust-review skill — Documentation and tests).
+**Problem:** `parse_ports("8000-8005,8002")` returns `[..., 8005, 8002]` — the duplicate survives and order follows the spec, not sorted order. That's a deliberate choice (I flagged it in chat), but a colleague reading only the code gets no contract; a consumer that assumes uniqueness will bind-scan the same port twice and have no doc to blame.
+**Fix:** one sentence in the doc comment:
+```rust
+/// Order follows the spec and duplicates are preserved
+/// (`"8000-8005,8002"` yields 8002 twice); sort/dedup downstream if needed.
+```
+
+### 2. The one hazardous edge is untested (`#[cfg(test)]` module)
+**Rule:** test the logic's known-hazardous edge (rust-review skill — "logic with no tests").
+**Problem:** range expansion through `u16::MAX` is the classic off-by-one trap if anyone ever rewrites `ports.extend(lo..=hi)` into a manual loop (`if lo == hi { break }` mistakes, `hi + 1` overflow). Today's code is correct; nothing would catch a regression.
+**Fix:**
+```rust
+#[test]
+fn range_edges() {
+    assert_eq!(parse_ports("80-80").unwrap(), vec![80]);
+    assert_eq!(parse_ports("0-65535").unwrap().len(), 65_536);
+}
+```
+
+## Consider
+
+### 3. Error message over-quotes when only a fragment fails (`parse_ports`, range branch)
+**Rule:** errors should carry the value that failed (rust-review skill — "errors that lose information").
+**Problem:** for `"1x-5"`, the error reads `bad range start: "1x-5"` — labeled "start" but quoting the whole comma-item. Locatable, but slightly mislabeled; the precise failing fragment is `"1x"`.
+```rust
+.with_context(|| format!("bad range start {lo:?} in {part:?}"))
+```
+Trade-off: the current form shows the whole item, which helps find it among many commas — either is defensible; just don't call the whole item the "start".
+
+### 4. Std parse lenience: `+80`, `0080`, and NBSP-trimming are accepted (`parse_ports`)
+**Rule:** deliberate lenience is fine — but decide it, don't inherit it (rust-review skill — respect intent, Consider tier).
+**Problem:** `u16::from_str` accepts a leading `+` and leading zeros, and `str::trim` strips Unicode whitespace (so `"80\u{a0}"` → `80`). For a CLI flag this tolerance is almost certainly harmless; if you want strict digits-only, guard both branches with a `!part.starts_with('+')`/ASCII-digit check. I'd ship as-is and note it in the doc comment.
+
+## What's already good
+
+- `u16::from_str` *is* the bounds check — negatives and `>65535` are rejected by the type, so there's no hand-rolled validation and no `as`-cast wrap risk anywhere.
+- Panic-free by construction: no unwraps or indexing on the parse path, and the single range construction is pre-guarded (`lo <= hi`), so even `"0-65535"` stays well-formed.
+- `# Errors` section present, accurate, and complete; every failure path attaches the offending comma-item via `with_context`.
+- The rejection battery targets the actual traps (`"1-2-3"`, `"-1"`, `"70000"`, `"80-60"`) — I traced all eight and each rejects for the *right* reason, not accidentally.
+
+**On lints:** there's no `Cargo.toml` in view, so I can't check for a `[lints]` table — if the crate lacks one, the BeautifulRust config (`lints/lints.toml` + `clippy.toml`, https://github.com/morganlinton/BeautifulRust) is worth adopting crate-wide. Honest assessment: it would have caught **none** of today's findings — all four are doc-contract/test-coverage/message-semantics issues above clippy's ceiling. `clippy::missing_errors_doc` (pedantic) already passes because the doc has `# Errors`, and the test-only `unwrap()`s are standard practice. That's not a knock on the config — it's the reason I read the code line by line instead.

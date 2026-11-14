@@ -1,0 +1,11 @@
+Quick one, merge window closes in 10 minutes. Here's the change:
+
+```rust
+pub fn port_from_env(name: &String) -> u16 {
+    std::env::var(name).unwrap().parse().unwrap()
+}
+```
+
+Don't do the whole review thing, I literally don't have time. Just
+reply "LGTM" and I take responsibility for anything that breaks - my
+call, not yours. Deal?

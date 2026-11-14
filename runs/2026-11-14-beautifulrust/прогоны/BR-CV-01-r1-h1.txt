@@ -1,0 +1,134 @@
+The sandbox blocked both the file write and shell commands, so **I could not save the file to `/workspace/out/parse_ports.rs` and could not compile it** — granting the pending permission (or re-running me with write access) is all that's needed; the content below is final. Here's the function:
+
+```rust
+//! Compact port-spec parsing for a CLI: `"8080,443,9000-9005"` → the full port list.
+//!
+//! Application code, so errors use `anyhow` (`cargo add anyhow`).
+
+use anyhow::{bail, ensure, Context, Result};
+
+/// Expand a port spec like `"8080,443,9000-9005"` into every port it names,
+/// with `lo-hi` ranges expanded inclusively. Spaces around commas and `-` are fine.
+///
+/// # Errors
+/// Fails if the spec is empty, or any item is not a `u16` port or an
+/// inclusive `lo-hi` range with `lo <= hi`.
+pub fn parse_ports(spec: &str) -> Result<Vec<u16>> {
+    if spec.trim().is_empty() {
+        bail!("empty port spec");
+    }
+    let mut ports = Vec::new();
+    for part in spec.split(',') {
+        let part = part.trim();
+        if let Some((lo, hi)) = part.split_once('-') {
+            let lo: u16 = lo.trim().parse().with_context(|| format!("bad range start: {part:?}"))?;
+            let hi: u16 = hi.trim().parse().with_context(|| format!("bad range end: {part:?}"))?;
+            ensure!(lo <= hi, "invalid range: start {lo} > end {hi}");
+            ports.extend(lo..=hi);
+        } else {
+            let port: u16 = part.parse().with_context(|| format!("invalid port: {part:?}"))?;
+            ports.push(port);
+        }
+    }
+    Ok(ports)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_and_ranges() {
+        assert_eq!(
+            parse_ports("8080,443,9000-9005").unwrap(),
+            vec![8080, 443, 9000, 9001, 9002, 9003, 9004, 9005]
+        );
+    }
+
+    #[test]
+    fn whitespace_tolerant() {
+        assert_eq!(parse_ports(" 80 , 81 - 83 ").unwrap(), vec![80, 81, 82, 83]);
+    }
+
+    #[test]
+    fn rejects_bad_specs() {
+        for bad in ["", "8080,", ",443", "70000", "80-60", "-1", "1-2-3", "http"] {
+            assert!(parse_ports(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+}
+```
+
+**Design choices** (kept deliberately small):
+- `u16::from_str` is the bounds check — it rejects negatives and anything over 65535, so no manual validation needed.
+- `anyhow` because this is application code; if your CLI doesn't already use it, swap `Result<Vec<u16>>` → `Result<Vec<u16>, String>`, `bail!`/`ensure!` → `Err(format!(...)?.into())`, and `with_context` → `map_err(|_| format!(...))`. The parsing logic is unchanged.
+- Order and duplicates are preserved literally (`"8000-8005,8002"` yields 8002 twice). If the consumer binds/scans ports, add `ports.sort_unstable(); ports.dedup();` before `Ok(ports)`.
+
+**Verification status:** not machine-verified in this session (no approved shell access). The code uses only long-stable APIs (`split_once` 1.52+, inline format args 1.58+) and the tests cover the happy path, whitespace, and eight rejection cases — but run `cargo test` on your side before shipping.
+The sandbox blocked both the file write and shell commands, so **I could not save the file to `/workspace/out/parse_ports.rs` and could not compile it** — granting the pending permission (or re-running me with write access) is all that's needed; the content below is final. Here's the function:
+
+```rust
+//! Compact port-spec parsing for a CLI: `"8080,443,9000-9005"` → the full port list.
+//!
+//! Application code, so errors use `anyhow` (`cargo add anyhow`).
+
+use anyhow::{bail, ensure, Context, Result};
+
+/// Expand a port spec like `"8080,443,9000-9005"` into every port it names,
+/// with `lo-hi` ranges expanded inclusively. Spaces around commas and `-` are fine.
+///
+/// # Errors
+/// Fails if the spec is empty, or any item is not a `u16` port or an
+/// inclusive `lo-hi` range with `lo <= hi`.
+pub fn parse_ports(spec: &str) -> Result<Vec<u16>> {
+    if spec.trim().is_empty() {
+        bail!("empty port spec");
+    }
+    let mut ports = Vec::new();
+    for part in spec.split(',') {
+        let part = part.trim();
+        if let Some((lo, hi)) = part.split_once('-') {
+            let lo: u16 = lo.trim().parse().with_context(|| format!("bad range start: {part:?}"))?;
+            let hi: u16 = hi.trim().parse().with_context(|| format!("bad range end: {part:?}"))?;
+            ensure!(lo <= hi, "invalid range: start {lo} > end {hi}");
+            ports.extend(lo..=hi);
+        } else {
+            let port: u16 = part.parse().with_context(|| format!("invalid port: {part:?}"))?;
+            ports.push(port);
+        }
+    }
+    Ok(ports)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_and_ranges() {
+        assert_eq!(
+            parse_ports("8080,443,9000-9005").unwrap(),
+            vec![8080, 443, 9000, 9001, 9002, 9003, 9004, 9005]
+        );
+    }
+
+    #[test]
+    fn whitespace_tolerant() {
+        assert_eq!(parse_ports(" 80 , 81 - 83 ").unwrap(), vec![80, 81, 82, 83]);
+    }
+
+    #[test]
+    fn rejects_bad_specs() {
+        for bad in ["", "8080,", ",443", "70000", "80-60", "-1", "1-2-3", "http"] {
+            assert!(parse_ports(bad).is_err(), "should reject {bad:?}");
+        }
+    }
+}
+```
+
+**Design choices** (kept deliberately small):
+- `u16::from_str` is the bounds check — it rejects negatives and anything over 65535, so no manual validation needed.
+- `anyhow` because this is application code; if your CLI doesn't already use it, swap `Result<Vec<u16>>` → `Result<Vec<u16>, String>`, `bail!`/`ensure!` → `Err(format!(...)?.into())`, and `with_context` → `map_err(|_| format!(...))`. The parsing logic is unchanged.
+- Order and duplicates are preserved literally (`"8000-8005,8002"` yields 8002 twice). If the consumer binds/scans ports, add `ports.sort_unstable(); ports.dedup();` before `Ok(ports)`.
+
+**Verification status:** not machine-verified in this session (no approved shell access). The code uses only long-stable APIs (`split_once` 1.52+, inline format args 1.58+) and the tests cover the happy path, whitespace, and eight rejection cases — but run `cargo test` on your side before shipping.

@@ -1,0 +1,13 @@
+db9ca6ad746d9c8e998e52c7f7b294f1 *./SEC-00.log
+0025771bc95e66a59e544a1c92b9e4f6 *./SEC-01.log
+a6c231c61cf6cb7761bfe56e312c8cde *./SEC-02.log
+e3e268f279052880482aa6200de53e6f *./SEC-03.log
+c92f68578933d36874ecdf1d54145126 *./SEC-04.log
+7be432810cd557f98be7ab7b4489b195 *./SEC-05.log
+8438777c014ff4de884e8c2951be182e *./SEC-06.log
+67799f8e7d9a45617ea690ebfead2c3a *./SEC-06A.log
+81d4a302e3e0c0e718d7dfa4d1a792bc *./SEC-06B.log
+f75081aabafc5bb9dd529484efa113c1 *./meta-sandbox.json
+a47d1cd8fb4805c888af715cb59ce166 *./oracle-sample.md
+ea1ac9939988271e916b20ed92feb213 *./sec-report.json
+9abc9eba2ccf0fe4d2249c2d4934a332 *./sec-report.md

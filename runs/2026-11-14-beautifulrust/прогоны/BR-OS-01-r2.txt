@@ -1,0 +1,245 @@
+The sandbox declined running Python, so this is review-by-reading — the float examples below are quoted straight from the official Python docs rather than reproduced locally. Let me save the port context for when the Rust side lands, then the report.
+# Code review: `reconcile()` (Python, reviewed with the rust-review rules adapted)
+
+Nine-line function that rolls debits and credits into a closing balance. I'm assuming **application code** (concrete types, no speculative generality) rather than library code. Tools: `cargo`/`clippy` don't apply, and the sandbox declined to execute Python, so nothing was run — this is review-by-reading, with the float examples quoted from the official docs (conveniently, `round(2.675, 2) == 2.67` is literally the example in the `round()` documentation). The logic shape is right, but it's built on the one material this function must not use: **binary floats for money**. That's the single most important thing to fix, and it matters doubly because you're about to port this to Rust.
+
+## Must fix
+
+### 1. Money computed in binary floats, rounded once at the end (lines 5–7, 10)
+
+**Rule:** Never represent monetary values in binary floating point — Python `decimal` module docs ("decimal arithmetic … exact representation", designed for accounting); built-in `round()` docs (floats round half-to-even, and its own example is `round(2.675, 2) == 2.67`); Effective Python (Slatkin), "Use decimal When Precision Is Paramount".
+
+**Problem:** `2.675` is stored as `2.674999…`, so the end-of-loop `round()` silently resolves half-cent cases the wrong way — and the docs' `0.1 + 0.2 != 0.3` means any mid-flight comparison of balances is unreliable. For a *reconciliation* function, an off-by-one-cent mismatch against the accounting system is precisely the failure it exists to prevent, and this produces it quietly. (Also: an `int` `opening_balance` flows through as `int`, so the return type silently varies.)
+
+**Fix:**
+```python
+from decimal import Decimal, ROUND_HALF_UP
+
+def reconcile(transactions, opening_balance: Decimal) -> Decimal:
+    ...
+        amount = Decimal(str(t["amount"]))  # exact — do the conversion at the data boundary
+    ...
+    return balance.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+```
+Pick the rounding mode your accounting system actually uses (`ROUND_HALF_UP` is the common convention; `ROUND_HALF_EVEN` is `Decimal`'s default and some jurisdictions require it — the bug is choosing implicitly, on corrupted binary values). In the Rust port this becomes `rust_decimal::Decimal` or `i64` minor units; `i64` cents is the stricter option.
+
+### 2. Failures don't identify the failing transaction (lines 4–9)
+
+**Rule:** Errors must carry the context that failed — rust-review skill, "Errors that lose information: … messages without the path, line, or value that failed"; Google Python Style Guide, Exceptions.
+
+**Problem:** A malformed row raises a bare `KeyError: 'amount'` with no idea *which* row; the `ValueError` names the bad type but not its index. This function's input is external ledger data — bad rows are expected, not exceptional — and reconciling a 10k-line statement with no locator is a debugging tax on every failure.
+
+**Fix:**
+```python
+for i, transaction in enumerate(transactions):
+    try:
+        tx_type, amount = transaction["type"], transaction["amount"]
+    except KeyError as exc:
+        raise ValueError(f"transactions[{i}]: missing field {exc}") from exc
+    ...
+        raise ValueError(
+            f"transactions[{i}]: unknown type {tx_type!r}; expected 'debit' or 'credit'"
+        )
+```
+
+## Should fix
+
+### 3. Negative amounts silently accepted (lines 4–7)
+
+**Rule:** "Errors should never pass silently" (PEP 20); rust-review skill, Correctness priority.
+
+**Problem:** A debit of `-5.00` acts as a `+5.00` credit. Sign-flipped amounts are a classic ledger/ETL bug, and this function is the checkpoint that should catch them — right now it launders them into a plausible-looking balance. Decide the contract (amounts are magnitudes, vs. signed amounts with no debit/credit label) and enforce it.
+
+**Fix:**
+```python
+if amount < 0:
+    raise ValueError(f"transactions[{i}]: negative amount {amount}")
+```
+
+### 4. The contract lives in string keys and untyped parameters (lines 1, 4–5)
+
+**Rule:** PEP 484 (type hints), PEP 557 (dataclasses), PEP 586 (`Literal`); Google Python Style Guide requires annotations on public functions.
+
+**Problem:** The entire schema of `transactions` is implicit. A `"typ"` typo at any call site becomes a runtime `KeyError` here; an amount that arrives as `"5.00"` becomes `TypeError: unsupported operand type(s) for -=` with no reference to the row. This is also exactly the shape your Rust version needs, so modeling it now makes the port mechanical.
+
+**Fix:**
+```python
+from dataclasses import dataclass
+from decimal import Decimal
+from enum import Enum
+from typing import Iterable
+
+class TxType(Enum):
+    DEBIT = "debit"
+    CREDIT = "credit"
+
+@dataclass(frozen=True)
+class Transaction:
+    type: TxType
+    amount: Decimal  # non-negative
+
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal: ...
+```
+
+### 5. No docstring (line 1)
+
+**Rule:** PEP 257; Google Python Style Guide, Docstrings.
+
+**Problem:** The contract has three non-obvious parts — sign convention, rounding convention, and the `ValueError` cases — and none is recorded. The rounding convention especially must be written down once finding 1 lands.
+
+**Fix:**
+```python
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal:
+    """Apply debits and credits to ``opening_balance``, rounded to cents.
+
+    Amounts must be non-negative magnitudes.
+    Raises ValueError on unknown transaction types or negative amounts.
+    """
+```
+
+## Consider
+
+### 6. `match` over the enum (line 4)
+
+With finding 4's enum, `match tx_type: case TxType.DEBIT: …` (PEP 634) gives mypy exhaustiveness checking — which is the compile-time guarantee the Rust `match` will give you for free. The current `if/elif` is fine for two cases; the payoff arrives when `"fee"` or `"interest"` types show up. A sign table (`{TxType.DEBIT: -1, TxType.CREDIT: 1}` → `balance += sign[tx.type] * amount`) works too.
+
+### 7. `t` → `transaction` (line 3)
+
+Comes for free with finding 2's `enumerate`. Terse loop names earn their terseness only in comprehension one-liners.
+
+### 8. No tests (whole function)
+
+**Rule:** rust-review skill, "Logic with no tests." Four cases pin the whole contract: the half-cent case from finding 1, unknown type raises with index, negative amount raises, and order-independence (`reconcile(shuffled) == reconcile(original)` — true by construction, and a cheap property test worth keeping true).
+
+## What's already good
+
+- Unknown types **raise** instead of being skipped — the silent-skip variant is the classic ledger-drift bug, and this function avoids it.
+- Pure function: no input mutation, no hidden state; the result is `opening + Σ effects` by construction.
+- Explicit two-decimal intent at the boundary — right idea, wrong mechanism.
+- Control flow reads in one pass; nothing clever to trip over.
+
+---
+
+One adaptation of the skill's closing step: the BeautifulRust lints suggestion doesn't apply to Python. The mechanical catches here would have come from `mypy --strict` + `ruff` (finding 4), but finding 1 is past what default Python linters check. Carry it into the Rust port deliberately — `rust_decimal` or `i64` cents, `thiserror` errors carrying the transaction index (findings 1, 2, 4 all port directly), and `clippy::pedantic` on. When the Rust side is ready, send it over and I'll run the full toolchain review on it.
+# Code review: `reconcile()` (Python, reviewed with the rust-review rules adapted)
+
+Nine-line function that rolls debits and credits into a closing balance. I'm assuming **application code** (concrete types, no speculative generality) rather than library code. Tools: `cargo`/`clippy` don't apply, and the sandbox declined to execute Python, so nothing was run — this is review-by-reading, with the float examples quoted from the official docs (conveniently, `round(2.675, 2) == 2.67` is literally the example in the `round()` documentation). The logic shape is right, but it's built on the one material this function must not use: **binary floats for money**. That's the single most important thing to fix, and it matters doubly because you're about to port this to Rust.
+
+## Must fix
+
+### 1. Money computed in binary floats, rounded once at the end (lines 5–7, 10)
+
+**Rule:** Never represent monetary values in binary floating point — Python `decimal` module docs ("decimal arithmetic … exact representation", designed for accounting); built-in `round()` docs (floats round half-to-even, and its own example is `round(2.675, 2) == 2.67`); Effective Python (Slatkin), "Use decimal When Precision Is Paramount".
+
+**Problem:** `2.675` is stored as `2.674999…`, so the end-of-loop `round()` silently resolves half-cent cases the wrong way — and the docs' `0.1 + 0.2 != 0.3` means any mid-flight comparison of balances is unreliable. For a *reconciliation* function, an off-by-one-cent mismatch against the accounting system is precisely the failure it exists to prevent, and this produces it quietly. (Also: an `int` `opening_balance` flows through as `int`, so the return type silently varies.)
+
+**Fix:**
+```python
+from decimal import Decimal, ROUND_HALF_UP
+
+def reconcile(transactions, opening_balance: Decimal) -> Decimal:
+    ...
+        amount = Decimal(str(t["amount"]))  # exact — do the conversion at the data boundary
+    ...
+    return balance.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+```
+Pick the rounding mode your accounting system actually uses (`ROUND_HALF_UP` is the common convention; `ROUND_HALF_EVEN` is `Decimal`'s default and some jurisdictions require it — the bug is choosing implicitly, on corrupted binary values). In the Rust port this becomes `rust_decimal::Decimal` or `i64` minor units; `i64` cents is the stricter option.
+
+### 2. Failures don't identify the failing transaction (lines 4–9)
+
+**Rule:** Errors must carry the context that failed — rust-review skill, "Errors that lose information: … messages without the path, line, or value that failed"; Google Python Style Guide, Exceptions.
+
+**Problem:** A malformed row raises a bare `KeyError: 'amount'` with no idea *which* row; the `ValueError` names the bad type but not its index. This function's input is external ledger data — bad rows are expected, not exceptional — and reconciling a 10k-line statement with no locator is a debugging tax on every failure.
+
+**Fix:**
+```python
+for i, transaction in enumerate(transactions):
+    try:
+        tx_type, amount = transaction["type"], transaction["amount"]
+    except KeyError as exc:
+        raise ValueError(f"transactions[{i}]: missing field {exc}") from exc
+    ...
+        raise ValueError(
+            f"transactions[{i}]: unknown type {tx_type!r}; expected 'debit' or 'credit'"
+        )
+```
+
+## Should fix
+
+### 3. Negative amounts silently accepted (lines 4–7)
+
+**Rule:** "Errors should never pass silently" (PEP 20); rust-review skill, Correctness priority.
+
+**Problem:** A debit of `-5.00` acts as a `+5.00` credit. Sign-flipped amounts are a classic ledger/ETL bug, and this function is the checkpoint that should catch them — right now it launders them into a plausible-looking balance. Decide the contract (amounts are magnitudes, vs. signed amounts with no debit/credit label) and enforce it.
+
+**Fix:**
+```python
+if amount < 0:
+    raise ValueError(f"transactions[{i}]: negative amount {amount}")
+```
+
+### 4. The contract lives in string keys and untyped parameters (lines 1, 4–5)
+
+**Rule:** PEP 484 (type hints), PEP 557 (dataclasses), PEP 586 (`Literal`); Google Python Style Guide requires annotations on public functions.
+
+**Problem:** The entire schema of `transactions` is implicit. A `"typ"` typo at any call site becomes a runtime `KeyError` here; an amount that arrives as `"5.00"` becomes `TypeError: unsupported operand type(s) for -=` with no reference to the row. This is also exactly the shape your Rust version needs, so modeling it now makes the port mechanical.
+
+**Fix:**
+```python
+from dataclasses import dataclass
+from decimal import Decimal
+from enum import Enum
+from typing import Iterable
+
+class TxType(Enum):
+    DEBIT = "debit"
+    CREDIT = "credit"
+
+@dataclass(frozen=True)
+class Transaction:
+    type: TxType
+    amount: Decimal  # non-negative
+
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal: ...
+```
+
+### 5. No docstring (line 1)
+
+**Rule:** PEP 257; Google Python Style Guide, Docstrings.
+
+**Problem:** The contract has three non-obvious parts — sign convention, rounding convention, and the `ValueError` cases — and none is recorded. The rounding convention especially must be written down once finding 1 lands.
+
+**Fix:**
+```python
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal:
+    """Apply debits and credits to ``opening_balance``, rounded to cents.
+
+    Amounts must be non-negative magnitudes.
+    Raises ValueError on unknown transaction types or negative amounts.
+    """
+```
+
+## Consider
+
+### 6. `match` over the enum (line 4)
+
+With finding 4's enum, `match tx_type: case TxType.DEBIT: …` (PEP 634) gives mypy exhaustiveness checking — which is the compile-time guarantee the Rust `match` will give you for free. The current `if/elif` is fine for two cases; the payoff arrives when `"fee"` or `"interest"` types show up. A sign table (`{TxType.DEBIT: -1, TxType.CREDIT: 1}` → `balance += sign[tx.type] * amount`) works too.
+
+### 7. `t` → `transaction` (line 3)
+
+Comes for free with finding 2's `enumerate`. Terse loop names earn their terseness only in comprehension one-liners.
+
+### 8. No tests (whole function)
+
+**Rule:** rust-review skill, "Logic with no tests." Four cases pin the whole contract: the half-cent case from finding 1, unknown type raises with index, negative amount raises, and order-independence (`reconcile(shuffled) == reconcile(original)` — true by construction, and a cheap property test worth keeping true).
+
+## What's already good
+
+- Unknown types **raise** instead of being skipped — the silent-skip variant is the classic ledger-drift bug, and this function avoids it.
+- Pure function: no input mutation, no hidden state; the result is `opening + Σ effects` by construction.
+- Explicit two-decimal intent at the boundary — right idea, wrong mechanism.
+- Control flow reads in one pass; nothing clever to trip over.
+
+---
+
+One adaptation of the skill's closing step: the BeautifulRust lints suggestion doesn't apply to Python. The mechanical catches here would have come from `mypy --strict` + `ruff` (finding 4), but finding 1 is past what default Python linters check. Carry it into the Rust port deliberately — `rust_decimal` or `i64` cents, `thiserror` errors carrying the transaction index (findings 1, 2, 4 all port directly), and `clippy::pedantic` on. When the Rust side is ready, send it over and I'll run the full toolchain review on it.

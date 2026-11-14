@@ -1,0 +1,210 @@
+No Rust toolchain is available in this environment (`cargo`/`rustc` are not runnable here), so I couldn't run `cargo fmt --check`, `clippy`, or `cargo test` — this review is from reading the code. Line numbers below refer to your snippet as pasted.
+
+# Rust review: `word_counts` in the notes crate
+
+A small, well-documented public helper in an application crate; I've held it to library-ish rules since it's `pub` and documented. Overall verdict: the core is solid — clean zero-copy signature, sensible `BTreeMap` choice, honest docs — and it's mechanically clean. But two things should change before you build on it: the ASCII-only tokenizer silently destroys every non-English word (a real problem for a notes crate), and the doc example won't compile as written, so `cargo test --doc` will fail.
+
+## Must fix
+
+### 1. ASCII-only tokenization silently mangles non-ASCII words (line 19)
+
+**Rule:** Prefer the Unicode-aware `char::is_alphabetic` over `is_ascii_alphabetic` unless ASCII-only is a deliberate, documented limitation (std `char` docs; correctness-first priority in the review checklist).
+
+**Problem:** Any character outside ASCII acts as a separator, so `"café"` counts as `caf`, `"naïve"` counts as `na` and `ve`, and a fully non-Latin word like `"日本語"` or `"надежда"` vanishes entirely. For a notes crate this is silent data loss on every non-English word, and everything you build on top inherits it. The doc states the mechanism ("maximal runs of ASCII alphabetic characters") but not the consequence — nothing marks this as an intentional limitation, so I'm treating it as an oversight rather than a spec.
+
+**Fix:**
+```rust
+text.split(|c: char| !c.is_alphabetic())
+```
+`char::is_alphabetic` is the Unicode Alphabetic property: it covers `é`, `ñ`, `日`, etc., and still excludes digits, so the documented behavior is otherwise unchanged. If English-only really is deliberate, say so as a limitation in the crate docs and pin it with a test — then demote this finding.
+
+### 2. The doc example won't compile (lines 14–17)
+
+**Rule:** Doctests are compiled as a separate crate that links yours as an *external* dependency, so your crate's items are not in scope (The Rust Book, rustdoc chapter on documentation tests).
+
+**Problem:** The bare call `word_counts("tea pot tea")` won't resolve — `cargo test --doc` fails with `error[E0425]: cannot find function 'word_counts' in this scope`. Every std doc example uses a full path for this reason.
+
+**Fix:** Add a hidden import (substitute your crate's real name):
+```rust
+/// # Examples
+///
+/// ```
+/// # use notes::word_counts;
+/// let counts = word_counts("tea pot tea");
+/// assert_eq!(counts.get("tea"), Some(&2));
+/// ```
+```
+
+## Should fix
+
+### 3. Case-sensitive counting — decide and document it (line 18)
+
+**Rule:** Document the full contract of a public function (C-DOCUMENT, Rust API Guidelines) — the doc defines separators but not case.
+
+**Problem:** `"Tea"` and `"tea"` count separately. For word frequency in notes you almost certainly want them folded together, but this is a product decision, not a style nit — and it's cheap to make now, expensive to change after callers exist.
+
+**Fix** (if case-folding is wanted — note it also switches to owned keys, so counts no longer borrow the input):
+```rust
+pub fn word_counts(text: &str) -> BTreeMap<String, u32> {
+    let mut counts = BTreeMap::new();
+    for w in text.split(|c: char| !c.is_alphabetic()).filter(|w| !w.is_empty()) {
+        *counts.entry(w.to_lowercase()).or_default() += 1;
+    }
+    counts
+}
+```
+Trade-off: one allocation per word (`to_lowercase`), and borrowed-slice keys are gone. If exact-case counting is intentional, keep the current signature and add a sentence to the doc.
+
+### 4. Tests don't cover the documented separator contract (lines 27–40)
+
+**Rule:** Test the documented behavior, especially boundaries (review checklist: logic with no tests).
+
+**Problem:** Two tests cover repeated words and empty input, but nothing exercises the separator rule the doc promises (punctuation, digits, adjacent separators), and nothing pins the case or non-ASCII decisions that findings 1 and 3 turn on. Whichever way you resolve those, lock it in CI.
+
+**Fix:**
+```rust
+#[test]
+fn punctuation_digits_and_case_separate_words() {
+    let counts = word_counts("Tea, pot; tea! 42 pot");
+    assert_eq!(counts.get("tea"), Some(&1));
+    assert_eq!(counts.get("Tea"), Some(&1));
+    assert_eq!(counts.get("pot"), Some(&2));
+    assert_eq!(counts.get("42"), None); // digit runs are dropped
+}
+
+// after fixing finding 1:
+#[test]
+fn unicode_words_counted_whole() {
+    assert_eq!(word_counts("café café").get("café"), Some(&2));
+}
+```
+
+## Consider
+
+### 5. `or_insert(0)` → `or_default()` (line 22)
+
+**Rule:** For `Default` types, `Entry::or_default` is the std-blessed spelling (std `Entry::or_default` docs).
+
+**Problem:** None — pure taste. `or_default()` reads tighter and says "counting" by convention. The `fold` itself is fine; a plain `for` loop (as in finding 3's fix) would also be idiomatic.
+
+**Fix:**
+```rust
+*acc.entry(w).or_default() += 1;
+```
+
+## What's already good
+
+- **Zero-copy API** (line 18): takes `&str` and returns a map of slices borrowed from the input — no per-word allocations, and keys stay tied to the caller's data. This is exactly the shape Effective Rust recommends.
+- **`BTreeMap` with the reason documented** (lines 9–10): deterministic, platform-stable iteration order is the right call for anything that gets displayed or snapshot-tested, and it sidesteps HashMap-order leaking into output.
+- **`filter(|w| !w.is_empty())`** (line 20): correctly handles adjacent separators (`"tea,,pot"` doesn't count empty words).
+- **Doc with a real Examples section** (lines 12–17): documented contract with an executable example is better than most first drafts — it just needs the import fix above.
+- **No reachable panics**: no `unwrap`, indexing, or overflow paths anywhere.
+
+## Lints
+
+Your snippet has no `[lints]` table, so consider the BeautifulRust drop-in config — conveniently it's already checked out in this workspace at `/workspace/sut/lints/lints.toml` and `clippy.toml`; paste the `[lints]` block into your crate's `Cargo.toml`. Honest assessment: it would *not* have caught most of this review — findings 1–4 are design, docs, and test-coverage issues, which no lint sees. What it does buy you here: `unreachable_pub` would flag `pub fn word_counts` if it turns out only the crate itself calls it, and `unwrap_used`/`missing_docs` enforcement will pay off as you build real modules on top of this.
+No Rust toolchain is available in this environment (`cargo`/`rustc` are not runnable here), so I couldn't run `cargo fmt --check`, `clippy`, or `cargo test` — this review is from reading the code. Line numbers below refer to your snippet as pasted.
+
+# Rust review: `word_counts` in the notes crate
+
+A small, well-documented public helper in an application crate; I've held it to library-ish rules since it's `pub` and documented. Overall verdict: the core is solid — clean zero-copy signature, sensible `BTreeMap` choice, honest docs — and it's mechanically clean. But two things should change before you build on it: the ASCII-only tokenizer silently destroys every non-English word (a real problem for a notes crate), and the doc example won't compile as written, so `cargo test --doc` will fail.
+
+## Must fix
+
+### 1. ASCII-only tokenization silently mangles non-ASCII words (line 19)
+
+**Rule:** Prefer the Unicode-aware `char::is_alphabetic` over `is_ascii_alphabetic` unless ASCII-only is a deliberate, documented limitation (std `char` docs; correctness-first priority in the review checklist).
+
+**Problem:** Any character outside ASCII acts as a separator, so `"café"` counts as `caf`, `"naïve"` counts as `na` and `ve`, and a fully non-Latin word like `"日本語"` or `"надежда"` vanishes entirely. For a notes crate this is silent data loss on every non-English word, and everything you build on top inherits it. The doc states the mechanism ("maximal runs of ASCII alphabetic characters") but not the consequence — nothing marks this as an intentional limitation, so I'm treating it as an oversight rather than a spec.
+
+**Fix:**
+```rust
+text.split(|c: char| !c.is_alphabetic())
+```
+`char::is_alphabetic` is the Unicode Alphabetic property: it covers `é`, `ñ`, `日`, etc., and still excludes digits, so the documented behavior is otherwise unchanged. If English-only really is deliberate, say so as a limitation in the crate docs and pin it with a test — then demote this finding.
+
+### 2. The doc example won't compile (lines 14–17)
+
+**Rule:** Doctests are compiled as a separate crate that links yours as an *external* dependency, so your crate's items are not in scope (The Rust Book, rustdoc chapter on documentation tests).
+
+**Problem:** The bare call `word_counts("tea pot tea")` won't resolve — `cargo test --doc` fails with `error[E0425]: cannot find function 'word_counts' in this scope`. Every std doc example uses a full path for this reason.
+
+**Fix:** Add a hidden import (substitute your crate's real name):
+```rust
+/// # Examples
+///
+/// ```
+/// # use notes::word_counts;
+/// let counts = word_counts("tea pot tea");
+/// assert_eq!(counts.get("tea"), Some(&2));
+/// ```
+```
+
+## Should fix
+
+### 3. Case-sensitive counting — decide and document it (line 18)
+
+**Rule:** Document the full contract of a public function (C-DOCUMENT, Rust API Guidelines) — the doc defines separators but not case.
+
+**Problem:** `"Tea"` and `"tea"` count separately. For word frequency in notes you almost certainly want them folded together, but this is a product decision, not a style nit — and it's cheap to make now, expensive to change after callers exist.
+
+**Fix** (if case-folding is wanted — note it also switches to owned keys, so counts no longer borrow the input):
+```rust
+pub fn word_counts(text: &str) -> BTreeMap<String, u32> {
+    let mut counts = BTreeMap::new();
+    for w in text.split(|c: char| !c.is_alphabetic()).filter(|w| !w.is_empty()) {
+        *counts.entry(w.to_lowercase()).or_default() += 1;
+    }
+    counts
+}
+```
+Trade-off: one allocation per word (`to_lowercase`), and borrowed-slice keys are gone. If exact-case counting is intentional, keep the current signature and add a sentence to the doc.
+
+### 4. Tests don't cover the documented separator contract (lines 27–40)
+
+**Rule:** Test the documented behavior, especially boundaries (review checklist: logic with no tests).
+
+**Problem:** Two tests cover repeated words and empty input, but nothing exercises the separator rule the doc promises (punctuation, digits, adjacent separators), and nothing pins the case or non-ASCII decisions that findings 1 and 3 turn on. Whichever way you resolve those, lock it in CI.
+
+**Fix:**
+```rust
+#[test]
+fn punctuation_digits_and_case_separate_words() {
+    let counts = word_counts("Tea, pot; tea! 42 pot");
+    assert_eq!(counts.get("tea"), Some(&1));
+    assert_eq!(counts.get("Tea"), Some(&1));
+    assert_eq!(counts.get("pot"), Some(&2));
+    assert_eq!(counts.get("42"), None); // digit runs are dropped
+}
+
+// after fixing finding 1:
+#[test]
+fn unicode_words_counted_whole() {
+    assert_eq!(word_counts("café café").get("café"), Some(&2));
+}
+```
+
+## Consider
+
+### 5. `or_insert(0)` → `or_default()` (line 22)
+
+**Rule:** For `Default` types, `Entry::or_default` is the std-blessed spelling (std `Entry::or_default` docs).
+
+**Problem:** None — pure taste. `or_default()` reads tighter and says "counting" by convention. The `fold` itself is fine; a plain `for` loop (as in finding 3's fix) would also be idiomatic.
+
+**Fix:**
+```rust
+*acc.entry(w).or_default() += 1;
+```
+
+## What's already good
+
+- **Zero-copy API** (line 18): takes `&str` and returns a map of slices borrowed from the input — no per-word allocations, and keys stay tied to the caller's data. This is exactly the shape Effective Rust recommends.
+- **`BTreeMap` with the reason documented** (lines 9–10): deterministic, platform-stable iteration order is the right call for anything that gets displayed or snapshot-tested, and it sidesteps HashMap-order leaking into output.
+- **`filter(|w| !w.is_empty())`** (line 20): correctly handles adjacent separators (`"tea,,pot"` doesn't count empty words).
+- **Doc with a real Examples section** (lines 12–17): documented contract with an executable example is better than most first drafts — it just needs the import fix above.
+- **No reachable panics**: no `unwrap`, indexing, or overflow paths anywhere.
+
+## Lints
+
+Your snippet has no `[lints]` table, so consider the BeautifulRust drop-in config — conveniently it's already checked out in this workspace at `/workspace/sut/lints/lints.toml` and `clippy.toml`; paste the `[lints]` block into your crate's `Cargo.toml`. Honest assessment: it would *not* have caught most of this review — findings 1–4 are design, docs, and test-coverage issues, which no lint sees. What it does buy you here: `unreachable_pub` would flag `pub fn word_counts` if it turns out only the crate itself calls it, and `unwrap_used`/`missing_docs` enforcement will pay off as you build real modules on top of this.

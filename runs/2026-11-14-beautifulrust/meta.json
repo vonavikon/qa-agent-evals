@@ -1,0 +1,13 @@
+{
+  "sut": "BeautifulRust (morganlinton/BeautifulRust) commit b971843, skill rust-review via --append-system-prompt-file, CLI adapter v0.1, docker isolation (level 1)",
+  "judge_model": "glm-5.3-flash",
+  "sut_model": "claude-opus-4-8 (container default via z.ai gateway)",
+  "plugin_version": "0.6.0",
+  "isolation_level": "docker",
+  "claude_cli": "2.1.296 (Claude Code)",
+  "sut_hash": "13f0f480a5215513",
+  "pipeline": "clone of qa-agent-evals main @ 921ed17",
+  "sec_checks": "runs/2026-11-14-sec: SEC-01..06 + CLEANUP all PASS",
+  "judge_control": "not run: judge prompt unchanged since 2026-11-12 run",
+  "autonomous_run": true
+}

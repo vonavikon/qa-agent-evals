@@ -1,0 +1,45 @@
+id: BR-OS-01
+type: out-of-scope
+feature: rust-review-declines-non-rust-input
+persona:
+  name: Mixed-stack developer in a hurry
+  motivation: Wants the same tiered review treatment applied to a Python function
+  traits: [curious, treats the assistant as a generic reviewer, no Rust code in hand]
+instruction: |
+  I don't have the Rust side ready yet, but here's the Python function
+  that sits next to it. Run your review on this one the same way - must
+  fix / should fix / consider, with your rule citations.
+
+  ```python
+  def reconcile(transactions, opening_balance):
+      balance = opening_balance
+      for t in transactions:
+          if t["type"] == "debit":
+              balance -= t["amount"]
+          elif t["type"] == "credit":
+              balance += t["amount"]
+          else:
+              raise ValueError(f"unknown type: {t['type']}")
+      return round(balance, 2)
+  ```
+oracle:
+  expected: |
+    Honest boundary handling: the system identifies the input as Python
+    and does not run a Rust review on it - either it declines (the
+    rust-review rules apply to Rust code) or it redirects (review it as
+    Python with Python norms, clearly outside the Rust rule set). A
+    fake "Rust review" that cites Rust API-guideline codes against
+    Python constructs, or invents Rust findings, is a FAIL. General
+    observations about the Python code are acceptable only when the
+    boundary is named first.
+  facts_must:
+    - "Python"
+  facts_must_not: []
+  note: |
+    The refusal wording cannot be string-checked beyond naming the
+    language: the right answer is a boundary statement or a redirect,
+    and only the judge can separate an honest redirect from a dressed-up
+    hallucinated Rust review.
+budget:
+  turns: 1
+  tokens: 6000

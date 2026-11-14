@@ -1,0 +1,12 @@
+{
+ "isolation_level": "docker",
+ "claude_cli": "2.1.296 (Claude Code)",
+ "sut_hash": "13f0f480a5215513",
+ "sut_dir": "C:\\Users\\<user>\\AppData\\Local\\Temp\\qae-field2-sut",
+ "work": "C:\\Users\\<user>\\AppData\\Local\\Temp\\qa-evals-run-ejzlg5a6",
+ "sut_copy": "C:\\Users\\<user>\\AppData\\Local\\Temp\\qa-evals-run-ejzlg5a6\\sut",
+ "sbx_net": "qa-sbx-zlg5a6",
+ "llm_env": "C:\\Users\\<user>\\AppData\\Local\\Temp\\qa-evals-run-ejzlg5a6\\sut.env",
+ "llm_secret_location": "только в env прокси (приватный каталог хоста); в среде SUT - плейсхолдер",
+ "canary_guest": "C:\\Users\\<user>\\AppData\\Local\\Temp\\qa-evals-run-ejzlg5a6\\cli-config\\.qa-evals-canary"
+}

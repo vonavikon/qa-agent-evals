@@ -1,0 +1,14 @@
+{"in": 83365, "out": 4348, "cache_read": 0, "cost_usd": 0.525525, "dur_s": 78.4, "model": "", "id": "BR-AD-01-r1", "call": "шаг1"}
+{"in": 84568, "out": 7101, "cache_read": 0, "cost_usd": 0.600365, "dur_s": 123.7, "model": "", "id": "BR-AD-01-r1", "call": "автопересуд"}
+{"in": 84744, "out": 2664, "cache_read": 0, "cost_usd": 0.49032, "dur_s": 53.6, "model": "", "id": "BR-AD-01-r2", "call": "шаг1"}
+{"in": 84830, "out": 6853, "cache_read": 0, "cost_usd": 0.595475, "dur_s": 121.0, "model": "", "id": "BR-AD-01-r2", "call": "автопересуд"}
+{"in": 88671, "out": 5558, "cache_read": 192, "cost_usd": 0.582401, "dur_s": 92.9, "model": "", "id": "BR-CR-01-r1", "call": "шаг1"}
+{"in": 88204, "out": 4276, "cache_read": 0, "cost_usd": 0.5479200000000001, "dur_s": 75.2, "model": "", "id": "BR-CR-01-r2", "call": "шаг1"}
+{"in": 88189, "out": 7463, "cache_read": 64, "cost_usd": 0.6275520000000001, "dur_s": 123.6, "model": "", "id": "BR-CR-02-r1", "call": "шаг1"}
+{"in": 86699, "out": 4504, "cache_read": 64, "cost_usd": 0.546127, "dur_s": 79.3, "model": "", "id": "BR-CR-02-r2", "call": "шаг1"}
+{"in": 87017, "out": 5980, "cache_read": 192, "cost_usd": 0.584681, "dur_s": 101.9, "model": "", "id": "BR-OB-01-r1", "call": "шаг1"}
+{"in": 21783, "out": 8901, "cache_read": 65728, "cost_usd": 0.36430399999999996, "dur_s": 157.5, "model": "", "id": "BR-OB-01-r2", "call": "шаг1"}
+{"in": 87788, "out": 3168, "cache_read": 64, "cost_usd": 0.5181720000000001, "dur_s": 54.3, "model": "", "id": "BR-OS-01-r1", "call": "шаг1"}
+{"in": 21987, "out": 2971, "cache_read": 65728, "cost_usd": 0.21707400000000002, "dur_s": 52.8, "model": "", "id": "BR-OS-01-r2", "call": "шаг1"}
+{"in": 88105, "out": 8988, "cache_read": 0, "cost_usd": 0.665225, "dur_s": 143.9, "model": "", "id": "BR-CV-01-r1", "call": "шаг1"}
+{"in": 89858, "out": 7188, "cache_read": 192, "cost_usd": 0.6290859999999999, "dur_s": 127.3, "model": "", "id": "BR-CV-01-r2", "call": "шаг1"}

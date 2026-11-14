@@ -1,0 +1,281 @@
+I'll review this against the library-crate rules. First, let me check whether a Rust toolchain is available and whether this module actually lives in a crate here, since the skill says to run `cargo fmt`/`clippy`/`test` before reading-level review.
+Splitting into simpler calls:
+Toolchain isn't accessible here (both `cargo` and `rustc` need approval this session can't grant), so this will be a read-level review — I'll say that in the report. One useful local resource: the BeautifulRust repo appears to be checked out at `/workspace/sut`. Let me read its lint config so the closing recommendation names real lints.
+The toolchain is approval-gated in this session, so `cargo fmt`/`clippy`/`test` could not be run — this is a read-level review, stated as such below. (The BeautifulRust repo is checked out at `/workspace/sut`, so the lint recommendation at the end names lints I verified against the actual config.)
+
+---
+
+# Rust review: `config` module (`parse_line` / `load`)
+
+Assumed library crate (you said so), and assumed the module lives at `src/config.rs` — adjust the paths below. No `Cargo.toml` was provided, so edition/MSRV are unchecked; the suggested fix uses `str::split_once` (rustc ≥ 1.52) and `#[non_exhaustive]` (≥ 1.40), safe for any maintained toolchain. Tools not run: `cargo`/`rustc` are gated in this environment, so the review is by reading — but the two headline findings are compiler-semantics facts, not estimates. **The single most important thing: this module does not compile, and once that's fixed, `load` panics on any config file containing a blank line or a comment.** Fix those before building anything on it.
+
+## Must fix
+
+### 1. The module does not compile: `&str` passed to a `&String` parameter (`config.rs:6`, call site `config.rs:18`)
+**Rule:** parameters take the widest borrow — `&str`, not `&String` (`clippy::ptr_arg`; Rust API Guidelines borrowing guidance).
+
+**Problem:** `parse_line` declares `line: &String`, but `load` passes it `&str` values from `text.lines()`. Deref coercion only goes `&String → &str`, never the reverse, so the crate fails with `error[E0308]: mismatched types — expected &String, found &str` at the call in `load`. Practical consequence: if `cargo check` passes on your tree right now, this file is not part of the build — check whether `mod config;` is even declared. The moment someone wires it in, the build breaks.
+
+**Fix:**
+```rust
+pub fn parse_line(line: &str) -> Result<(String, String), String> {
+```
+
+### 2. `load` panics on the most ordinary config files (`config.rs:18`)
+**Rule:** no panics on paths reachable from external input — return an error instead (`M-PANIC-ON-BUG`, Microsoft Rust Guidelines; panics are for bugs, `unwrap` on expected failure is a panic in the caller's process).
+
+**Problem:** `parse_line`'s `Err` case is *expected* — it fires for any line without `=` — and `load` calls `.unwrap()` on it. `load("a=1\n\nb=2")` panics: `lines()` yields `["a=1", ""]`, the blank line has no `=`, and you get `called 'Result::unwrap()' on an 'Err' value: "bad line: "`. Same for comment lines (`# host = ...`). Blank lines and comments are the norm in real config files, so essentially every real input panics — inside the *user's* application, since this is a library. Finding 1 masks this today: the code can't run at all.
+
+**Fix** (requires the error type from finding 3):
+```rust
+pub fn load(text: &str) -> Result<HashMap<String, String>, ConfigError> {
+    let mut map = HashMap::new();
+    for (n, line) in text.lines().enumerate() {
+        let (key, value) = parse_line(line).ok_or_else(|| ConfigError::BadLine {
+            line: n + 1,
+            content: line.to_string(),
+        })?;
+        map.insert(key, value);
+    }
+    Ok(map)
+}
+```
+
+### 3. `String` as the public error type (`config.rs:6`)
+**Rule:** the error type is meaningful — implements `Display` + `std::error::Error`, callers match on variants (`C-GOOD-ERR`, Rust API Guidelines).
+
+**Problem:** `String` implements neither trait, so callers can't handle specific failures programmatically or downcast, and `Result<_, String>` can't grow new error kinds without a breaking change. Since you're about to build on this library, changing the error type after publication is a breaking API change — fix the shape now. (Related: the message carries the offending line but no line number; `load` is the only caller that knows it.)
+
+**Fix:**
+```rust
+use std::fmt;
+
+/// An error from parsing configuration text.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A line did not contain a `=` separator.
+    BadLine {
+        /// 1-based line number in the input.
+        line: usize,
+        /// The offending line, as it appeared.
+        content: String,
+    },
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigError::BadLine { line, content } => {
+                write!(f, "line {}: expected `key=value`, got `{}`", line, content)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+```
+With `parse_line` made private (Consider 1), it can return `Option<(String, String)>` and only `load` needs the error type. Also add a `# Errors` section to `load`'s doc comment.
+
+## Should fix
+
+### 4. `splitn` + collect + `len()` + indexing instead of `split_once` (`config.rs:7-11`)
+**Rule:** prefer the purpose-built stdlib API over check-then-index (idiom; a combinator beats a match on a collected `Vec`).
+
+**Problem:** collecting into a `Vec<&str>`, testing `parts.len() != 2`, then indexing `parts[0]`/`parts[1]` is five lines expressing "split at the first `=`". `str::split_once` (stable 1.52) does exactly that — including the `splitn(2)` semantics of keeping later `=`s in the value — with no indexing at all.
+
+**Fix:**
+```rust
+fn parse_line(line: &str) -> Option<(String, String)> {
+    let (key, value) = line.split_once('=')?;
+    Some((key.trim().to_string(), value.trim().to_string()))
+}
+```
+
+### 5. No tests (whole file)
+**Rule:** logic has no tests; doc examples absent (skill documentation-and-tests rules).
+
+**Problem:** one test with a blank line would have caught finding 2; any test at all would have caught finding 1, because nothing in this file compiles. For a module you plan to build on, the contract ("what is a valid line, what happens to duplicates") is untested.
+
+**Fix:**
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_may_contain_equals() {
+        let m = load("k=a=b").unwrap();
+        assert_eq!(m.get("k").map(String::as_str), Some("a=b"));
+    }
+
+    #[test]
+    fn blank_line_is_an_error_not_a_panic() {
+        assert!(load("a=1\n\nb=2").is_err()); // panicked before the fix
+    }
+}
+```
+
+## Consider
+
+### 6. `parse_line` is `pub` (`config.rs:6`)
+The module doc promises *loading*, not line-parsing; publishing `parse_line` doubles the API surface and drags its error type into the public contract. Make it private or `pub(crate)` unless someone actually needs it.
+
+### 7. Duplicate keys silently last-wins (`config.rs:19`)
+`map.insert` overwrites, so in `a=1\na=2` the value is `2`. That's a legitimate convention — but document it in `load`'s doc comment, or return an error on duplicates. Right now it's an undocumented behavior users will discover in production.
+
+### 8. Comment and blank-line support is absent, and undocumented (`config.rs:1`)
+A "simple" `key=value` format without comments is a defensible scope decision — but the module docs don't say so, and today a comment line isn't skipped, it's a panic (finding 2). After fixing `load`, decide: skip blank lines and `#` comments, or treat them as errors — and say which in the module docs.
+
+### 9. `load` reads like disk I/O but takes in-memory text (`config.rs:15`)
+`load` conventionally implies a path or network. Since it parses a `&str`, consider renaming to `parse`, or introducing a `Config` newtype with a `FromStr` impl so callers get `parse::<Config>()?` idiomatically.
+
+## What's already good
+
+- `splitn(2, '=')` preserves `=` inside values (`k=a=b` → value `a=b`) — correct, and easy to get wrong with a naive `split('=')`.
+- Both key and value are trimmed, so `host = example.com` parses sensibly.
+- `load` takes `&str`, the right borrow for read-only text input.
+- The leaf function signals failure with `Result` rather than panicking or returning `Option` — the instinct is right; only the caller drops it. Both functions have doc comments.
+
+---
+
+**Lints:** your crate almost certainly lacks a `[lints]` table (none was shown). The BeautifulRust drop-in config (`lints/lints.toml` + `lints/clippy.toml`, https://github.com/morganlinton/BeautifulRust — also checked out locally at `/workspace/sut/lints/`) makes clippy catch most of the above mechanically. It would have flagged three of these findings directly: `clippy::unwrap_used` → the `.unwrap()` in finding 2; `clippy::missing_panics_doc` → `load`'s panic would at minimum have to be documented as public API; and `clippy::ptr_arg` (via the `all` group) → the `&String` in finding 1. `missing_errors_doc` and `exhaustive_enums` would have pushed the `# Errors` doc and `#[non_exhaustive]` from finding 3.
+The toolchain is approval-gated in this session, so `cargo fmt`/`clippy`/`test` could not be run — this is a read-level review, stated as such below. (The BeautifulRust repo is checked out at `/workspace/sut`, so the lint recommendation at the end names lints I verified against the actual config.)
+
+---
+
+# Rust review: `config` module (`parse_line` / `load`)
+
+Assumed library crate (you said so), and assumed the module lives at `src/config.rs` — adjust the paths below. No `Cargo.toml` was provided, so edition/MSRV are unchecked; the suggested fix uses `str::split_once` (rustc ≥ 1.52) and `#[non_exhaustive]` (≥ 1.40), safe for any maintained toolchain. Tools not run: `cargo`/`rustc` are gated in this environment, so the review is by reading — but the two headline findings are compiler-semantics facts, not estimates. **The single most important thing: this module does not compile, and once that's fixed, `load` panics on any config file containing a blank line or a comment.** Fix those before building anything on it.
+
+## Must fix
+
+### 1. The module does not compile: `&str` passed to a `&String` parameter (`config.rs:6`, call site `config.rs:18`)
+**Rule:** parameters take the widest borrow — `&str`, not `&String` (`clippy::ptr_arg`; Rust API Guidelines borrowing guidance).
+
+**Problem:** `parse_line` declares `line: &String`, but `load` passes it `&str` values from `text.lines()`. Deref coercion only goes `&String → &str`, never the reverse, so the crate fails with `error[E0308]: mismatched types — expected &String, found &str` at the call in `load`. Practical consequence: if `cargo check` passes on your tree right now, this file is not part of the build — check whether `mod config;` is even declared. The moment someone wires it in, the build breaks.
+
+**Fix:**
+```rust
+pub fn parse_line(line: &str) -> Result<(String, String), String> {
+```
+
+### 2. `load` panics on the most ordinary config files (`config.rs:18`)
+**Rule:** no panics on paths reachable from external input — return an error instead (`M-PANIC-ON-BUG`, Microsoft Rust Guidelines; panics are for bugs, `unwrap` on expected failure is a panic in the caller's process).
+
+**Problem:** `parse_line`'s `Err` case is *expected* — it fires for any line without `=` — and `load` calls `.unwrap()` on it. `load("a=1\n\nb=2")` panics: `lines()` yields `["a=1", ""]`, the blank line has no `=`, and you get `called 'Result::unwrap()' on an 'Err' value: "bad line: "`. Same for comment lines (`# host = ...`). Blank lines and comments are the norm in real config files, so essentially every real input panics — inside the *user's* application, since this is a library. Finding 1 masks this today: the code can't run at all.
+
+**Fix** (requires the error type from finding 3):
+```rust
+pub fn load(text: &str) -> Result<HashMap<String, String>, ConfigError> {
+    let mut map = HashMap::new();
+    for (n, line) in text.lines().enumerate() {
+        let (key, value) = parse_line(line).ok_or_else(|| ConfigError::BadLine {
+            line: n + 1,
+            content: line.to_string(),
+        })?;
+        map.insert(key, value);
+    }
+    Ok(map)
+}
+```
+
+### 3. `String` as the public error type (`config.rs:6`)
+**Rule:** the error type is meaningful — implements `Display` + `std::error::Error`, callers match on variants (`C-GOOD-ERR`, Rust API Guidelines).
+
+**Problem:** `String` implements neither trait, so callers can't handle specific failures programmatically or downcast, and `Result<_, String>` can't grow new error kinds without a breaking change. Since you're about to build on this library, changing the error type after publication is a breaking API change — fix the shape now. (Related: the message carries the offending line but no line number; `load` is the only caller that knows it.)
+
+**Fix:**
+```rust
+use std::fmt;
+
+/// An error from parsing configuration text.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ConfigError {
+    /// A line did not contain a `=` separator.
+    BadLine {
+        /// 1-based line number in the input.
+        line: usize,
+        /// The offending line, as it appeared.
+        content: String,
+    },
+}
+
+impl fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ConfigError::BadLine { line, content } => {
+                write!(f, "line {}: expected `key=value`, got `{}`", line, content)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+```
+With `parse_line` made private (Consider 1), it can return `Option<(String, String)>` and only `load` needs the error type. Also add a `# Errors` section to `load`'s doc comment.
+
+## Should fix
+
+### 4. `splitn` + collect + `len()` + indexing instead of `split_once` (`config.rs:7-11`)
+**Rule:** prefer the purpose-built stdlib API over check-then-index (idiom; a combinator beats a match on a collected `Vec`).
+
+**Problem:** collecting into a `Vec<&str>`, testing `parts.len() != 2`, then indexing `parts[0]`/`parts[1]` is five lines expressing "split at the first `=`". `str::split_once` (stable 1.52) does exactly that — including the `splitn(2)` semantics of keeping later `=`s in the value — with no indexing at all.
+
+**Fix:**
+```rust
+fn parse_line(line: &str) -> Option<(String, String)> {
+    let (key, value) = line.split_once('=')?;
+    Some((key.trim().to_string(), value.trim().to_string()))
+}
+```
+
+### 5. No tests (whole file)
+**Rule:** logic has no tests; doc examples absent (skill documentation-and-tests rules).
+
+**Problem:** one test with a blank line would have caught finding 2; any test at all would have caught finding 1, because nothing in this file compiles. For a module you plan to build on, the contract ("what is a valid line, what happens to duplicates") is untested.
+
+**Fix:**
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn value_may_contain_equals() {
+        let m = load("k=a=b").unwrap();
+        assert_eq!(m.get("k").map(String::as_str), Some("a=b"));
+    }
+
+    #[test]
+    fn blank_line_is_an_error_not_a_panic() {
+        assert!(load("a=1\n\nb=2").is_err()); // panicked before the fix
+    }
+}
+```
+
+## Consider
+
+### 6. `parse_line` is `pub` (`config.rs:6`)
+The module doc promises *loading*, not line-parsing; publishing `parse_line` doubles the API surface and drags its error type into the public contract. Make it private or `pub(crate)` unless someone actually needs it.
+
+### 7. Duplicate keys silently last-wins (`config.rs:19`)
+`map.insert` overwrites, so in `a=1\na=2` the value is `2`. That's a legitimate convention — but document it in `load`'s doc comment, or return an error on duplicates. Right now it's an undocumented behavior users will discover in production.
+
+### 8. Comment and blank-line support is absent, and undocumented (`config.rs:1`)
+A "simple" `key=value` format without comments is a defensible scope decision — but the module docs don't say so, and today a comment line isn't skipped, it's a panic (finding 2). After fixing `load`, decide: skip blank lines and `#` comments, or treat them as errors — and say which in the module docs.
+
+### 9. `load` reads like disk I/O but takes in-memory text (`config.rs:15`)
+`load` conventionally implies a path or network. Since it parses a `&str`, consider renaming to `parse`, or introducing a `Config` newtype with a `FromStr` impl so callers get `parse::<Config>()?` idiomatically.
+
+## What's already good
+
+- `splitn(2, '=')` preserves `=` inside values (`k=a=b` → value `a=b`) — correct, and easy to get wrong with a naive `split('=')`.
+- Both key and value are trimmed, so `host = example.com` parses sensibly.
+- `load` takes `&str`, the right borrow for read-only text input.
+- The leaf function signals failure with `Result` rather than panicking or returning `Option` — the instinct is right; only the caller drops it. Both functions have doc comments.
+
+---
+
+**Lints:** your crate almost certainly lacks a `[lints]` table (none was shown). The BeautifulRust drop-in config (`lints/lints.toml` + `lints/clippy.toml`, https://github.com/morganlinton/BeautifulRust — also checked out locally at `/workspace/sut/lints/`) makes clippy catch most of the above mechanically. It would have flagged three of these findings directly: `clippy::unwrap_used` → the `.unwrap()` in finding 2; `clippy::missing_panics_doc` → `load`'s panic would at minimum have to be documented as public API; and `clippy::ptr_arg` (via the `all` group) → the `&String` in finding 1. `missing_errors_doc` and `exhaustive_enums` would have pushed the `# Errors` doc and `#[non_exhaustive]` from finding 3.

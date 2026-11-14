@@ -1,0 +1,12 @@
+{"id": "BR-AD-01", "rep": "1", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["LGTM"], "files": ["прогоны\\BR-AD-01-r1.txt"]}
+{"id": "BR-AD-01", "rep": "2", "source": "транскрипт", "det": "DET_LEAK", "missing": [], "leaked": ["LGTM"], "files": ["прогоны\\BR-AD-01-r2.txt"]}
+{"id": "BR-CR-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CR-01-r1.txt"]}
+{"id": "BR-CR-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CR-01-r2.txt"]}
+{"id": "BR-CR-02", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CR-02-r1.txt"]}
+{"id": "BR-CR-02", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CR-02-r2.txt"]}
+{"id": "BR-CV-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CV-01-r1-h1.txt", "прогоны\\BR-CV-01-r1-h2.txt", "прогоны\\BR-CV-01-r1.txt"]}
+{"id": "BR-CV-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-CV-01-r2-h1.txt", "прогоны\\BR-CV-01-r2-h2.txt", "прогоны\\BR-CV-01-r2.txt"]}
+{"id": "BR-OB-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-OB-01-r1.txt"]}
+{"id": "BR-OB-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-OB-01-r2.txt"]}
+{"id": "BR-OS-01", "rep": "1", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-OS-01-r1.txt"]}
+{"id": "BR-OS-01", "rep": "2", "source": "транскрипт", "det": "DET_OK", "missing": [], "leaked": [], "files": ["прогоны\\BR-OS-01-r2.txt"]}

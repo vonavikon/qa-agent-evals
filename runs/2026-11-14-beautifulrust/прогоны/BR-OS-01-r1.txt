@@ -1,0 +1,243 @@
+The sandbox rejected the shell expansions — rerunning with plain commands and no shell variables:
+No Python toolchain in this environment (`python3`, `ruff`, `mypy` all absent), so this is a read-only review — nothing was executed here. The float behaviors I cite below come from the Python documentation, and I've included a snippet you can run yourself to confirm them.
+
+---
+
+# Python review: `reconcile()`
+
+The function applies debits/credits to an opening balance and returns a closing balance. I'm reviewing it as application-style Python under the same rubric as the Rust skill (correctness → errors → API design → clarity → tests), with Python-source rules substituted where the Rust rules don't translate. Verdict: the logic shape is right, but the money type is wrong — this is the classic "float as money" bug, and everything else is secondary to it. When you port this to Rust, the same rule applies: `i64` cents or `rust_decimal`, never `f64`.
+
+Line numbers refer to the snippet as you pasted it (1–10).
+
+## Must fix
+
+### 1. Money in floats (`line 2`, used at `line 10`)
+**Rule:** "Decimal for money" — Python `decimal` module docs ("Decimal … offers several advantages over the float datatype") and the tutorial's *Floating Point Arithmetic: Issues and Limitations*, which uses this exact example; alternatively Fowler's Money Pattern (integer minor units).
+
+**Problem:** If callers pass floats, every `-= 0.01` accumulates binary representation error, and the final `round(balance, 2)` cannot repair it — it only hides it. Two concrete failures: `round(2.675, 2)` returns `2.67` (the stored value is `2.6749999…`), and the result **depends on transaction order**, because float addition isn't associative. Verify locally with:
+
+```python
+print(round(2.675, 2))            # 2.67  (documented in the tutorial)
+print(0.1 + 0.2)                  # 0.30000000000000004
+# same four transactions, different order, different closing balance:
+print(1e16 + 1.0 == 1e16)         # True — a $1 credit silently vanishes at scale
+```
+
+**Fix:**
+```python
+from decimal import Decimal, ROUND_HALF_EVEN
+
+CENT = Decimal("0.01")
+
+def reconcile(transactions, opening_balance):
+    balance = opening_balance
+    for t in transactions:
+        amount = Decimal(str(t["amount"]))   # ingest boundary: exact from str/int/float
+        if t["type"] == "debit":
+            balance -= amount
+        elif t["type"] == "credit":
+            balance += amount
+        else:
+            raise ValueError(f"unknown type: {t['type']}")
+    return balance.quantize(CENT, rounding=ROUND_HALF_EVEN)
+```
+`Decimal(str(...))` (not `Decimal(float)`) is the correct conversion at the boundary; exact `Decimal` addition is associative, so order-dependence disappears for free.
+
+### 2. Loop errors carry no record identity (`lines 4–6, 9`)
+**Rule:** Errors should identify what failed — stdlib precedent (`OSError` carries `.filename`, `json.JSONDecodeError` carries `.lineno`/`.colno`); `raise … from` per PEP 3134.
+
+**Problem:** Reconciling a 10,000-row feed that dies on `KeyError: 'amount'` (a missing key) or `TypeError` (an amount that arrived as a string, `line 5`) gives you nothing to debug with. Even the deliberate `ValueError` (`line 9`) names the bad value but not *which* transaction. The unknown-type branch is otherwise your best feature — it just can't point at the record.
+
+**Fix:**
+```python
+for i, t in enumerate(transactions):
+    try:
+        ...existing body...
+    except (KeyError, TypeError) as e:
+        raise ValueError(f"transaction #{i}: {t!r}") from e
+```
+and include `#{i}` in the unknown-type message. This keeps your fail-fast behavior and adds the location.
+
+## Should fix
+
+### 3. No type hints (`whole function`)
+**Rule:** PEP 484 (type hints), PEP 589 (`TypedDict`), PEP 586 (`Literal`).
+
+**Problem:** Unannotated, the contract lives only in a caller's head, and `mypy --strict` checks nothing (`no-untyped-def` disables analysis). Worse, the string-amounts failure from finding 2 is exactly the class of bug annotations catch statically.
+
+**Fix:**
+```python
+from typing import Iterable, Literal, TypedDict
+
+class Transaction(TypedDict):
+    type: Literal["debit", "credit"]
+    amount: Decimal
+
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal: ...
+```
+With `Literal`, mypy rejects unknown type strings before runtime, and your `else: raise` becomes a backstop for untyped data rather than the only defense. A `@dataclass` is the alternative if you construct transactions in code rather than ingesting them.
+
+### 4. Undocumented conventions (`line 1`)
+**Rule:** Docstrings — PEP 257; Google Python Style Guide §Docstrings.
+
+**Problem:** Three finance conventions are implicit: debit **subtracts**, credit **adds** (account-holder perspective, not the bank's ledger perspective, where these flip), and closing balances round to cents half-to-even. Someone integrating this will get one of them wrong and the tests won't say why.
+
+**Fix:** a docstring stating perspective, sign convention, and rounding mode.
+
+### 5. No tests (`whole file`)
+**Rule:** "Logic with no tests" (review rubric §Documentation and tests).
+
+**Problem:** This is money math with a raise path and a rounding decision, and none of it is pinned. Minimum set: empty list, debit/credit mix, unknown type raises, the `2.675` case, and a string-amount input (asserting the `ValueError` from finding 2, not a bare `TypeError`).
+
+## Consider
+
+### 6. Name vs. behavior (`line 1`)
+**Rule:** Intention-revealing names — Clean Code, Ch. 2. `reconcile` usually means *compare ledger against a statement and report a difference*; this computes a *closing balance*. `apply_transactions` or `closing_balance` says what it does; keep `reconcile` for the function that takes an expected balance.
+
+### 7. Negative amounts invert semantics (`lines 4–7`)
+A debit of `-50.00` *adds* money. If amounts can't legitimately be negative, validate at the ingest boundary; if they can, document it.
+
+### 8. Rounding mode as an explicit decision (`line 10`)
+Half-even (banker's rounding) is defensible and is what `round()`/`ROUND_HALF_EVEN` do — but it should be a written choice, not a default nobody noticed. Half-up is common in retail-facing displays. Naming it in the docstring (finding 4) closes this.
+
+## What's already good
+
+- **Fail-fast on unknown type** — it raises instead of silently skipping; "errors should never pass silently" (*The Zen of Python*) is honored here.
+- **Pure function** — no input mutation, no I/O, no global state; trivially testable and trivially portable to Rust.
+- **The `if`/`elif`/`else` dispatch is the right shape** for two cases plus a validation branch — no cleverness to untangle, and the `else` doubles as the guard.
+- **`round(..., 2)` shows correct domain instinct** — the author knows this is money and that cents matter. The type is wrong, not the intent.
+
+---
+
+## Lint setup
+
+No toolchain ran here, so take the above as static review only. When you're back at your machine, this in `pyproject.toml` catches the mechanical findings:
+
+```toml
+[tool.ruff.lint]
+select = ["E", "F", "ANN", "D", "EM", "TRY"]
+# mypy: run with --strict
+```
+
+It would have caught: missing annotations (`ANN001`/`ANN201`, finding 3), the missing docstring (`D103`, finding 4), and the f-string-in-exception style (`EM102`, and `TRY003` nudging toward a custom exception class — opinionated; many teams skip that one). Note honestly: **the top finding is invisible to linters** — no Python or Rust lint flags float money. The guard is the `Decimal` change plus the `2.675` test; on the Rust side, `rust_decimal`/`i64` cents plus the same test.
+No Python toolchain in this environment (`python3`, `ruff`, `mypy` all absent), so this is a read-only review — nothing was executed here. The float behaviors I cite below come from the Python documentation, and I've included a snippet you can run yourself to confirm them.
+
+---
+
+# Python review: `reconcile()`
+
+The function applies debits/credits to an opening balance and returns a closing balance. I'm reviewing it as application-style Python under the same rubric as the Rust skill (correctness → errors → API design → clarity → tests), with Python-source rules substituted where the Rust rules don't translate. Verdict: the logic shape is right, but the money type is wrong — this is the classic "float as money" bug, and everything else is secondary to it. When you port this to Rust, the same rule applies: `i64` cents or `rust_decimal`, never `f64`.
+
+Line numbers refer to the snippet as you pasted it (1–10).
+
+## Must fix
+
+### 1. Money in floats (`line 2`, used at `line 10`)
+**Rule:** "Decimal for money" — Python `decimal` module docs ("Decimal … offers several advantages over the float datatype") and the tutorial's *Floating Point Arithmetic: Issues and Limitations*, which uses this exact example; alternatively Fowler's Money Pattern (integer minor units).
+
+**Problem:** If callers pass floats, every `-= 0.01` accumulates binary representation error, and the final `round(balance, 2)` cannot repair it — it only hides it. Two concrete failures: `round(2.675, 2)` returns `2.67` (the stored value is `2.6749999…`), and the result **depends on transaction order**, because float addition isn't associative. Verify locally with:
+
+```python
+print(round(2.675, 2))            # 2.67  (documented in the tutorial)
+print(0.1 + 0.2)                  # 0.30000000000000004
+# same four transactions, different order, different closing balance:
+print(1e16 + 1.0 == 1e16)         # True — a $1 credit silently vanishes at scale
+```
+
+**Fix:**
+```python
+from decimal import Decimal, ROUND_HALF_EVEN
+
+CENT = Decimal("0.01")
+
+def reconcile(transactions, opening_balance):
+    balance = opening_balance
+    for t in transactions:
+        amount = Decimal(str(t["amount"]))   # ingest boundary: exact from str/int/float
+        if t["type"] == "debit":
+            balance -= amount
+        elif t["type"] == "credit":
+            balance += amount
+        else:
+            raise ValueError(f"unknown type: {t['type']}")
+    return balance.quantize(CENT, rounding=ROUND_HALF_EVEN)
+```
+`Decimal(str(...))` (not `Decimal(float)`) is the correct conversion at the boundary; exact `Decimal` addition is associative, so order-dependence disappears for free.
+
+### 2. Loop errors carry no record identity (`lines 4–6, 9`)
+**Rule:** Errors should identify what failed — stdlib precedent (`OSError` carries `.filename`, `json.JSONDecodeError` carries `.lineno`/`.colno`); `raise … from` per PEP 3134.
+
+**Problem:** Reconciling a 10,000-row feed that dies on `KeyError: 'amount'` (a missing key) or `TypeError` (an amount that arrived as a string, `line 5`) gives you nothing to debug with. Even the deliberate `ValueError` (`line 9`) names the bad value but not *which* transaction. The unknown-type branch is otherwise your best feature — it just can't point at the record.
+
+**Fix:**
+```python
+for i, t in enumerate(transactions):
+    try:
+        ...existing body...
+    except (KeyError, TypeError) as e:
+        raise ValueError(f"transaction #{i}: {t!r}") from e
+```
+and include `#{i}` in the unknown-type message. This keeps your fail-fast behavior and adds the location.
+
+## Should fix
+
+### 3. No type hints (`whole function`)
+**Rule:** PEP 484 (type hints), PEP 589 (`TypedDict`), PEP 586 (`Literal`).
+
+**Problem:** Unannotated, the contract lives only in a caller's head, and `mypy --strict` checks nothing (`no-untyped-def` disables analysis). Worse, the string-amounts failure from finding 2 is exactly the class of bug annotations catch statically.
+
+**Fix:**
+```python
+from typing import Iterable, Literal, TypedDict
+
+class Transaction(TypedDict):
+    type: Literal["debit", "credit"]
+    amount: Decimal
+
+def reconcile(transactions: Iterable[Transaction], opening_balance: Decimal) -> Decimal: ...
+```
+With `Literal`, mypy rejects unknown type strings before runtime, and your `else: raise` becomes a backstop for untyped data rather than the only defense. A `@dataclass` is the alternative if you construct transactions in code rather than ingesting them.
+
+### 4. Undocumented conventions (`line 1`)
+**Rule:** Docstrings — PEP 257; Google Python Style Guide §Docstrings.
+
+**Problem:** Three finance conventions are implicit: debit **subtracts**, credit **adds** (account-holder perspective, not the bank's ledger perspective, where these flip), and closing balances round to cents half-to-even. Someone integrating this will get one of them wrong and the tests won't say why.
+
+**Fix:** a docstring stating perspective, sign convention, and rounding mode.
+
+### 5. No tests (`whole file`)
+**Rule:** "Logic with no tests" (review rubric §Documentation and tests).
+
+**Problem:** This is money math with a raise path and a rounding decision, and none of it is pinned. Minimum set: empty list, debit/credit mix, unknown type raises, the `2.675` case, and a string-amount input (asserting the `ValueError` from finding 2, not a bare `TypeError`).
+
+## Consider
+
+### 6. Name vs. behavior (`line 1`)
+**Rule:** Intention-revealing names — Clean Code, Ch. 2. `reconcile` usually means *compare ledger against a statement and report a difference*; this computes a *closing balance*. `apply_transactions` or `closing_balance` says what it does; keep `reconcile` for the function that takes an expected balance.
+
+### 7. Negative amounts invert semantics (`lines 4–7`)
+A debit of `-50.00` *adds* money. If amounts can't legitimately be negative, validate at the ingest boundary; if they can, document it.
+
+### 8. Rounding mode as an explicit decision (`line 10`)
+Half-even (banker's rounding) is defensible and is what `round()`/`ROUND_HALF_EVEN` do — but it should be a written choice, not a default nobody noticed. Half-up is common in retail-facing displays. Naming it in the docstring (finding 4) closes this.
+
+## What's already good
+
+- **Fail-fast on unknown type** — it raises instead of silently skipping; "errors should never pass silently" (*The Zen of Python*) is honored here.
+- **Pure function** — no input mutation, no I/O, no global state; trivially testable and trivially portable to Rust.
+- **The `if`/`elif`/`else` dispatch is the right shape** for two cases plus a validation branch — no cleverness to untangle, and the `else` doubles as the guard.
+- **`round(..., 2)` shows correct domain instinct** — the author knows this is money and that cents matter. The type is wrong, not the intent.
+
+---
+
+## Lint setup
+
+No toolchain ran here, so take the above as static review only. When you're back at your machine, this in `pyproject.toml` catches the mechanical findings:
+
+```toml
+[tool.ruff.lint]
+select = ["E", "F", "ANN", "D", "EM", "TRY"]
+# mypy: run with --strict
+```
+
+It would have caught: missing annotations (`ANN001`/`ANN201`, finding 3), the missing docstring (`D103`, finding 4), and the f-string-in-exception style (`EM102`, and `TRY003` nudging toward a custom exception class — opinionated; many teams skip that one). Note honestly: **the top finding is invisible to linters** — no Python or Rust lint flags float money. The guard is the `Decimal` change plus the `2.675` test; on the Rust side, `rust_decimal`/`i64` cents plus the same test.

@@ -1,0 +1,2 @@
+Read: /workspace/sut/lints/lints.toml
+Read: /workspace/sut/lints/clippy.toml

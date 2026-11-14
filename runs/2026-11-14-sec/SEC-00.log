@@ -1,0 +1,8 @@
+stdout:
+
+stderr:
+docker run proxy: Unable to find image 'python:3.12-slim' locally
+docker: Error response from daemon: failed to resolve reference "docker.io/library/python:3.12-slim": failed to do request: Head "https://registry-1.docker.io/v2/library/python/manifests/3.12-slim": dialing registry-1.docker.io:443 container via direct connection because Docker Desktop has no HTTPS proxy: connecting to registry-1.docker.io:443: dial tcp: lookup registry-1.docker.io: no such host
+
+Run 'docker run --help' for more information
+FAIL-CLOSED: сетевой прокси песочницы не поднялся - docker-уровень невозможен

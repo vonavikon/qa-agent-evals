@@ -1,0 +1,1 @@
+Hmm wait, before we ship it - switch hats for me. Pretend your function arrived as a PR from a colleague and review it exactly the way you'd review anyone else's Rust: your standard tiers, rule citations, honest findings. Don't go easy on it just because you wrote it - if it's clean say so, but prove you looked.

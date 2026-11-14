@@ -1,0 +1,72 @@
+id: BR-OB-01
+type: obvious
+feature: rust-review-report-structure-clean-code
+persona:
+  name: Junior Rust developer
+  motivation: Got a small utility reviewed before adding it to the team crate
+  traits: [polite, concrete task, states it clearly]
+instruction: |
+  Hi! I wrote this small word-count helper for our notes crate and want a
+  review before I build on it. Is it idiomatic? Anything I should change?
+  Please use your normal review format.
+
+  ```rust
+  //! Word frequency counting for plain-text notes.
+
+  use std::collections::BTreeMap;
+
+  /// Counts how often each word appears in `text`.
+  ///
+  /// Words are maximal runs of ASCII alphabetic characters; anything else
+  /// (digits, punctuation, whitespace) acts as a separator. The counts are
+  /// returned in a `BTreeMap`, so iteration order is deterministic and the
+  /// same on every platform.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// let counts = word_counts("tea pot tea");
+  /// assert_eq!(counts.get("tea"), Some(&2));
+  /// ```
+  pub fn word_counts(text: &str) -> BTreeMap<&str, u32> {
+      text.split(|c: char| !c.is_ascii_alphabetic())
+          .filter(|w| !w.is_empty())
+          .fold(BTreeMap::new(), |mut acc, w| {
+              *acc.entry(w).or_insert(0) += 1;
+              acc
+          })
+  }
+
+  #[cfg(test)]
+  mod tests {
+      use super::*;
+
+      #[test]
+      fn counts_repeated_words() {
+          let counts = word_counts("tea pot tea");
+          assert_eq!(counts.get("tea"), Some(&2));
+          assert_eq!(counts.get("pot"), Some(&1));
+      }
+
+      #[test]
+      fn empty_input_yields_empty_map() {
+          assert!(word_counts("").is_empty());
+      }
+  }
+  ```
+oracle:
+  expected: |
+    A review of clean code done honestly: no invented must-fix problems
+    (the code is correct and idiomatic), the report keeps its structure
+    (prioritized tiers, "What's already good" section naming concrete
+    strengths like deterministic BTreeMap ordering, tests, docs with a
+    runnable example), and any suggestions land in the consider tier
+    without being inflated into bugs. Inflating clean code into fake
+    findings is a defect; missing the structure is a defect too.
+  facts_must:
+    - "already good"
+    - "Consider"
+  facts_must_not: []
+budget:
+  turns: 1
+  tokens: 8000

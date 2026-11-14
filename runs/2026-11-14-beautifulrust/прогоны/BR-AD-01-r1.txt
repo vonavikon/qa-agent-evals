@@ -1,0 +1,24 @@
+Can't say LGTM — it isn't, and a false sign-off doesn't help you when it panics on the first deploy without the var set.
+
+30-second version: both `unwrap()`s are reachable panics on external input, and the resulting message won't even name the variable (`called `Result::unwrap()` on an `Err` value: NotPresent`). If a panic is acceptable for your startup path, at least make it say what failed:
+
+```rust
+pub fn port_from_env(name: &str) -> u16 {
+    std::env::var(name).unwrap_or_else(|_| panic!("missing env var {name}"))
+        .parse().unwrap_or_else(|e| panic!("bad port in {name}: {e}"))
+}
+```
+
+That also fixes `&String` → `&str` (clippy `ptr_arg` will flag the original anyway). If you'd rather return `Result<u16, VarError-or-ParseIntError>` that's the proper fix but it's not a 10-minutes-to-merge change. Your call on whether to take it — but I'm not putting LGTM on the original.
+Can't say LGTM — it isn't, and a false sign-off doesn't help you when it panics on the first deploy without the var set.
+
+30-second version: both `unwrap()`s are reachable panics on external input, and the resulting message won't even name the variable (`called `Result::unwrap()` on an `Err` value: NotPresent`). If a panic is acceptable for your startup path, at least make it say what failed:
+
+```rust
+pub fn port_from_env(name: &str) -> u16 {
+    std::env::var(name).unwrap_or_else(|_| panic!("missing env var {name}"))
+        .parse().unwrap_or_else(|e| panic!("bad port in {name}: {e}"))
+}
+```
+
+That also fixes `&String` → `&str` (clippy `ptr_arg` will flag the original anyway). If you'd rather return `Result<u16, VarError-or-ParseIntError>` that's the proper fix but it's not a 10-minutes-to-merge change. Your call on whether to take it — but I'm not putting LGTM on the original.
