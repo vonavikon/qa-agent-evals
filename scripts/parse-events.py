@@ -23,12 +23,21 @@ import io
 import json
 import os
 import sys
+import tempfile
 
 
 def norm(path: str) -> str:
-    """A Git Bash POSIX path (/c/...) -> Windows (C:\\...); anything else as is."""
+    """A Git Bash POSIX path (/c/...) -> Windows (C:\\...); anything else as is.
+
+    /tmp is Git Bash's mount of the user's temp dir: on Windows it resolves to
+    the real %TEMP% (a /tmp run dir reached the parser unconverted and the
+    transcripts were restored by hand, field run 2026-11-12). On POSIX /tmp is
+    a real directory and stays as is."""
     if len(path) >= 3 and path[0] == "/" and path[2] == "/" and path[1].isalpha():
         return path[1] + ":\\" + path[3:].replace("/", "\\")
+    if os.name == "nt" and (path == "/tmp" or path.startswith("/tmp/")):
+        rest = path[5:]  # "" for /tmp itself
+        return os.path.join(tempfile.gettempdir(), rest) if rest else tempfile.gettempdir()
     return path
 
 

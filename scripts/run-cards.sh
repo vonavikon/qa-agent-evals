@@ -36,6 +36,12 @@ ASP=()
 [ -n "$SKILL_MD" ] && ASP=(--append-system-prompt-file "$SKILL_MD")
 # Invocation: "${ASP[@]+${ASP[@]}}" - safe expansion of an empty array under set -u.
 
+# The run language is fixed per call (field run 2026-11-12: the host's global
+# "language": "Russian" CLI setting leaked into the SUT session and it answered
+# Russian to English cards). The flag beats the host config; QA_EVALS_LANG
+# overrides the default English.
+SUT_SETTINGS=(--settings "{\"language\":\"${QA_EVALS_LANG:-English}\"}")
+
 OUT_DIR="$RUN_DIR/прогоны"
 mkdir -p "$OUT_DIR"
 
@@ -58,6 +64,9 @@ fi
 
 # Extract a field from a card: a second-level YAML field (scalar or literal block).
 # The card format is fixed by the taxonomy - a simple parser is enough.
+# A literal block holds blank lines inside it (field run 2026-11-12: CR-01's
+# replica was cut to 96 bytes at the first blank line and re-issued); a
+# non-indented line ends the block.
 yaml_field() { # $1=file $2=field name
   awk -v key="$2" '
     $0 ~ "^"key":" {
@@ -67,6 +76,7 @@ yaml_field() { # $1=file $2=field name
       print val; exit
     }
     block && /^[ \t]+/ { print substr($0, 3); next }
+    block && /^$/ { print ""; next }
     block { exit }
   ' "$1"
 }
@@ -132,7 +142,7 @@ for card in "$CARDS_DIR"/*.yaml; do
       mapfile -t DCMD < <(python "$SB" wrap docker "$work" -- claude -p \
         --plugin-dir /workspace/sut --max-turns "$MAX_TURNS" \
         --disallowedTools Skill,WebFetch,WebSearch,webReader,webSearch --strict-mcp-config --mcp-config /workspace/out/mcp-empty.json \
-        ${ASPD[@]+"${ASPD[@]}"} --output-format stream-json --verbose | \
+        "${SUT_SETTINGS[@]}" ${ASPD[@]+"${ASPD[@]}"} --output-format stream-json --verbose | \
         python -c "import json,sys; [print(x) for x in json.load(sys.stdin)]" | tr -d '\r')
       # wall-time session limit (SEC-04): a stuck process gets cut off
       printf '%s\n' "$turn" | MSYS_NO_PATHCONV=1 timeout "${QA_EVALS_SUT_TIMEOUT:-900}" \
@@ -142,7 +152,7 @@ for card in "$CARDS_DIR"/*.yaml; do
       ( cd "$work" && printf '%s\n' "$turn" | \
           "${SCRUB[@]}" claude -p --plugin-dir "$SUT_DIR" --max-turns "$MAX_TURNS" \
           --disallowedTools Skill --strict-mcp-config --mcp-config "$work/mcp-empty.json" \
-          ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
+          "${SUT_SETTINGS[@]}" ${ASP[@]+"${ASP[@]}"} --output-format stream-json --verbose \
           > "$OUT_DIR/$id-r$r.events.jsonl" 2>"$OUT_DIR/$id-r$r.err" )
     fi
     # Log parsing: scripts/parse-events.py writes .txt/.prov.txt/.diag.txt

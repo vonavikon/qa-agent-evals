@@ -3,6 +3,9 @@
 
 Reads result events from прогоны/*.events.jsonl (usage/duration_ms/
 total_cost_usd are written by the CLI), aggregates per card and per run.
+A multi-turn card driven by hand leaves one <id>-r<N>-h<K>.events.jsonl
+per turn; every file is a CLI call and counts into its card (field run
+2026-11-12: CV-01's six h-files had to be aggregated by hand).
 A budget limit (USD) via --budget: exceeding it is flagged in the report
 (the runner continues; a hard stop is not implemented - the decision stays
 with the human, see the conclusion asymmetry).
@@ -79,7 +82,9 @@ def main():
 
     rows = []
     for evf in sorted(glob.glob(os.path.join(rd, "прогоны", "*.events.jsonl"))):
-        m = re.search(r"([A-Za-z0-9\-]+)-r(\d+)\.events\.jsonl$", os.path.basename(evf))
+        # -r<N> repeats plus the -h<K> manual-turn files of multi-turn cards
+        m = re.search(r"([A-Za-z0-9\-]+)-r(\d+)(?:-h(\d+))?\.events\.jsonl$",
+                      os.path.basename(evf))
         if not m:
             continue
         s = run_stats(evf)

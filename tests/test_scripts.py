@@ -10,6 +10,9 @@ import importlib.util
 import io
 import json
 import os
+import re
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -29,6 +32,7 @@ check_facts = load("check_facts", "check-facts.py")
 build_index = load("build_index_mod", "build-index.py")
 judge_control = load("judge_control_mod", "judge-control.py")
 cost_report = load("cost_report_mod", "cost-report.py")
+parse_events = load("parse_events_mod", "parse-events.py")
 av = load("av", "annotate-visuals.py")
 
 # Valid 1x1 PNG - the content does not matter, the validator only needs the file to exist.
@@ -1009,6 +1013,28 @@ class CostReportMain(unittest.TestCase):
             md = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
             self.assertNotIn("БЮДЖЕТ ПРЕВЫШЕН", md)  # равен бюджету - не превышен
 
+    def test_manual_turn_events_counted(self):
+        """-h<K> файлы (ручные ходы многоходовой карточки) попадают в итог.
+        Регрессия прогона 2026-11-12: шесть -h файлов CV-01 выпали из cost.md,
+        карточку считали руками ($1.26)."""
+        with tempfile.TemporaryDirectory() as td:
+            os.makedirs(os.path.join(td, "прогоны"))
+            self.events(td, "CV-01", 1, 10, 100, 0.01)
+            self.events(td, "CV-01", "1-h1", 20, 200, 0.02)
+            self.events(td, "CV-01", "1-h2", 30, 300, 0.03)
+            self.events(td, "T-01", 1, 10, 100, 0.01)
+            argv = sys.argv
+            sys.argv = ["cost-report.py", td]
+            try:
+                cost_report.main()
+            finally:
+                sys.argv = argv
+            md = io.open(os.path.join(td, "cost.md"), encoding="utf-8").read()
+            self.assertIn("Прогонов: 4. Токены: input 70 (cache read 16), "
+                          "output 35. Длительность: 0.7 с. Стоимость: $0.070.", md)
+            self.assertIn("| CV-01 | 3 | 60 | 30 | 0.6 | 0.060 |", md)
+            self.assertIn("| T-01 | 1 | 10 | 5 | 0.1 | 0.010 |", md)
+
     def test_norm(self):
         """norm(): a Git Bash drive path converts, others pass through."""
         self.assertEqual(cost_report.norm("/c/users/x"), "c:\\users\\x")
@@ -1237,3 +1263,101 @@ class DiffRunsFull(unittest.TestCase):
             self.assertIn("нет в B", out)
             self.assertIn("новая карточка в B", out)
             self.assertIn("Итогов совпало: 2, изменилось/новых: 4.", out)
+
+
+class ParseEventsNorm(unittest.TestCase):
+    """parse-events.py norm(): диски Git Bash (/c/...) И /tmp (его маунт
+    пользовательского темпа). Каталог прогона в /tmp-форме доходил до парсера
+    несконвертированным, транскрипты восстанавливали руками (прогон 2026-11-12)."""
+
+    def test_drive_and_tmp(self):
+        self.assertEqual(parse_events.norm("/c/users/x"), "c:\\users\\x")
+        self.assertEqual(parse_events.norm("/C/users/x"), "C:\\users\\x")
+        self.assertEqual(parse_events.norm("C:/users/x"), "C:/users/x")
+        self.assertEqual(parse_events.norm("/ab"), "/ab")  # не диск
+        got = parse_events.norm("/tmp/qa-evals-run-x")
+        if os.name == "nt":
+            # Git Bash /tmp = %TEMP% хоста; на POSIX /tmp - настоящий путь
+            self.assertEqual(got, os.path.join(tempfile.gettempdir(), "qa-evals-run-x"))
+        else:
+            self.assertEqual(got, "/tmp/qa-evals-run-x")
+
+    def test_tmp_run_dir_end_to_end(self):
+        """main() принимает каталог прогона в /tmp-форме Git Bash: events.jsonl
+        находится, транскрипт пишется рядом с ним."""
+        with tempfile.TemporaryDirectory() as td:
+            runs = os.path.join(td, "прогоны")
+            os.makedirs(runs)
+            io.open(os.path.join(runs, "T-01-r1.events.jsonl"), "w",
+                    encoding="utf-8").write(
+                json.dumps({"type": "result", "result": "Ответ"}) + "\n")
+            # TemporaryDirectory лежит прямо в темпе, его Git Bash-форма -
+            # /tmp/<имя>; на POSIX это уже /tmp/... и конвертация не нужна
+            posix = "/tmp/" + os.path.basename(td) if os.name == "nt" else td
+            argv = sys.argv
+            sys.argv = ["parse-events.py", posix, "T-01", "r1"]
+            try:
+                rc = parse_events.main()
+            finally:
+                sys.argv = argv
+            self.assertEqual(rc, 0)
+            self.assertEqual(io.open(os.path.join(runs, "T-01-r1.txt"),
+                                     encoding="utf-8").read(), "Ответ")
+
+
+class RunCardsYamlField(unittest.TestCase):
+    """run-cards.sh yaml_field: пустая строка внутри literal-блока остаётся в
+    значении поля. Регрессия прогона 2026-11-12: реплика CR-01 обрезалась до
+    96 байт на первой пустой строке, карточку перезаявляли."""
+
+    def yaml_field(self, card_text, field):
+        src = io.open(os.path.join(ROOT, "scripts", "run-cards.sh"),
+                      encoding="utf-8").read()
+        m = re.search(r"(?ms)^yaml_field\(\) \{.*?^\}$", src)
+        self.assertTrue(m, "yaml_field не найдена в run-cards.sh")
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("bash недоступен")
+        with tempfile.TemporaryDirectory() as td:
+            card = os.path.join(td, "card.yaml")
+            io.open(card, "w", encoding="utf-8", newline="\n").write(card_text)
+            out = subprocess.run(
+                [bash, "-c", m.group(0) + '\nyaml_field "$1" ' + field,
+                 "yaml_field-test", card],
+                capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        return out.stdout
+
+    def test_blank_line_inside_literal_block(self):
+        got = self.yaml_field(
+            "id: CR-01\ntype: critical\nfeature: f\ninstruction: |\n"
+            "  Release is in 40 minutes and the auth suite just went red.\n"
+            "\n"
+            "  FAIL src/auth/auth.spec.ts\n"
+            "  What's wrong here?\n"
+            "oracle:\n  expected: |\n    Ожидание.\n", "instruction")
+        self.assertEqual(
+            got, "Release is in 40 minutes and the auth suite just went red.\n"
+                 "\nFAIL src/auth/auth.spec.ts\nWhat's wrong here?\n")
+
+    def test_scalar_and_block_end(self):
+        got = self.yaml_field("id: T-01\ntype: obvious\ninstruction: |\n"
+                              "  Реплика?\noracle:\n  expected: |\n    ok\n", "id")
+        self.assertEqual(got, "T-01\n")
+        got2 = self.yaml_field("id: T-01\ninstruction: |\n  Реплика?\noracle:\n",
+                               "instruction")
+        self.assertEqual(got2, "Реплика?\n")
+
+
+class RunCardsLanguage(unittest.TestCase):
+    """run-cards.sh фиксирует язык прогона флагом на каждый вызов (прогон
+    2026-11-12: глобальная "language": "Russian" хоста просачивалась в сессию
+    SUT). QA_EVALS_LANG переопределяет, дефолт English, флаг несут оба вызова
+    claude (host и docker)."""
+
+    def test_settings_flag_on_both_invocations(self):
+        src = io.open(os.path.join(ROOT, "scripts", "run-cards.sh"),
+                      encoding="utf-8").read()
+        self.assertIn('SUT_SETTINGS=(--settings', src)
+        self.assertIn('${QA_EVALS_LANG:-English}', src)
+        self.assertEqual(src.count('"${SUT_SETTINGS[@]}"'), 2)  # host + docker
