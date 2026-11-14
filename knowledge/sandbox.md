@@ -6,13 +6,13 @@ Why: an acceptance run starts a foreign plugin in a real Claude Code. Without a 
 
 | Level | Name | What it is | What it guarantees | When to choose it |
 |---|---|---|---|---|
-| 0 | `host` | The current mode: a separate work directory, an env allowlist, an empty MCP, `--disallowedTools Skill`, the tamper detector | Environment secrets are not inherited. Foreign skills/MCP are not called. Tampering with run files is caught. **Leaving work is physically NOT blocked**: only the behavior of the model is the barrier | Public plugins from open repositories, quick acceptance runs, environments without Docker |
-| 1 | `docker` | A container: only a SUT copy + work, network off, read-only + tmpfs, non-root, pids/memory limits | The SUT sees no host files (including oracles and secrets, except the single LLM config), has no network, and writes only to work | Untrusted plugins, closed or corporate systems, runs of "evil" material, public security demos |
+| 0 | `host` | A separate work directory, an env allowlist, an empty MCP, `--disallowedTools Skill`, the tamper detector | Environment secrets are not inherited. Foreign skills/MCP are not called. Tampering with run files is caught. **Leaving work is physically NOT blocked**: only the behavior of the model is the barrier | The pipeline's own self-acceptance, or a run where the human explicitly accepted the risk |
+| 1 | `docker` | A container: only a SUT copy + work, network off, read-only + tmpfs, non-root, pids/memory limits | The SUT sees no host files (including oracles and secrets, except the single LLM config), has no network, and writes only to work | Any third-party SUT, whatever its stars or author |
 
 ## Selection Rules (Phase B, Adapter)
 
-1. Choose the level deliberately during adapter setup and record it in the report (meta `isolation_level`). The default is `host`: simple public plugins need no container.
-2. For untrusted material the `docker` level is mandatory. A request to "run it without a container" for such material gets a refusal with a reference to this rule.
+1. Choose the level deliberately during adapter setup and record it in the report (meta `isolation_level`). The default is `docker` for any third-party SUT: stars, popularity, or a known author do not lower this bar.
+2. For a third-party SUT the `docker` level is the norm, not a measure reserved for untrusted material. A request to "run it without a container" for such a SUT gets a refusal with a reference to this rule. `host` stays for the pipeline's own self-acceptance or a run where the human explicitly accepted the risk.
 3. **Fail-closed**: when `docker` is chosen but Docker is unavailable, the run stops with an explicit error. There is no silent swap to `host`. A switch happens only when the human edits the level choice, with a new entry in the report.
 4. At either level the SUT session receives no environment of the tester (the env allowlist in the runner is a shared layer).
 

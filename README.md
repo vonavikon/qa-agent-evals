@@ -29,12 +29,12 @@ Three things separate it from running prompts by hand: every card has its expect
 
 The full map (isolation, context hierarchy, responsibility matrix) is in [docs/architecture.md](docs/architecture.md). Interactive version: [docs/architecture.html](docs/architecture.html), every node shows which file or parameter moves it. Open the file locally in a browser. All runs of the project are summed up in the acceptance log: [docs/benchmarks.md](docs/benchmarks.md).
 
-## Execution isolation (v0.5.0)
+## Execution isolation
 
 The tested plugin runs at one of two isolation levels, recorded in every run report:
 
-- **host** (default): no Docker, no extra dependencies. Environment isolation as before: env allowlist, empty MCP, neutral working directory, tamper detector. There is no filesystem or network barrier, and the report honestly marks this level "not a sandbox". Good enough for public plugins from known sources.
-- **docker** (for untrusted material): a container mounting only the work directory and a copy of the plugin, read-only root, non-root user, resource limits; the only way out is an internal proxy container to the LLM gateway. If Docker is unavailable, the run refuses to start (fail-closed), with no silent fallback to the unsafe mode.
+- **host** (no barrier; only for the pipeline's own self-acceptance or when you explicitly accept the risk for this run): no Docker, no extra dependencies. Environment isolation as before: env allowlist, empty MCP, neutral working directory, tamper detector. There is no filesystem or network barrier, and the report honestly marks this level "not a sandbox".
+- **docker** (default for any third-party SUT: container, network only to the LLM gateway, read-only SUT sources; stars or a known author do not lower this bar): mounts only the work directory and a copy of the plugin, read-only root, non-root user, resource limits; the only way out is an internal proxy container to the LLM gateway. If Docker is unavailable, the run refuses to start (fail-closed), with no silent fallback to the unsafe mode.
 
 Verified in live runs against our own examples/evil-plugin (a plugin that never refuses): under docker, reading a host secret, network access, writing outside the workspace, and evidence tampering were all blocked; on host, the same attacks are honestly recorded as level risks. Side finding: gateway server-side tools (web reading) deliver content into a closed network, so they are banned in docker mode.
 
@@ -57,6 +57,7 @@ The pipeline walks steps A-E on its own and stops exactly once, before the card 
 ```
 .claude-plugin/plugin.json    manifest
 skills/acceptance-test/       the five-step pipeline (orchestrator)
+skills/human-report/          the human-facing report (report-human.md)
 agents/analyst.md             SUT profiler
 agents/role-user.md           role-playing actor
 agents/judge.md               two-step judge (pinned to a different model)
@@ -103,9 +104,9 @@ First came four self-acceptance runs (v1-v4, reports in [runs/](runs/2026-10-08-
 
 Then third-party systems: a prose-editing skill (two runs with a version comparison, [runs/](runs/2026-10-11-stop-slop-r2/report.md)), a slide generator with a content-borne injection, a technical-English rewriting skill, the classic 2048 game through the browser adapter (a deterministic non-LLM SUT), and systems from a closed perimeter (details withheld). Those runs grew v0.3-v0.4: the machine fact layer (grep-caught leaks, including SUT-written files), the judge control sample from open datasets (TruthfulQA 45/45; HH-RLHF attacks), the Growing-Golden feedback loop with a clickable markup page, automatic re-judging of self-contradictions, and measured run economics: a typical acceptance run costs $0.6-1.8 on the SUT side plus roughly $0.4 per judge call, because a judge CLI call carries ~75K tokens of session preamble.
 
-v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and infrastructure failures are now separated from plugin defects (BLOCKED/ERROR statuses). v0.5.1 and v0.5.2 hardened it: the gateway key lives only in the proxy container, plugin sources are mounted read-only with an evidence-based write probe, proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy runs as non-root with no capabilities. The security suite (`python scripts/sec-checks.py docker`) is green on Windows and the Linux CI runner (runs/2026-10-13-sec/); an integration test runs the live pipeline with real Claude Code (runs/2026-10-13-secint/). In total: 67 tests: 58 pipeline unit tests and 9 live proxy tests.
+v0.5.0 added execution isolation (host/docker) with live evil-plugin proof, and infrastructure failures are now separated from plugin defects (BLOCKED/ERROR statuses). v0.5.1 and v0.5.2 hardened it: the gateway key lives only in the proxy container, plugin sources are mounted read-only with an evidence-based write probe, proxy path normalization closes /../ traversals, rate/volume/time limits added, and the proxy runs as non-root with no capabilities. The security suite (`python scripts/sec-checks.py docker`) is green on Windows and the Linux CI runner (runs/2026-10-13-sec/); an integration test runs the live pipeline with real Claude Code (runs/2026-10-13-secint/). In total: 73 tests: 64 pipeline unit tests and 9 live proxy tests.
 
-The pipeline's own scripts are checked with mutation testing (mutmut 2.5.1): the tool injects hundreds of small faults into nine modules in `scripts/` and counts how many the unit tests catch. A surviving mutant is a fault no test notices, so this is testing the tests with the same method the pipeline applies elsewhere: seeded defects against the SUT and a golden set against the judge. A full run takes about 40 minutes and is started manually from the Actions tab (the mutation workflow, Run workflow button); the per-module table and the surviving mutants with diffs are uploaded as artifacts.
+The pipeline's own scripts are checked with mutation testing (mutmut 2.5.1): the tool injects hundreds of small faults into nine modules in `scripts/` and counts how many the unit tests catch. A surviving mutant is a fault no test notices, so this is testing the tests with the same method the pipeline applies elsewhere: seeded defects against the SUT and a golden set against the judge. A full run takes about 40 minutes and is started manually from the Actions tab (the mutation workflow, Run workflow button); the per-module table and the surviving mutants with diffs are uploaded as artifacts. The workflow offers a full scope (nine modules) and a quick scope (judge-control, cost-report, check-facts; the default).
 
 Not working yet: only the CLI and browser adapters are implemented; isolation cuts skill invocation but not knowledge of the skills' existence; the judge is wired up manually (explicit `--model` or the owner's choice at step B), because the agent `model` field does not work in every environment.
 

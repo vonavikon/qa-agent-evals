@@ -21,6 +21,8 @@ and siblings) · `docs/architecture.md` (+ interactive
 ## Layout
 
 - `skills/acceptance-test/SKILL.md` — orchestrator instructions, five phases A–E
+- `skills/human-report/SKILL.md`: builds report-human.md for the decision maker
+  (report language follows the language of the run cards)
 - `agents/` — role definitions: analyst, role-user (executor), judge,
   visual-reviewer (marks browser screenshots; judge-blind by design)
 - `knowledge/` — taxonomy (5 card types), adapters and environment isolation,

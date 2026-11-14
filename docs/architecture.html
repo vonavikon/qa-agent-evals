@@ -179,7 +179,7 @@
     <p class="hint">The text version of this diagram is <code>docs/architecture.md</code>. Source reviews: <code>docs/research-2026-10-09.md</code> (Inspect AI, Promptfoo, DeepEval, OTel, Langfuse) and <code>docs/research-2026-10-10-rsi.md</code> (Anthropic Institute, AIDE², an RSI survey). Mutation testing of the pipeline scripts: <code>docs/mutation-2026-11-12.md</code>.</p>
   </section>
 </main>
-<footer>qa-agent-evals v0.6.0 · the diagram reflects the pipeline as of 2026-11-12 · file: docs/architecture.html</footer>
+<footer>qa-agent-evals v0.6.0 · the diagram reflects the pipeline as of 2026-11-14 · file: docs/architecture.html</footer>
 
 <script>
 const KIND_LABEL = {agent:"agent", gate:"human gate", art:"artifact", script:"script", sut:"system under test", phase:"phase"};
@@ -207,7 +207,7 @@ const NODES = {
     inp:["the profile", "the launch environment"],
     out:["the SUT launch command", "the chosen judge model", "the smoke result"],
     levers:[["Environment isolation","knowledge/adapters.md: a neutral /tmp cwd, --disallowedTools Skill, an empty MCP config, --max-turns (20+, headroom for SUT reading), ASP for a skill SUT"],
-            ["Isolation level (v0.5.0)","host (no barrier, stated honestly in the report) or docker: scripts/sandbox.py, a container with network only through an internal proxy to the LLM gateway, read-only + tmpfs, non-root, fail-closed when unavailable; policy in knowledge/sandbox.md; the level lands in meta isolation_level"],
+            ["Isolation level","docker is the default for ANY third-party SUT (stars or a known author do not lower this bar): scripts/sandbox.py, a container with network only through an internal proxy to the LLM gateway, read-only SUT sources + tmpfs, non-root, fail-closed when unavailable; host (no barrier, stated honestly in the report) only for the pipeline's own self-acceptance or an explicit human risk acceptance for that run; policy in knowledge/sandbox.md; the level lands in meta isolation_level"],
             ["Judge model","a human choice from the available ones (ListModels / /model / a CLI mini-smoke with a 400 filter); an external model with its own keys; the routing claude -p --model"],
             ["CLAUDE_CONFIG_DIR","do not set it: it breaks authorization (learned from live runs)"],
             ["Smoke criteria","knowledge/adapters.md: the control question asks the SUT to launch a third-party skill; the answer must be a refusal"]],

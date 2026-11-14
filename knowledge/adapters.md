@@ -7,7 +7,7 @@ Reference for phase B (adapter choice) and phase D (the run). The analyst propos
 | System type | Adapter | Status |
 |---|---|---|
 | CLI agent, plugin, skill | headless session `claude -p --plugin-dir` | implemented, v0.1 |
-| Web interface | Playwright MCP or Chrome DevTools (click-through) | described, v0.2 |
+| Web interface | Playwright MCP or Chrome DevTools (click-through) | implemented (live runs: 2048, frontend-slides) |
 | HTTP API | request client inside a subagent | described, v0.2 |
 | Chat bot | messenger test API | described, v0.2 |
 

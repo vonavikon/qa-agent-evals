@@ -1,6 +1,6 @@
 # qa-agent-evals architecture
 
-How the plugin works: who does what, where the controls are, and why the results can be trusted. Version 0.5.0 (execution isolation: host/docker levels, a container with a network proxy to the LLM gateway, fail-closed. Live runs against evil-plugin and a third-party skill).
+How the plugin works: who does what, where the controls are, and why the results can be trusted. Version 0.6.0 (execution isolation: host/docker levels, a container with a network proxy to the LLM gateway, fail-closed. Live runs against evil-plugin and a third-party skill).
 
 ## Vocabulary
 
@@ -40,7 +40,11 @@ What happens at each step, in words:
 - **B. Connection.** We pick how to start the system, set up isolation (see below), pick the judge model, and run a smoke test: one control question. It shows that the system answers at all and that isolation works. A failed smoke test stops the pipeline.
 - **C. Scenarios.** From the profile we write cards: at least two for each of the five types (obvious, convoluted, critical, adversarial, out-of-scope). Every card carries an oracle. The expectation is fixed before the run and is never edited later.
 - **D. Runs.** Each card runs N times (default 2). First the machine fact check (det layer), then the judge.
-- **E. Reports.** Two documents: a working one (verdict tables for program summaries) and a human one (findings in plain words, with quotes and what the system read).
+- **E. Reports.** Two documents: a working one (verdict tables for program summaries) and a human one (findings in plain words, with quotes and what the system read). The human one is written by the human-report skill (`skills/human-report/`), in the language of the run cards; an explicit request from the human wins.
+
+## Isolation levels
+
+Step B also picks the isolation level of the SUT session, and the choice lands in the report (meta `isolation_level`). The default for any third-party SUT is `docker`: a container with a read-only copy of the SUT, network only through an internal proxy to the LLM gateway, non-root user with resource limits, fail-closed when Docker is unavailable. Stars, popularity, or a known author do not lower this bar. `host` (no filesystem or network barrier, stated honestly in the report) stays for the pipeline's own self-acceptance or a run where the human explicitly accepted the risk. Levels, mounts, and the security checks: [knowledge/sandbox.md](knowledge/sandbox.md).
 
 ## Answer checking: machine first, then judge
 
@@ -91,6 +95,8 @@ Order of work at step D/E: runs → machine check → judge → summary index.
 | `build-index.py` | step E | the machine-readable run summary (index.jsonl): verdicts, repeat votes, machine checks, layer agreement |
 | `collect-feedback.py` | step E (optional) | human feedback: a markup page (--html, clicks instead of yaml), judge agreement with the human, golden candidates (the reference is the human verdict) |
 | `run-integrity.sh` | before and after a run | directory checksums: catches the system tampering with acceptance files |
+
+The unit tests behind these scripts are themselves checked with mutation testing (mutmut 2.5.1) over nine modules of `scripts/`, started manually from the Actions tab: a full scope and a quick scope (judge-control, cost-report, check-facts; the default). The last run and the per-module table: [docs/mutation-2026-11-12.md](docs/mutation-2026-11-12.md).
 
 ## Principles
 
