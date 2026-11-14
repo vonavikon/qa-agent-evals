@@ -54,7 +54,7 @@ The human picks the adapter from the options the analyst proposed. Together with
 
 Run the chosen adapter through a smoke test (knowledge/adapters.md): the SUT answers, the isolation holds, the budget is set. When the smoke fails, fix the adapter. Do not go to phase C.
 
-The isolation level (knowledge/sandbox.md) is a human choice at this step. Record it in the report. The default is host (level 0: no Docker, no filesystem or network barrier, an honest mark in the report). Offer docker mode when you do not trust the material. Examples: a plugin from an unknown source with no history and no stars, closed or corporate code, a request like «проверь, безопасно ли это ставить». Do not force it. Recommend and explain the difference. When the choice is docker but Docker is unavailable, the run does not start (fail-closed). Return an error to the human. Never start it silently without the barrier.
+The isolation level (knowledge/sandbox.md) is a human choice at this step. Record it in the report. The default for any third-party SUT is docker (level 1: container, network only through the proxy, read-only SUT sources). Stars, popularity or a known author do not lower this bar: external code runs in a container whatever its reputation. Host (level 0: no barrier, an honest mark in the report) is allowed only for the pipeline's own self-acceptance or when the human explicitly accepts the risk for this specific run. When the choice is docker but Docker is unavailable, the run does not start (fail-closed). Return an error to the human. Never start it silently without the barrier.
 
 ## Phase C: card generation
 

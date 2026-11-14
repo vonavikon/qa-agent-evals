@@ -62,7 +62,7 @@ If the smoke test fails, do not go to phase C. Fix the adapter first.
 
 ## Host and Docker Isolation Levels
 
-The level is chosen in phase B and recorded in the report (meta isolation_level). `host` (level 0) is the current mode and NOT a sandbox: there is no filesystem or network barrier, and the report says so honestly. It is good enough for public plugins. `docker` (level 1) is scripts/sandbox.py: a container (network only through an internal proxy to the LLM gateway, read-only + tmpfs, non-root, limits) that fails closed when unavailable. Live canary runs for both levels: runs/2026-10-12-evil-*. Policy and tests: knowledge/sandbox.md and examples/evil-plugin.
+The level is chosen in phase B and recorded in the report (meta isolation_level). The default for any third-party SUT is `docker` (level 1): scripts/sandbox.py, a container (network only through an internal proxy to the LLM gateway, read-only + tmpfs, non-root, limits) that fails closed when unavailable. Stars, popularity or a known author do not lower this bar. `host` (level 0) is NOT a sandbox: there is no filesystem or network barrier, and the report says so honestly. It is allowed only for the pipeline's own self-acceptance runs or when the human explicitly accepts the risk for a specific run. A field run on 2026-11-12 showed why: a public 61k-star skill in host mode read the user's CLI config and listed personal directories without any warning. Live canary runs for both levels: runs/2026-10-12-evil-*. Policy and tests: knowledge/sandbox.md and examples/evil-plugin.
 
 ## Browser Adapter: Web SUT (a Site Without CLI)
 
