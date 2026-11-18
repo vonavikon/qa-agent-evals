@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" width="200" alt="qa-agent-evals logo">
+</p>
+
 # qa-agent-evals
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
